@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>KOL Tracker</title>
+    <!-- CSS dùng chung với panel, nạp từ KT.PANEL_CSS trong popup.js -->
+    <style id="kt-shared"></style>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="kt-root">
+      <div class="kt-head">
+        <span class="kt-dot" id="dot"></span>
+        <span class="kt-title">KOL Tracker</span>
+        <span class="kt-spacer"></span>
+        <button class="kt-icon" id="refresh" title="Tải lại từ Sheet">⟳</button>
+      </div>
+
+      <div class="kt-body">
+        <input
+          class="kt-input"
+          id="q"
+          placeholder="Handle, tên, hoặc token…"
+          spellcheck="false"
+          autocomplete="off"
+          autocapitalize="none"
+          autocorrect="off"
+        />
+        <div id="content"></div>
+      </div>
+
+      <div class="kt-foot">
+        <span id="foot"></span>
+        <span class="kt-spacer"></span>
+        <a class="kt-link" id="panel-btn" title="Chèn panel vào tab đang mở">Panel</a>
+        <a class="kt-link" id="diag-btn" title="Chart này vẽ bằng canvas hay DOM?">Chẩn đoán</a>
+        <a class="kt-link" id="opts-btn">Options</a>
+      </div>
+    </div>
+
+    <script src="../src/lib/normalize.js"></script>
+    <script src="../src/lib/csv.js"></script>
+    <script src="../src/lib/tier.js"></script>
+    <script src="../src/lib/stats.js"></script>
+    <script src="../src/lib/model.js"></script>
+    <script src="../src/lib/sheet-url.js"></script>
+    <script src="../src/lib/config.js"></script>
+    <script src="../src/lib/styles.js"></script>
+    <script src="../src/lib/render.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

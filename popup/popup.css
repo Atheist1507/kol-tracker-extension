@@ -1,0 +1,19 @@
+/* Chỉ phần riêng của popup — phần chung nằm trong KT.PANEL_CSS. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 360px;
+  background: #0f1319;
+}
+.kt-root {
+  display: flex;
+  flex-direction: column;
+  max-height: 560px;
+}
+.kt-body {
+  max-height: 460px;
+}
+.kt-head {
+  cursor: default;
+}

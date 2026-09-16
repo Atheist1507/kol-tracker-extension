@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>KOL Tracker — preview</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #05070a;
+        color: #6e7a88;
+        font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 40px;
+      }
+      h1 { color: #e6edf3; font-size: 18px; margin: 0 0 6px; }
+      .fake-chart {
+        margin-top: 24px;
+        height: 260px;
+        border: 1px solid #1d232c;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #0d1117, #0a0d12);
+        position: relative;
+        overflow: hidden;
+      }
+      .fake-chart img {
+        position: absolute;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+      }
+      kbd {
+        background: #161b22; border: 1px solid #262c36; border-radius: 4px;
+        padding: 1px 5px; color: #9ba6b2; font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>KOL Tracker — trang xem thử</h1>
+    <p>
+      Dữ liệu giả, <code>chrome.*</code> giả. Panel và overlay là code THẬT trong
+      <code>content/</code>. Bấm <kbd>Alt</kbd>+<kbd>K</kbd> để bật/tắt panel.
+    </p>
+    <p>
+      Hai avatar dưới đây nằm trong "database" mẫu → phải có viền màu theo tier, hover ra thẻ tóm tắt.
+      Avatar thứ ba là người lạ → không viền.
+    </p>
+
+    <div class="fake-chart" id="chart"></div>
+
+    <script src="../src/lib/normalize.js"></script>
+    <script src="../src/lib/csv.js"></script>
+    <script src="../src/lib/tier.js"></script>
+    <script src="../src/lib/stats.js"></script>
+    <script src="../src/lib/model.js"></script>
+    <script src="../src/lib/sheet-url.js"></script>
+    <script src="../src/lib/config.js"></script>
+    <script src="../src/lib/styles.js"></script>
+    <script src="../src/lib/render.js"></script>
+    <script src="stub.js"></script>
+    <script>
+      // Avatar rải trên "chart" giả — đúng hình dạng mà overlay phải bắt được
+      const chart = document.getElementById("chart");
+      const spots = [
+        { src: globalThis.__KT_SAMPLE__.APE, left: 110, top: 70 },
+        { src: globalThis.__KT_SAMPLE__.MOON, left: 300, top: 150 },
+        { src: "data:image/svg+xml;base64," + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" fill="rgb(60,60,60)"/></svg>'), left: 480, top: 100 },
+      ];
+      for (const s of spots) {
+        const img = document.createElement("img");
+        img.src = s.src;
+        img.style.left = s.left + "px";
+        img.style.top = s.top + "px";
+        chart.appendChild(img);
+      }
+    </script>
+    <script src="../content/overlay.js"></script>
+    <script src="../content/panel.js"></script>
+    <script src="../content/content.js"></script>
+  </body>
+</html>

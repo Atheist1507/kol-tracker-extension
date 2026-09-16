@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KOL Tracker — Cài đặt</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-head">
+        <h1>KOL Tracker</h1>
+        <p class="sub">
+          Dữ liệu nằm ở Google Sheet — extension chỉ đọc. Muốn thêm/sửa KOL thì sửa thẳng trên Sheet,
+          ở đây bấm ⟳ là thấy.
+        </p>
+      </header>
+
+      <section class="card" id="status-card">
+        <div class="row between">
+          <div>
+            <div class="label">Trạng thái</div>
+            <div id="status" class="status">Đang kiểm tra…</div>
+          </div>
+          <button class="btn primary" id="refresh">Tải lại ngay</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>1. Link dữ liệu</h2>
+        <p class="hint">
+          Trên Google Sheet: <b>File → Share → Publish to web</b> → chọn từng tab → định dạng
+          <b>Comma-separated values (.csv)</b> → copy link vào đây. Dán nhầm link <code>/edit</code> cũng được,
+          extension tự đổi (nhưng lúc đó Sheet phải đang bật chia sẻ “Anyone with the link”).
+        </p>
+
+        <label class="field">
+          <span class="label">Tab <b>KOLs</b> (bắt buộc)</span>
+          <input type="url" id="kolsCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=0&single=true&output=csv" />
+          <span class="test" id="kolsCsvUrl-test"></span>
+        </label>
+        <button class="btn" data-test="kolsCsvUrl">Thử link tab KOLs</button>
+
+        <label class="field">
+          <span class="label">Tab <b>Calls</b> (để trống cũng chạy, chỉ là không có track record)</span>
+          <input type="url" id="callsCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=123…&output=csv" />
+          <span class="test" id="callsCsvUrl-test"></span>
+        </label>
+        <button class="btn" data-test="callsCsvUrl">Thử link tab Calls</button>
+
+        <label class="field">
+          <span class="label">Link Sheet để mở nhanh (tuỳ chọn)</span>
+          <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/…/edit" />
+          <span class="hint">Nút “Thêm vào Sheet” trong panel sẽ mở link này khi gặp người lạ.</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>2. Cách tính track record</h2>
+        <div class="grid">
+          <label class="field">
+            <span class="label">Từ x mấy trở lên tính là call thắng</span>
+            <input type="number" id="winMultiple" min="1" step="0.5" />
+          </label>
+          <label class="field">
+            <span class="label">Bao nhiêu case thì win rate mới đáng tin</span>
+            <input type="number" id="minSample" min="1" step="1" />
+          </label>
+        </div>
+        <p class="hint">
+          Cột <code>result</code> đọc được cả “x5”, “5x”, “+300%”, “-70%” lẫn chữ (“đúng”, “sai”, “rug”).
+          Có số thì SỐ quyết định, không có số mới đọc chữ. Dưới x1 = thua, từ ngưỡng trên = thắng,
+          ở giữa = huề. Case không đọc được không tính vào mẫu số của win rate.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>3. Hiển thị</h2>
+        <label class="check"><input type="checkbox" id="panelEnabled" /> <span>Tự mở panel khi vào GMGN (Alt+K để bật/tắt)</span></label>
+        <label class="check"><input type="checkbox" id="overlayRings" /> <span>Viền màu theo tier quanh avatar quen mặt trên trang</span></label>
+        <label class="check"><input type="checkbox" id="overlayHover" /> <span>Hover avatar / tooltip → hiện thẻ tóm tắt</span></label>
+        <div class="grid">
+          <label class="field">
+            <span class="label">Tự tải lại mỗi (phút, 0 = tắt)</span>
+            <input type="number" id="refreshMinutes" min="0" step="5" />
+          </label>
+          <label class="field">
+            <span class="label">Mở GMGN mà dữ liệu cũ hơn (phút) thì tải lại</span>
+            <input type="number" id="staleMinutes" min="0" step="5" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Cấu trúc Sheet</h2>
+        <p class="hint">
+          Dòng đầu mỗi tab là tên cột. Tên tiếng Anh như dưới hoặc tiếng Việt tương đương đều nhận
+          (“Cờ đỏ” = <code>red_flags</code>, “Hạng” = <code>tier</code>…). Cột lạ không bị bỏ đi —
+          vẫn hiện ở cuối thẻ chi tiết.
+        </p>
+        <div class="cols">
+          <div>
+            <div class="label">Tab <b>KOLs</b></div>
+            <code class="block" id="kols-headers"></code>
+            <button class="btn sm" data-copy="kols-headers">Copy dòng tiêu đề</button>
+          </div>
+          <div>
+            <div class="label">Tab <b>Calls</b></div>
+            <code class="block" id="calls-headers"></code>
+            <button class="btn sm" data-copy="calls-headers">Copy dòng tiêu đề</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <span id="saved" class="saved"></span>
+        <span class="spacer"></span>
+        <a class="link" href="https://github.com/Atheist1507/kol-tracker-extension" target="_blank" rel="noopener">README</a>
+      </footer>
+    </main>
+
+    <script src="../src/lib/normalize.js"></script>
+    <script src="../src/lib/csv.js"></script>
+    <script src="../src/lib/tier.js"></script>
+    <script src="../src/lib/stats.js"></script>
+    <script src="../src/lib/model.js"></script>
+    <script src="../src/lib/sheet-url.js"></script>
+    <script src="../src/lib/config.js"></script>
+    <script src="../src/lib/render.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

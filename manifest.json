@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "KOL Tracker",
+  "version": "0.1.0",
+  "description": "Tra cứu tier + track record của KOL/caller ngay trên trang GMGN. Dữ liệu lấy từ Google Sheet dạng CSV.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://docs.google.com/*",
+    "https://*.googleusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "KOL Tracker",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gmgn.ai/*",
+        "https://*.gmgn.ai/*",
+        "https://gmgn.cc/*",
+        "https://*.gmgn.cc/*"
+      ],
+      "js": [
+        "src/lib/normalize.js",
+        "src/lib/csv.js",
+        "src/lib/tier.js",
+        "src/lib/stats.js",
+        "src/lib/model.js",
+        "src/lib/sheet-url.js",
+        "src/lib/config.js",
+        "src/lib/styles.js",
+        "src/lib/render.js",
+        "content/overlay.js",
+        "content/panel.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Alt+K"
+      },
+      "description": "Bật/tắt panel KOL Tracker (tra cả đoạn text đang bôi đen)"
+    }
+  }
+}
