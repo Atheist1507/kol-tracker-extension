@@ -56,3 +56,14 @@
 - **Ghi chú xong thì panel tự về danh sách** (`api.onSaved` → `panel.home()`), và mở panel ra nếu
   nó đang đóng. Ghi chú bằng phím N từ chart là ghi cho MỘT người trong một danh sách nhiều người —
   đứng lại ở màn chi tiết của người vừa ghi là bắt người dùng tự tìm đường lùi.
+- **"Người đang hover" KHÔNG được là state toàn cục.** Từng có `state.hovered` do overlay ghi vào
+  qua `api.setHovered`, và phím N đọc lại. Trên một SPA thì ai cũng ghi vào được: đường dự phòng đọc
+  tooltip chạy theo MutationObserver, nên mỗi lần GMGN vẽ lại một chỗ nào đó có `@handle` quen mặt là
+  biến đó bị ghi đè — N mở mãi một người bất kể chuột ở đâu. Giờ overlay theo dõi `pointermove` và
+  phím N hỏi `overlay.hitAtPointer()`, tức là **hỏi lại con trỏ ngay lúc bấm** (`elementsFromPoint`).
+  Sai người là ghi chú vào nhầm hồ sơ — hỏng im lặng, kiểu tệ nhất; nên khi không chắc thì trả `null`
+  (N không làm gì) chứ đừng đoán.
+- **Thẻ tóm tắt có hai nguồn, hai luật khác nhau** (`cardFromPointer`): mọc từ chính avatar dưới con
+  trỏ thì chỉ còn đúng khi con trỏ VẪN nằm trên đúng avatar đó (rê sang avatar bên cạnh là hết hiệu
+  lực); mọc từ tooltip GMGN thì nó nằm CẠNH avatar chứ không dưới con trỏ, nên chỉ đòi nó trong tầm
+  `NEAR_POINTER_PX`. Gộp hai luật làm một là avatar người lạ sẽ ăn theo thẻ của người vừa hover trước đó.

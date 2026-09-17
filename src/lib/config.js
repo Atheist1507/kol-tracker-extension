@@ -52,6 +52,7 @@
     "src/lib/model.js",
     "src/lib/gmgn.js",
     "src/lib/tooltip-text.js",
+    "src/lib/geom.js",
     "src/lib/sheet-url.js",
     "src/lib/config.js",
     "src/lib/styles.js",
