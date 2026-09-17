@@ -161,7 +161,11 @@
         .join("");
 
       const label = token && token.symbol ? "$" + token.symbol : "token này";
-      const bits = [`${callers.length} người đã post về ${label}`];
+      const posts = callers.reduce((n, c) => n + (c.postCount || 1), 0);
+      const bits = [
+        `${callers.length} người đã post về ${label}` +
+          (posts > callers.length ? ` (${posts} bài)` : ""),
+      ];
       if (known) bits.push(`${known} đã có hồ sơ`);
       if (flagged) bits.push(`${flagged} cờ đỏ`);
 

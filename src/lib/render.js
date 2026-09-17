@@ -139,6 +139,7 @@
     const known = !!person;
     const bits = [];
     if (caller.multiple != null) bits.push(fmtMultiple(caller.multiple));
+    if (caller.postCount > 1) bits.push("hô " + caller.postCount + " lần");
     if (caller.followers != null) bits.push(caller.followers + " follower");
     if (caller.postedTs) bits.push(timeAgo(caller.postedTs));
 
