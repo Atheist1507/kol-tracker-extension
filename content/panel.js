@@ -126,6 +126,38 @@
       el.dot.className = "kt-dot ok";
     }
 
+    /**
+     * Dòng dán thẳng vào tab KOLs của Sheet. Ngăn bằng TAB chứ không phải dấu
+     * phẩy: dán chuỗi có tab vào Google Sheets là nó tự rải ra từng cột, dán
+     * chuỗi có dấu phẩy thì nằm gọn trong một ô.
+     * Thứ tự cột: handle · aliases · avatar_url · tier · description ·
+     * source_found · red_flags · added_by · updated_at
+     */
+    function sheetRow(handle, avatar) {
+      const today = new Date().toISOString().slice(0, 10);
+      return [handle, "", avatar || "", "", "", "GMGN chart", "", "", today].join("\t");
+    }
+
+    function seenHtml() {
+      const seen = api.getSeen ? api.getSeen() : [];
+      if (!seen.length) return "";
+      const rows = seen
+        .map(
+          (u) => `<div class="kt-row" data-act="copy-row"
+              data-handle="${KT.esc(u.handle)}" data-avatar="${KT.esc(u.avatar || "")}">
+            <span class="kt-av">${KT.esc(KT.initials(u.handle))}</span>
+            <span class="kt-grow kt-trunc">
+              <span class="kt-name">@${KT.esc(u.handle)}</span>
+              <span class="kt-sub kt-trunc" style="display:block">bấm để copy dòng dán vào Sheet${
+                u.avatar ? " (kèm avatar)" : ""
+              }</span>
+            </span>
+          </div>`
+        )
+        .join("");
+      return `<div class="kt-sec-title">Vừa thấy trên chart · chưa có trong DB</div>${rows}`;
+    }
+
     function renderEmptyQuery() {
       const { db, cfg } = api.getState();
       if (!db || !db.kols.length) {
@@ -137,6 +169,7 @@
       }
       const top = db.kols.filter((k) => !k.ghost).slice(0, 6);
       el.content.innerHTML =
+        seenHtml() +
         `<div class="kt-sec-title">Hạng cao nhất</div>` +
         top.map((k) => KT.render.rowHtml(k)).join("") +
         `<div class="kt-hint">Alt+K để bật/tắt panel. Bôi đen một cái tên trên trang rồi Alt+K là tra luôn cái đó.</div>` +
@@ -257,6 +290,10 @@
           return rerender();
         }
         if (act === "copy") return copy(actEl.dataset.value || "");
+        if (act === "copy-row") {
+          copy(sheetRow(actEl.dataset.handle, actEl.dataset.avatar));
+          return flashFoot("Đã copy — dán vào ô cột A của tab KOLs");
+        }
         if (act === "open-sheet") {
           const { cfg } = api.getState();
           const url = KT.safeUrl(cfg && cfg.sheetUrl);

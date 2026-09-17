@@ -22,6 +22,10 @@
     getState: () => state,
     refresh: () => chrome.runtime.sendMessage({ type: KT.MSG.REFRESH }).catch((e) => ({ error: String(e) })),
     openOptions: () => chrome.runtime.sendMessage({ type: "kt:openOptions" }).catch(() => {}),
+    getSeen: () => (overlay ? overlay.getSeen() : []),
+    onCapture: () => {
+      if (panel && panel.isOpen()) panel.update();
+    },
     savePos: (pos) => {
       const ui = Object.assign({}, state.ui, pos);
       state.ui = ui;

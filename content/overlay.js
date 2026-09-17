@@ -22,7 +22,18 @@
   const MAX_RINGS = 60; // chart dày đặc thì vẽ hết là giật, cắt ở đây
   const MIN_AVATAR_PX = 12;
   const SCAN_DEBOUNCE_MS = 250;
-  const HANDLE_RE = /@([A-Za-z0-9_]{2,20})/g;
+  const TOOLTIP_DEBOUNCE_MS = 80;
+
+  // Giới hạn khi soi một node vừa xuất hiện. Node đó có thể là cái tooltip
+  // bé tí, mà cũng có thể là cả nửa trang vừa render lại — không chặn thì một
+  // lần GMGN đổi route là quét cả nghìn text node.
+  const MAX_TEXT_NODES = 60;
+  // Một thẻ người chỉ có dăm mẩu chữ (tên, nhãn, @handle, thời gian, nội dung).
+  // Nhiều hơn ngần này = mình đang cầm cả một khối trang, không phải tooltip.
+  const MAX_CARD_CHUNKS = 24;
+  const MAX_TOOLTIP_W = 700; // thẻ neo vào khối to hơn thế = neo nhầm vào cả trang
+  const MAX_TOOLTIP_H = 600;
+  const MAX_SEEN = 20;
 
   function createOverlay(api) {
     const host = document.createElement("div");
@@ -45,7 +56,12 @@
 
     /** img đang được theo dõi → { kol, ring } */
     const tracked = new Map();
+    /** handle thấy trên chart mà chưa có trong Sheet → { handle, avatar, at } */
+    const seenUnknown = new Map();
+    let lastTooltip = null;
     let scanTimer = null;
+    let tooltipTimer = null;
+    let pendingNodes = new Set();
     let rafId = null;
     let running = false;
     let observer = null;
@@ -114,25 +130,98 @@
 
     /* ---------- (b) đường vòng cho chart canvas: đọc tooltip ---------- */
 
+    /**
+     * Gom chữ của một node thành từng MẨU theo text node.
+     *
+     * ⚠ KHÔNG dùng `node.textContent`: nó nối mọi chữ lại KHÔNG có dấu cách.
+     * Tooltip của GMGN in tên hiển thị, nhãn, rồi @handle ở ba element liền
+     * nhau, nên textContent ra "nolifeloserThesis@nolifeloser2dAhaa Only up…"
+     * và regex @handle nuốt luôn phần đuôi thành "@nolifeloser2dAhaa" — tra
+     * không bao giờ trúng, mà cũng chẳng có lỗi nào hiện ra.
+     */
+    function textChunks(node) {
+      if (!node) return [];
+      if (node.nodeType === 3) {
+        const t = (node.nodeValue || "").trim();
+        return t ? [t] : [];
+      }
+      if (node.nodeType !== 1) return [];
+
+      const out = [];
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode()) && out.length < MAX_TEXT_NODES) {
+        const t = (n.nodeValue || "").trim();
+        if (t) out.push(t);
+      }
+      return out;
+    }
+
+    /** Ghi lại hình dạng tooltip gặp gần nhất — diagnose() in ra để còn chỉnh tiếp. */
+    function rememberTooltip(el, chunks, matchedAs, found) {
+      lastTooltip = {
+        tag: el && el.tagName ? el.tagName.toLowerCase() : "?",
+        cls: el ? String(el.className || "").slice(0, 120) : "",
+        chunks: chunks.slice(0, 10),
+        imgs: el && el.querySelectorAll
+          ? Array.from(el.querySelectorAll("img[src]"))
+              .slice(0, 3)
+              .map((i) => (i.currentSrc || i.src).slice(0, 160))
+          : [],
+        matchedAs: matchedAs || null,
+        foundInDb: !!found,
+        at: new Date().toISOString(),
+      };
+    }
+
+    /**
+     * Thấy một handle LẠ trên chart thì nhớ lại (kèm URL avatar bắt được trong
+     * chính tooltip đó). Đây là nửa còn lại của vòng làm việc: thấy người lạ →
+     * panel có sẵn dòng dán thẳng vào Sheet, khỏi phải gõ tay lại cái tên vừa
+     * nhìn thấy rồi đi mò ảnh đại diện.
+     */
+    function captureUnknown(handle, el) {
+      const key = KT.handleKey(handle);
+      if (!key || seenUnknown.has(key)) return;
+
+      let avatar = "";
+      if (el && el.querySelector) {
+        const img = el.querySelector("img[src]");
+        if (img) avatar = img.currentSrc || img.src;
+      }
+      if (/^data:/i.test(avatar)) avatar = ""; // ảnh nhúng thì copy sang Sheet vô nghĩa
+
+      seenUnknown.set(key, { handle, avatar, at: Date.now() });
+      while (seenUnknown.size > MAX_SEEN) seenUnknown.delete(seenUnknown.keys().next().value);
+      if (api.onCapture) api.onCapture();
+    }
+
     /** Tìm handle quen mặt trong chữ của một node vừa xuất hiện. */
     function matchHandleIn(node) {
-      const { db } = api.getState();
-      if (!db) return null;
-      const text = (node.textContent || "").slice(0, 400);
-      if (!text) return null;
+      const chunks = textChunks(node);
+      if (!chunks.length || chunks.length > MAX_CARD_CHUNKS) return null;
 
-      HANDLE_RE.lastIndex = 0;
-      let m;
-      while ((m = HANDLE_RE.exec(text))) {
-        const kol = KT.lookup(db, m[1]);
-        if (kol) return kol;
+      const el = node.nodeType === 1 ? node : node.parentElement;
+      const { db } = api.getState();
+      const { standalone, at, plain } = KT.candidateHandles(chunks);
+
+      for (const c of standalone.concat(at, plain)) {
+        const key = KT.handleKey(c);
+        if (key.length < 2) continue;
+        const kol = db && db.byKey[key];
+        if (kol) {
+          rememberTooltip(el, chunks, c, true);
+          return kol;
+        }
       }
-      // Không có dấu @ thì thử vài từ đầu — tooltip GMGN hay in tên trần
-      const words = text.split(/[\s|·,]+/).slice(0, 6);
-      for (const w of words) {
-        if (w.length < 3) continue;
-        const kol = KT.lookup(db, w);
-        if (kol) return kol;
+
+      if (standalone.length) {
+        rememberTooltip(el, chunks, standalone[0], false);
+        // Ghi vào danh sách "người lạ" CHỈ khi khối này còn có ảnh đại diện —
+        // tức là một thẻ người, không phải một câu văn có nhắc tên ai đó.
+        // Thiếu vế này thì mỗi bài post nhắc "@ai_đó" là một dòng rác.
+        const hasAvatar = el && el.querySelector && el.querySelector("img[src]");
+        if (hasAvatar && db && db.kols.length) captureUnknown(standalone[0], el);
       }
       return null;
     }
@@ -161,10 +250,30 @@
     }
 
     let hideTimer = null;
-    function showCard(kol, anchorRect) {
+    let cardAnchor = null;
+    let cardWatch = null;
+
+    /**
+     * Tooltip của GMGN tự biến mất khi chuột rời đi, mà nó biến mất KHÔNG kèm
+     * sự kiện nào mình nghe được. Không canh thì thẻ của mình ở lại giữa màn
+     * hình sau khi cái nó chú thích đã đi mất.
+     */
+    function watchAnchor() {
+      clearInterval(cardWatch);
+      if (!cardAnchor) return;
+      cardWatch = setInterval(() => {
+        if (!cardAnchor || !cardAnchor.isConnected) return hideCard(0);
+        const r = cardAnchor.getBoundingClientRect();
+        if (!r.width || !r.height) hideCard(0);
+      }, 300);
+    }
+
+    function showCard(kol, anchorRect, anchorNode) {
       const { cfg } = api.getState();
       if (!cfg || !cfg.overlayHover) return;
       clearTimeout(hideTimer);
+      cardAnchor = anchorNode || null;
+      watchAnchor();
       card.innerHTML = cardHtml(kol);
       KT.render.hydrateAvatars(card);
       card.style.display = "block";
@@ -184,6 +293,8 @@
 
     function hideCard(delay) {
       clearTimeout(hideTimer);
+      clearInterval(cardWatch);
+      cardAnchor = null;
       hideTimer = setTimeout(() => {
         card.style.display = "none";
       }, delay == null ? 120 : delay);
@@ -198,7 +309,7 @@
       if (target.tagName === "IMG") {
         const kol = KT.lookupByAvatar(db, target.currentSrc || target.src);
         if (kol) {
-          showCard(kol, target.getBoundingClientRect());
+          showCard(kol, target.getBoundingClientRect(), target);
           return;
         }
       }
@@ -217,25 +328,65 @@
       if (scanTimer == null) scanTimer = setTimeout(scanAll, SCAN_DEBOUNCE_MS);
     }
 
+    function queueTooltip(node) {
+      if (!node || shadow.contains(node)) return;
+      pendingNodes.add(node);
+      if (tooltipTimer == null) tooltipTimer = setTimeout(processTooltipQueue, TOOLTIP_DEBOUNCE_MS);
+    }
+
+    /**
+     * Soi những node vừa xuất hiện/đổi chữ, tìm cái nào là tooltip của một
+     * người mình biết. Gộp một nhịp rồi xử lý một lượt: mở một tooltip là
+     * MutationObserver bắn ra cả chục record.
+     */
+    function processTooltipQueue() {
+      tooltipTimer = null;
+      const nodes = Array.from(pendingNodes).slice(0, 30);
+      pendingNodes.clear();
+
+      for (const node of nodes) {
+        if (!node.isConnected) continue;
+        const kol = matchHandleIn(node);
+        if (!kol) continue;
+
+        const el = node.nodeType === 1 ? node : node.parentElement;
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (!rect.width || !rect.height) continue;
+        // Khối to hơn cỡ một cái tooltip = mình đang neo nhầm vào nguyên trang
+        if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) continue;
+
+        showCard(kol, rect, el);
+        return;
+      }
+    }
+
     function onMutation(records) {
-      const { db, cfg } = api.getState();
-      if (!db) return;
+      const { cfg } = api.getState();
+      const watchText = !!(cfg && cfg.overlayHover);
       let needScan = false;
 
       for (const rec of records) {
-        for (const node of rec.addedNodes) {
-          if (node.nodeType !== 1) continue;
-          if (host.contains(node)) continue;
-          needScan = true;
-
-          // Node nhỏ vừa xuất hiện = ứng viên tooltip. Chỉ đọc CHỮ, không sửa gì.
-          if (cfg && cfg.overlayHover && node.childElementCount <= 12) {
-            const kol = matchHandleIn(node);
-            if (kol) {
-              const rect = node.getBoundingClientRect();
-              if (rect.width && rect.height) showCard(kol, rect);
+        if (rec.type === "characterData") {
+          // GMGN có thể DÙNG LẠI một node tooltip và chỉ thay chữ bên trong —
+          // lúc đó không có addedNodes nào để bắt.
+          // ⚠ KHÔNG queue thẳng parentElement: một text node con trực tiếp của
+          // <body> đổi chữ (SPA đổi giá liên tục) sẽ đẩy cả <body> vào hàng
+          // đợi, rồi mọi "@ai_đó" trên trang bị coi là một thẻ người.
+          // MAX_CARD_CHUNKS chặn ca đó, đây là lớp chặn thứ hai cho rẻ.
+          if (watchText) {
+            const parent = rec.target.parentElement;
+            if (parent && parent !== document.body && parent !== document.documentElement) {
+              queueTooltip(parent);
             }
           }
+          continue;
+        }
+        for (const node of rec.addedNodes) {
+          if (node.nodeType !== 1 && node.nodeType !== 3) continue;
+          if (shadow.contains(node) || host.contains(node)) continue;
+          needScan = true;
+          if (watchText) queueTooltip(node);
         }
         if (rec.removedNodes && rec.removedNodes.length) needScan = true;
       }
@@ -267,6 +418,8 @@
         avatarSamples: small.slice(0, 12).map((i) => (i.currentSrc || i.src).slice(0, 140)),
         matchedInDb: matched.length,
         ringsActive: tracked.size,
+        lastTooltip, // hình dạng tooltip gặp gần nhất — cái quyết định Mức 2 làm được tới đâu
+        unknownSeen: getSeen().map((u) => u.handle),
         verdict: canvases.length && !small.length
           ? "Chart nhiều khả năng vẽ bằng CANVAS — avatar không phải element riêng, phải đi đường tooltip."
           : small.length
@@ -277,14 +430,27 @@
 
     /* ---------- vòng đời ---------- */
 
+    /** Người lạ gặp trên chart, mới nhất trước. */
+    function getSeen() {
+      return Array.from(seenUnknown.values()).sort((a, b) => b.at - a.at);
+    }
+
     return {
       host,
+      getSeen,
+      clearSeen() {
+        seenUnknown.clear();
+      },
       start() {
         if (running) return;
         running = true;
         document.documentElement.appendChild(host);
         observer = new MutationObserver(onMutation);
-        observer.observe(document.documentElement, { childList: true, subtree: true });
+        observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
         document.addEventListener("pointerover", onPointerOver, true);
         window.addEventListener("scroll", schedule, true);
         window.addEventListener("resize", schedule);
@@ -292,6 +458,9 @@
       },
       stop() {
         running = false;
+        clearTimeout(tooltipTimer);
+        tooltipTimer = null;
+        pendingNodes.clear();
         if (observer) observer.disconnect();
         document.removeEventListener("pointerover", onPointerOver, true);
         window.removeEventListener("scroll", schedule, true);

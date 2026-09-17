@@ -110,9 +110,24 @@ hover là hiện note. Có chạy được hay không phụ thuộc GMGN vẽ ma
 2. **Chart vẽ bằng canvas** (nhiều khả năng, kiểu TradingView) → không có element để bám. Đường vòng:
    rình cái tooltip mà GMGN tự hiện khi hover vào avatar, đọc handle trong đó, dán thẻ tóm tắt cạnh bên.
 
+Tooltip của GMGN in **tên hiển thị**, một nhãn, **`@handle`** và nội dung post — mỗi thứ một element.
+Extension đọc theo **từng text node**, không đọc `node.textContent`: `textContent` nối hết chữ lại
+không có dấu cách (`"nolifeloserThesis2d@nolifeloserAhaa Only up…"`) và regex `@handle` sẽ nuốt luôn
+chữ bên cạnh. Có test khoá lại ca này trong `tests/tooltip-text.test.js`.
+
+Tên hiển thị thường **khác** handle. Muốn hover ra thẻ cả khi tooltip chưa kịp hiện dòng `@`, thì bỏ
+tên hiển thị vào cột `aliases`.
+
+**Bắt người lạ**: tooltip nào có `@handle` chưa có trong Sheet thì extension nhớ lại (kèm URL avatar
+lấy ngay trong tooltip đó). Mở panel với ô tìm kiếm trống → mục **"Vừa thấy trên chart · chưa có trong
+DB"**. Bấm một dòng là copy sẵn **một dòng ngăn bằng Tab**, dán vào ô cột A của tab `KOLs` là tự rải
+đúng cột (handle, avatar_url, source_found, updated_at). Đó là nửa còn lại của vòng làm việc: thấy
+người lạ trên chart → có hồ sơ, khỏi gõ tay lại cái tên vừa nhìn thấy.
+
 **Xác định trang GMGN thuộc ca nào**: mở chart, hover vào vùng avatar, bấm icon extension → **Chẩn đoán**.
-Nó đếm canvas/ảnh trên trang, in ra vài URL ảnh mẫu, và copy toàn bộ vào clipboard. Hoặc mở DevTools
-Console trên trang và gõ `__KT.diagnose()`.
+Nó đếm canvas/ảnh trên trang, in ra vài URL ảnh mẫu, **hình dạng tooltip gặp gần nhất** (`lastTooltip`:
+tag, class, từng mẩu chữ, URL ảnh trong đó, khớp được ai không), và copy toàn bộ vào clipboard. Hoặc
+mở DevTools Console trên trang và gõ `__KT.diagnose()`.
 
 Mọi thứ extension vẽ đều nằm trong shadow root riêng, `position: fixed`, `pointer-events: none` —
 **không sửa một node nào trong DOM của GMGN**. Chèn node vào giữa cây của một SPA là cách nhanh nhất
@@ -137,6 +152,7 @@ src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ
   tier.js                    S/A/B/C → chữ cái + màu
   stats.js                   đọc "x5"/"đu đỉnh"/"+300%" → win rate, timing, mốc thời gian
   model.js                   dựng db trong bộ nhớ + tìm kiếm có xếp hạng
+  tooltip-text.js            mẩu chữ trong tooltip → ứng viên handle (chủ thẻ vs tên bị nhắc tới)
   sheet-url.js               link Sheet kiểu gì cũng ra được link CSV
   render.js                  dựng HTML dùng CHUNG cho panel và popup
   styles.js                  CSS dạng chuỗi (shadow DOM phải nhét style bằng JS)
@@ -153,7 +169,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 61 test logic thuần, không cần cài gì
+npm test         # 68 test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```
@@ -172,5 +188,6 @@ trong `src/lib/config.js`; quên một chỗ thì `npm run check` báo đỏ.
 ## 7. Chưa làm
 
 - Chưa publish lên Chrome Web Store (spec nói không cần — share qua repo + "Load unpacked").
-- Overlay Mức 2 mới có khung sẵn cho cả hai ca; phải chạy **Chẩn đoán** trên GMGN thật rồi mới biết
-  phải siết cái nào (xem mục 4).
+- Overlay Mức 2 mới có khung sẵn cho cả hai ca. Đường tooltip đã dựng theo đúng cấu trúc quan sát được
+  trên GMGN (17/09/2026) và có test, nhưng **chưa chạy trên trang thật lần nào** — phải chạy
+  **Chẩn đoán** rồi mới biết còn phải siết chỗ nào (xem mục 4).

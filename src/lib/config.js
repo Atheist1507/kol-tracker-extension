@@ -43,6 +43,7 @@
     "src/lib/tier.js",
     "src/lib/stats.js",
     "src/lib/model.js",
+    "src/lib/tooltip-text.js",
     "src/lib/sheet-url.js",
     "src/lib/config.js",
     "src/lib/styles.js",

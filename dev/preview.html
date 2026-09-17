@@ -47,11 +47,67 @@
 
     <div class="fake-chart" id="chart"></div>
 
+    <p style="margin-top: 20px">
+      Tooltip giả, dựng theo đúng cấu trúc ảnh chụp trang GMGN thật (tên hiển thị, nhãn,
+      <code>@handle</code>, thời gian, nội dung post — mỗi thứ một element, nên
+      <code>textContent</code> nối hết lại không có dấu cách):
+      <button id="tip-known">Tooltip người ĐÃ có trong DB</button>
+      <button id="tip-unknown">Tooltip người LẠ</button>
+      <button id="tip-clear">Đóng tooltip</button>
+    </p>
+
+    <script>
+      // Dựng lại y hệt cây DOM trong ảnh chụp — đây là thứ overlay phải đọc được
+      function fakeTooltip(display, badge, handle, body) {
+        const card = document.createElement("div");
+        card.className = "gmgn-tip";
+        card.style.cssText =
+          "position:fixed;left:120px;top:420px;width:330px;padding:14px;border-radius:14px;" +
+          "background:#0d0d0d;border:1px solid #222;color:#eee;font-size:13px;z-index:10";
+        const head = document.createElement("div");
+        head.style.cssText = "display:flex;align-items:center;gap:8px";
+        const av = document.createElement("img");
+        av.src = globalThis.__KT_SAMPLE__.APE;
+        av.style.cssText = "width:34px;height:34px;border-radius:50%";
+        const name = document.createElement("span");
+        name.textContent = display;
+        name.style.fontWeight = "600";
+        const tag = document.createElement("span");
+        tag.textContent = badge;
+        tag.style.cssText = "font-size:11px;color:#58a6ff;background:#13233a;padding:1px 6px;border-radius:4px";
+        const age = document.createElement("span");
+        age.textContent = "2d";
+        age.style.cssText = "margin-left:auto;color:#f85149;font-size:12px";
+        head.append(av, name, tag, age);
+        const at = document.createElement("div");
+        at.textContent = "@" + handle;
+        at.style.cssText = "color:#8b949e;margin-top:2px";
+        const text = document.createElement("div");
+        text.textContent = body;
+        text.style.marginTop = "10px";
+        card.append(head, at, text);
+        return card;
+      }
+      function clearTip() {
+        document.querySelectorAll(".gmgn-tip").forEach((n) => n.remove());
+      }
+      document.getElementById("tip-known").onclick = () => {
+        clearTip();
+        document.body.appendChild(fakeTooltip("Crypto Ape", "Thesis", "cryptoape", "Ahaa Only up from here stack up!!!!!"));
+      };
+      document.getElementById("tip-unknown").onclick = () => {
+        clearTip();
+        document.body.appendChild(fakeTooltip("nolifeloser", "Thesis", "nolifeloser", "Ahaa Only up from here stack up!!!!!"));
+      };
+      document.getElementById("tip-clear").onclick = clearTip;
+    </script>
+
     <script src="../src/lib/normalize.js"></script>
     <script src="../src/lib/csv.js"></script>
     <script src="../src/lib/tier.js"></script>
     <script src="../src/lib/stats.js"></script>
     <script src="../src/lib/model.js"></script>
+    <script src="../src/lib/tooltip-text.js"></script>
     <script src="../src/lib/sheet-url.js"></script>
     <script src="../src/lib/config.js"></script>
     <script src="../src/lib/styles.js"></script>
