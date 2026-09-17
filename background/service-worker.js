@@ -129,6 +129,43 @@ async function testUrl(rawUrl) {
   }
 }
 
+/**
+ * Thử kết nối tới Apps Script Web App. Trả về đúng lời script nói, để Options
+ * chỉ ra được sai ở đâu: URL, secret, hay chưa chạy setup().
+ */
+async function sheetPing(url, secret) {
+  if (!url) return { ok: false, error: "Chưa có URL Apps Script." };
+  if (!/^https:\/\/script\.google\.com\//i.test(url)) {
+    return { ok: false, error: "Phải là URL /exec của Apps Script (script.google.com)." };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const target =
+      url + (url.includes("?") ? "&" : "?") + "action=ping&secret=" + encodeURIComponent(secret || "");
+    const res = await fetch(target, { signal: controller.signal, cache: "no-store", redirect: "follow" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      // Apps Script trả HTML khi deploy sai chế độ truy cập, hoặc khi URL là
+      // link /edit của trình soạn thảo thay vì link /exec của bản deploy.
+      return {
+        ok: false,
+        error:
+          "Script trả về HTML chứ không phải JSON — nhiều khả năng deploy chưa đặt " +
+          '"Who has access: Anyone", hoặc dán nhầm link trình soạn thảo thay vì link /exec.',
+      };
+    }
+  } catch (err) {
+    if (err.name === "AbortError") return { ok: false, error: "Quá lâu không phản hồi." };
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function refresh() {
   if (!inFlight) {
     inFlight = doRefresh().finally(() => {
@@ -185,6 +222,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === KT.MSG.GET_DATA) {
     KT.getData().then(sendResponse);
+    return true;
+  }
+  if (msg.type === KT.MSG.SHEET_PING) {
+    sheetPing(msg.url, msg.secret).then(sendResponse);
     return true;
   }
   if (msg.type === KT.MSG.TEST_URL) {

@@ -27,7 +27,31 @@
       </section>
 
       <section class="card">
-        <h2>1. Link dữ liệu</h2>
+        <h2>1. Kết nối Sheet</h2>
+        <p class="hint">
+          Dán URL <b>/exec</b> của Apps Script Web App đã deploy, và đúng chuỗi <code>SECRET</code> mày
+          đặt trong file <code>Code.gs</code>. Đây là đường đọc VÀ ghi — có nó thì bấm lưu ghi chú là
+          vào thẳng Sheet. Các bước deploy xem <code>apps-script/README.md</code> trong repo.
+        </p>
+
+        <label class="field">
+          <span class="label">URL Web App (/exec)</span>
+          <input type="url" id="sheetApiUrl" placeholder="https://script.google.com/macros/s/AKfy…/exec" />
+        </label>
+
+        <label class="field">
+          <span class="label">SECRET (giống hệt trong Code.gs)</span>
+          <input type="text" id="sheetApiSecret" placeholder="chuỗi bí mật của riêng bạn" autocomplete="off" spellcheck="false" />
+          <span class="test" id="sheetApi-test"></span>
+        </label>
+        <button class="btn primary" id="sheet-ping">Thử kết nối</button>
+      </section>
+
+      <section class="card">
+        <h2>2. Link CSV (đường cũ, chỉ đọc)</h2>
+        <p class="hint">
+          Chỉ cần khi KHÔNG dùng Apps Script. Đã điền mục 1 thì bỏ qua cả mục này.
+        </p>
         <p class="hint">
           Trên Google Sheet: <b>File → Share → Publish to web</b> → chọn từng tab → định dạng
           <b>Comma-separated values (.csv)</b> → copy link vào đây. Dán nhầm link <code>/edit</code> cũng được,
@@ -56,7 +80,7 @@
       </section>
 
       <section class="card">
-        <h2>2. Cách tính track record</h2>
+        <h2>3. Cách tính track record</h2>
         <div class="grid">
           <label class="field">
             <span class="label">Từ x mấy trở lên tính là call thắng</span>
@@ -75,7 +99,7 @@
       </section>
 
       <section class="card">
-        <h2>3. Hiển thị</h2>
+        <h2>4. Hiển thị</h2>
         <label class="check"><input type="checkbox" id="panelEnabled" /> <span>Tự mở panel khi vào GMGN (Alt+K để bật/tắt)</span></label>
         <label class="check"><input type="checkbox" id="overlayRings" /> <span>Viền màu theo tier quanh avatar quen mặt trên trang</span></label>
         <label class="check"><input type="checkbox" id="overlayHover" /> <span>Hover avatar / tooltip → hiện thẻ tóm tắt</span></label>

@@ -27,6 +27,13 @@
 - **Content script chạy trong mọi frame.** Panel chỉ mount khi `window.top === window`; overlay và
   `refreshIfStale` cũng phải nhớ mình đang ở frame nào, nếu không là n panel chồng nhau và n lời gọi
   fetch cho cùng một bảng.
+- **Khoá của một người là `wallet_address`**, không phải username (đổi được) và TUYỆT ĐỐI không
+  phải `encrypted_user_id`: đo trên trang thật thấy cùng một message trả về ba giá trị khác nhau
+  trong ba lần gọi. Lấy nó làm khoá là mỗi lần mở chart đẻ ra một người mới, im lặng.
+- **Dữ liệu người lấy từ API `community/messages`, không cạo từ DOM.** DOM chỉ còn là đường dự
+  phòng. API trả sẵn danh tính + nội dung post + multiplier + số liệu mua/bán.
+- **Mọi chuỗi ghi vào Sheet phải qua `safeValue_()`** trong Code.gs: chuỗi mở đầu bằng `=` `+` `-`
+  `@` bị Sheets hiểu là công thức. Ô `note` và `post_text` là chữ người gõ tự do.
 - **Mọi phép so khớp handle đi qua `KT.handleKey()`**, đừng `.toLowerCase()` tại chỗ: `@Foo`, `foo`,
   `x.com/Foo`, `Foo ` phải là một người.
 - **Hai danh sách content script** (`manifest.json` và `KT.CONTENT_FILES` trong `src/lib/config.js`)

@@ -21,6 +21,27 @@ Không có bước build, không có `npm install`. Sửa code xong bấm ⟳ �
 
 ## 2. Dựng Google Sheet
 
+Extension nói chuyện với Sheet qua **Apps Script Web App** — một đoạn script sống trong chính file
+Sheet đó, không cần Google Cloud, không cần OAuth. Nó vừa cho extension **đọc**, vừa cho **ghi**
+(gõ ghi chú xong bấm lưu là vào thẳng Sheet).
+
+**Các bước deploy: xem [`apps-script/README.md`](apps-script/README.md).** Chạy hàm `setup()` một
+lần là script tự dựng 2 tab đúng cột, khỏi gõ tay tiêu đề.
+
+| Tab | Một dòng là gì | Khoá |
+|---|---|---|
+| `Overview` | một người | `wallet` — ví thì không đổi tên được, username thì có |
+| `Detail` | một lần ghi chú | `wallet` nối sang Overview |
+
+Cột mày **gõ tay** chỉ có `note` (bên Detail) và `tier` / `summary` / `red_flags` (bên Overview).
+Tất cả phần còn lại — username, tên hiển thị, avatar, link X, nội dung post, giờ post, x mấy, còn
+giữ hay đã xả — extension lấy thẳng từ API của GMGN và tự điền.
+
+<details>
+<summary>Đường cũ: CSV publish-to-web (chỉ đọc, không cần Apps Script)</summary>
+
+
+
 Tạo một Sheet với **2 tab**, dòng đầu mỗi tab là tên cột (copy nguyên dòng dưới, hoặc import file trong
 `sheet-templates/`):
 
@@ -72,6 +93,8 @@ nhiêu dòng và nhận ra những cột nào.
 
 > Dán nhầm link `/edit` cũng không sao — extension tự đổi sang link export CSV, nhưng lúc đó Sheet
 > phải đang bật chia sẻ *"Anyone with the link"*.
+
+</details>
 
 > ⚠ Link publish-to-web thì **ai có link cũng đọc được** (không cần đăng nhập, nhưng Google không đưa
 > nó lên kết quả tìm kiếm). Dữ liệu KOL không nhạy cảm nên chấp nhận được. Cần chặt hơn thì đổi sang
@@ -152,6 +175,8 @@ content/panel.js           Mức 1 — panel nổi (shadow DOM, kéo thả, tìm
 content/overlay.js         Mức 2 — viền tier quanh avatar + thẻ hover + hàm chẩn đoán canvas/DOM
 popup/                     Bản rút gọn của panel, dùng được ở mọi trang
 options/                   Cấu hình: 2 link CSV, ngưỡng win rate, bật/tắt overlay
+apps-script/Code.gs        Sống TRONG file Sheet: doGet trả JSON cho extension đọc, doPost nhận
+                           một lần ghi chú → thêm dòng Detail + tạo/cập nhật dòng Overview
 src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ config.js):
   normalize.js               bỏ dấu, quy handle/token/URL avatar về khoá so khớp
   csv.js                     parser CSV (RFC 4180) + map tên cột Việt/Anh → khoá chuẩn
@@ -159,6 +184,8 @@ src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ
   stats.js                   đọc "x5"/"đu đỉnh"/"+300%" → win rate, timing, mốc thời gian
   model.js                   dựng db trong bộ nhớ + tìm kiếm có xếp hạng
   tooltip-text.js            mẩu chữ trong tooltip → ứng viên handle (chủ thẻ vs tên bị nhắc tới)
+  gmgn.js                    đọc API community/messages của GMGN: danh tính, nội dung post, x mấy,
+                             và "mua thật hay hô xong xả sạch"
   sheet-url.js               link Sheet kiểu gì cũng ra được link CSV
   render.js                  dựng HTML dùng CHUNG cho panel và popup
   styles.js                  CSS dạng chuỗi (shadow DOM phải nhét style bằng JS)
@@ -175,7 +202,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 73 test logic thuần, không cần cài gì
+npm test         # 88 test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```

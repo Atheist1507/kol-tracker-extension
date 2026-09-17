@@ -4,6 +4,10 @@
   const KT = (root.KT = root.KT || {});
 
   const DEFAULTS = {
+    // Apps Script Web App — đường ĐỌC và GHI chính (xem apps-script/README.md)
+    sheetApiUrl: "",
+    sheetApiSecret: "",
+    // CSV publish-to-web — đường đọc cũ, chỉ đọc, giữ làm dự phòng
     kolsCsvUrl: "",
     callsCsvUrl: "",
     sheetUrl: "", // link /edit để bấm "Mở Sheet" khi cần thêm người mới
@@ -29,6 +33,7 @@
     DATA_CHANGED: "kt:dataChanged",
     DIAGNOSE: "kt:diagnose", // popup hỏi content script: chart này canvas hay DOM?
     TEST_URL: "kt:testUrl", // Options thử một link CSV trước khi lưu
+    SHEET_PING: "kt:sheetPing", // Options thử kết nối Apps Script
   };
 
   /**

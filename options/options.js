@@ -6,7 +6,7 @@
   "use strict";
   const KT = globalThis.KT;
 
-  const TEXT_FIELDS = ["kolsCsvUrl", "callsCsvUrl", "sheetUrl"];
+  const TEXT_FIELDS = ["sheetApiUrl", "sheetApiSecret", "kolsCsvUrl", "callsCsvUrl", "sheetUrl"];
   const NUMBER_FIELDS = ["winMultiple", "minSample", "refreshMinutes", "staleMinutes"];
   const BOOL_FIELDS = ["panelEnabled", "overlayRings", "overlayHover"];
 
@@ -105,6 +105,35 @@
       if (res.warning) bits.push("⚠ " + res.warning);
       out.textContent = bits.join(" · ");
     });
+  });
+
+  /* ---------- thử kết nối Apps Script ---------- */
+
+  $("sheet-ping").addEventListener("click", async () => {
+    const out = $("sheetApi-test");
+    out.className = "test";
+    out.textContent = "Đang thử…";
+
+    const res = await chrome.runtime.sendMessage({
+      type: KT.MSG.SHEET_PING,
+      url: $("sheetApiUrl").value.trim(),
+      secret: $("sheetApiSecret").value.trim(),
+    });
+
+    if (!res || !res.ok) {
+      out.className = "test err";
+      out.textContent = "✕ " + ((res && res.error) || "không gọi được service worker");
+      return;
+    }
+    if (!res.hasOverview || !res.hasDetail) {
+      out.className = "test warn";
+      out.textContent =
+        "Kết nối được, nhưng Sheet chưa có đủ 2 tab. Mở Apps Script chạy hàm setup() một lần.";
+      return;
+    }
+    out.className = "test ok";
+    out.textContent =
+      `✓ Đã nối "${res.sheet}" · Overview ${res.overviewRows} dòng · Detail ${res.detailRows} dòng`;
   });
 
   /* ---------- copy tiêu đề ---------- */
