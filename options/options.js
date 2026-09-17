@@ -53,9 +53,16 @@
     flashSaved.t = setTimeout(() => (el.textContent = ""), 1500);
   }
 
+  /** Ký tự vô hình hay đi lạc vào lúc copy-paste, mà nhìn thì không thấy gì. */
+  function cleanText(value) {
+    return String(value)
+      .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
+      .trim();
+  }
+
   function collect() {
     const patch = {};
-    for (const key of TEXT_FIELDS) patch[key] = $(key).value.trim();
+    for (const key of TEXT_FIELDS) patch[key] = cleanText($(key).value);
     for (const key of NUMBER_FIELDS) {
       const n = parseFloat($(key).value);
       patch[key] = Number.isFinite(n) ? n : KT.DEFAULTS[key];
@@ -117,15 +124,22 @@
     out.className = "test";
     out.textContent = "Đang thử…";
 
+    const secret = $("sheetApiSecret").value.trim();
     const res = await chrome.runtime.sendMessage({
       type: KT.MSG.SHEET_PING,
       url: $("sheetApiUrl").value.trim(),
-      secret: $("sheetApiSecret").value.trim(),
+      secret,
     });
 
     if (!res || !res.ok) {
       out.className = "test err";
-      out.textContent = "✕ " + ((res && res.error) || "không gọi được service worker");
+      let msg = (res && res.error) || "không gọi được service worker";
+      // "sai secret" là lỗi mù nhất trong đám: hai chuỗi lệch một ký tự thì
+      // nhìn bằng mắt y hệt nhau. Nói ra độ dài để còn so được với Code.gs.
+      if (/secret/i.test(msg)) {
+        msg += ` — extension gửi chuỗi ${secret.length} ký tự. Đếm lại chuỗi trong Code.gs xem có đúng bấy nhiêu không.`;
+      }
+      out.textContent = "✕ " + msg;
       return;
     }
     if (!res.hasOverview || !res.hasDetail) {
