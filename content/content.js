@@ -24,7 +24,9 @@
     db: null,
     callers: [], // người đang hiện trên chart (từ API GMGN)
     token: null, // { symbol, address, chain }
-    hovered: null, // { caller, person } — để phím N biết đang nói về ai
+    // KHÔNG giữ "người đang hover" ở đây nữa: state toàn cục thì mutation nào
+    // của GMGN cũng ghi vào được, và phím N mở mãi một người. Overlay hỏi
+    // thẳng con trỏ — xem overlay.hitAtPointer().
     ui: {},
   };
 
@@ -71,11 +73,6 @@
     savePos: (pos) => {
       state.ui = Object.assign({}, state.ui, pos);
       chrome.storage.local.set({ [KT.STORAGE.UI]: state.ui });
-    },
-
-    /** Overlay báo "chuột đang ở trên người này" → phím N dùng lại. */
-    setHovered: (hit, rect) => {
-      state.hovered = hit ? Object.assign({}, hit, { rect: rect || null }) : null;
     },
 
     openNote: (hit, rect) => {
@@ -196,9 +193,10 @@
     // né mọi ô nhập của GMGN — bằng không gõ chữ "n" trong ô tìm kiếm của họ
     // là bật hộp note.
     if (key === "n" && !ev.altKey && !ev.shiftKey && !isTyping(ev.target)) {
-      if (!state.hovered) return;
+      const hit = overlay && overlay.hitAtPointer();
+      if (!hit) return;
       ev.preventDefault();
-      api.openNote(state.hovered, state.hovered.rect);
+      api.openNote(hit, hit.rect);
     }
   }
 
@@ -262,8 +260,10 @@
     if (msg.type === KT.MSG.DIAGNOSE) {
       if (!isTop) return;
       const base = overlay ? overlay.diagnose() : { error: "overlay chưa chạy" };
+      const under = overlay && overlay.hitAtPointer();
       sendResponse(
         Object.assign(base, {
+          underPointer: under ? under.person.username || under.person.wallet : null,
           callers: state.callers.length,
           token: state.token,
           sheetPeople: state.db ? state.db.counts.people : 0,

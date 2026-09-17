@@ -26,6 +26,13 @@
   const MAX_TOOLTIP_W = 700;
   const MAX_TOOLTIP_H = 600;
 
+  // Tooltip của GMGN mọc CẠNH avatar chứ không đè lên, nên "thứ người ta đang
+  // trỏ vào" phải nới ra quanh con trỏ chứ không chỉ là ô dưới mũi tên.
+  const NEAR_POINTER_PX = 240;
+  // Con trỏ đứng yên quá lâu thì thôi coi như không còn hover gì: chuột rời
+  // khỏi cửa sổ không phải lúc nào cũng bắn pointerout mình nghe được.
+  const POINTER_TTL_MS = 15000;
+
   function createOverlay(api) {
     const host = document.createElement("div");
     host.id = "kol-tracker-overlay";
@@ -54,6 +61,7 @@
     let rafId = null;
     let running = false;
     let observer = null;
+    let pointer = null; // { x, y, t } — vị trí chuột thật, cập nhật mỗi pointermove
 
     /* ---------- viền quanh avatar ---------- */
 
@@ -213,7 +221,18 @@
 
     let hideTimer = null;
     let cardAnchor = null;
+    let cardHit = null;
+    let cardFromPointer = false; // thẻ mọc từ chính avatar dưới con trỏ, hay từ tooltip cạnh nó
     let cardWatch = null;
+
+    function pointerFresh() {
+      return !!pointer && Date.now() - pointer.t < POINTER_TTL_MS;
+    }
+
+    /** Ô này có nằm trong tầm với của con trỏ ngay lúc này không? */
+    function nearPointer(rect) {
+      return pointerFresh() && KT.nearRect(pointer.x, pointer.y, rect, NEAR_POINTER_PX);
+    }
 
     /**
      * Tooltip của GMGN biến mất mà không bắn sự kiện nào mình nghe được.
@@ -230,10 +249,20 @@
       }, 300);
     }
 
-    function showCard(hit, anchorRect, anchorNode) {
+    function showCard(hit, anchorRect, anchorNode, fromPointer) {
       const { cfg } = api.getState();
-      api.setHovered(hit, anchorRect);
-      if (!cfg || !cfg.overlayHover) return;
+      // Thẻ này chú thích cho thứ con trỏ đang chỉ vào. Nhớ lại để phím N có
+      // đường dự phòng khi avatar dưới con trỏ không phải <img> so khớp được
+      // — nhưng KHÔNG ghi đè state toàn cục nào nữa: trước đây mọi node SPA
+      // vừa đổi mà có @handle quen mặt đều tự xưng là "người đang hover", nên
+      // N mở mãi một người bất kể chuột ở đâu.
+      cardHit = hit;
+      cardFromPointer = !!fromPointer;
+      if (!cfg || !cfg.overlayHover) {
+        cardAnchor = anchorNode || null;
+        watchAnchor();
+        return;
+      }
 
       clearTimeout(hideTimer);
       cardAnchor = anchorNode || null;
@@ -259,9 +288,59 @@
       clearTimeout(hideTimer);
       clearInterval(cardWatch);
       cardAnchor = null;
+      cardHit = null;
+      cardFromPointer = false;
       hideTimer = setTimeout(() => {
         card.style.display = "none";
       }, delay == null ? 120 : delay);
+    }
+
+    function onPointerMove(ev) {
+      pointer = { x: ev.clientX, y: ev.clientY, t: Date.now() };
+      // Tooltip của GMGN tự biến mất không báo; thẻ của mình thì phải tự biết
+      // rời đi khi con trỏ đã đi khỏi thứ nó đang chú thích.
+      if (cardAnchor && cardAnchor.isConnected && !nearPointer(cardAnchor.getBoundingClientRect())) {
+        hideCard(0);
+      }
+    }
+
+    /**
+     * Ai đang nằm dưới con trỏ NGAY LÚC NÀY.
+     *
+     * Phím N hỏi hàm này chứ không đọc một biến "người đang hover" nhớ sẵn:
+     * biến nhớ sẵn thì ai ghi vào cũng được, mà trên một SPA thì "ai" là bất
+     * kỳ mutation nào.
+     */
+    function hitAtPointer() {
+      if (!pointerFresh()) return null;
+
+      let els = [];
+      try {
+        els = document.elementsFromPoint(pointer.x, pointer.y) || [];
+      } catch (e) {
+        els = [];
+      }
+      for (const el of els) {
+        if (!el || el.tagName !== "IMG") continue;
+        const hit = api.identifyByAvatar(el.currentSrc || el.src);
+        if (hit) return Object.assign({}, hit, { rect: el.getBoundingClientRect() });
+      }
+
+      if (!cardHit || !cardAnchor || !cardAnchor.isConnected) return null;
+      const r = cardAnchor.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+
+      // Thẻ mọc từ chính một avatar: chỉ còn đúng khi con trỏ VẪN ở trên đúng
+      // avatar đó. Rê sang avatar bên cạnh mà vẫn trả lời người cũ là ghi chú
+      // vào nhầm hồ sơ — hỏng im lặng, kiểu tệ nhất.
+      if (cardFromPointer) {
+        return els.indexOf(cardAnchor) >= 0 ? Object.assign({}, cardHit, { rect: r }) : null;
+      }
+
+      // Thẻ mọc từ tooltip GMGN (đọc bằng chữ) thì nó nằm CẠNH avatar chứ
+      // không dưới con trỏ — đây là đường duy nhất cho avatar mình không so
+      // khớp được URL, nên chỉ đòi nó ở trong tầm với.
+      return nearPointer(r) ? Object.assign({}, cardHit, { rect: r }) : null;
     }
 
     function onPointerOver(ev) {
@@ -270,7 +349,7 @@
       if (target.tagName !== "IMG") return;
 
       const hit = api.identifyByAvatar(target.currentSrc || target.src);
-      if (hit) showCard(hit, target.getBoundingClientRect(), target);
+      if (hit) showCard(hit, target.getBoundingClientRect(), target, true);
     }
 
     /* ---------- quét ---------- */
@@ -306,6 +385,9 @@
         const rect = el.getBoundingClientRect();
         if (!rect.width || !rect.height) continue;
         if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) continue;
+        // Không ở cạnh con trỏ thì đó không phải tooltip người ta gọi ra —
+        // chỉ là SPA vừa vẽ lại một chỗ nào đó có tên người quen.
+        if (!nearPointer(rect)) continue;
 
         showCard(hit, rect, el);
         return;
@@ -368,6 +450,7 @@
     return {
       host,
       diagnose,
+      hitAtPointer,
       isRunning: () => running,
       start() {
         if (running) return;
@@ -380,6 +463,7 @@
           characterData: true,
         });
         document.addEventListener("pointerover", onPointerOver, true);
+        document.addEventListener("pointermove", onPointerMove, { capture: true, passive: true });
         window.addEventListener("scroll", schedule, true);
         window.addEventListener("resize", schedule);
         queueScan();
@@ -391,6 +475,8 @@
         pendingNodes.clear();
         if (observer) observer.disconnect();
         document.removeEventListener("pointerover", onPointerOver, true);
+        document.removeEventListener("pointermove", onPointerMove, true);
+        pointer = null;
         window.removeEventListener("scroll", schedule, true);
         window.removeEventListener("resize", schedule);
         for (const img of Array.from(tracked.keys())) untrack(img);
