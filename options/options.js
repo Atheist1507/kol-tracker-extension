@@ -33,6 +33,9 @@
 
   const $ = (id) => document.getElementById(id);
 
+  const manifest = chrome.runtime.getManifest();
+  $("ver").textContent = "v" + manifest.version;
+
   document.getElementById("kols-headers").textContent = KOL_HEADERS.join(",");
   document.getElementById("calls-headers").textContent = CALL_HEADERS.join(",");
 

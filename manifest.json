@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KOL Tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tra cứu tier + track record của KOL/caller ngay trên trang GMGN. Dữ liệu lấy từ Google Sheet dạng CSV.",
   "permissions": [
     "storage",

@@ -87,3 +87,15 @@ input[type="number"] { max-width: 160px; }
 @media (max-width: 560px) {
   .grid, .cols { grid-template-columns: 1fr; }
 }
+
+/* Số hiệu bản đang chạy — để liếc một cái là biết bản vừa cài đã ăn chưa.
+   Extension cài kiểu unpacked không tự cập nhật, mà Mac thì bấm đúp zip là
+   tạo thư mục mới chứ không đè, nên rất dễ tưởng đã lên bản mới. */
+.ver {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-subtle);
+  letter-spacing: .04em;
+  vertical-align: middle;
+  margin-left: 6px;
+}
