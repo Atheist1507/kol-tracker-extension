@@ -26,6 +26,8 @@
       <div class="kt-panel">
         <div class="kt-head">
           <span class="kt-dot" data-el="dot"></span>
+          <button class="kt-icon" data-el="back" data-act="back" title="Về danh sách (Esc)"
+                  style="display:none">←</button>
           <span class="kt-title">KOL Tracker</span>
           <span class="kt-spacer"></span>
           <button class="kt-icon" data-act="refresh" title="Tải lại từ Sheet">⟳</button>
@@ -45,6 +47,7 @@
       panel: wrap.querySelector(".kt-panel"),
       head: wrap.querySelector(".kt-head"),
       dot: wrap.querySelector('[data-el="dot"]'),
+      back: wrap.querySelector('[data-el="back"]'),
       body: wrap.querySelector('[data-el="body"]'),
       input: wrap.querySelector('[data-el="input"]'),
       content: wrap.querySelector('[data-el="content"]'),
@@ -92,6 +95,15 @@
     }
 
     /* ---------- vẽ ---------- */
+
+    /**
+     * Nút ← sống trong thanh tiêu đề chứ không nằm giữa thân panel: đang ở màn
+     * chi tiết mà cuộn xuống đọc ghi chú là nút trong thân trôi khỏi tầm mắt,
+     * không còn đường nào nhìn thấy để quay ra danh sách.
+     */
+    function syncBackBtn() {
+      if (el.back) el.back.style.display = detailRef || el.input.value.trim() ? "" : "none";
+    }
 
     function rows() {
       return Array.from(el.content.querySelectorAll(".kt-row"));
@@ -173,6 +185,7 @@
           el.content.innerHTML += `<div class="kt-hint">Chưa nối Sheet nên chưa biết ai là ai. Options → Kết nối Sheet.</div>`;
         }
         KT.render.hydrateAvatars(el.content);
+        syncBackBtn();
         return;
       }
 
@@ -185,6 +198,7 @@
           callers.length ? "" : " (chưa thấy ai — mở một chart có người post)"
         }</div>`;
       KT.render.hydrateAvatars(el.content);
+      syncBackBtn();
     }
 
     function renderSearch(query) {
@@ -194,10 +208,12 @@
       const hits = KT.search(db, query, 10);
       if (!hits.length) {
         el.content.innerHTML = `<div class="kt-empty">Không có ai khớp <b>${KT.esc(query)}</b>.</div>`;
+        syncBackBtn();
         return;
       }
       el.content.innerHTML = `<div class="kt-sec-title">Kết quả</div>` + KT.render.resultsHtml(hits);
       KT.render.hydrateAvatars(el.content);
+      syncBackBtn();
       setActive(0);
     }
 
@@ -214,6 +230,7 @@
         noteLimit: 8,
       });
       KT.render.hydrateAvatars(el.content);
+      syncBackBtn();
       el.body.scrollTop = 0;
     }
 
@@ -225,6 +242,14 @@
         renderSearch(q);
       } else renderHome();
       renderFoot();
+    }
+
+    /** Về đúng màn hình ban đầu: danh sách người đang trên chart. */
+    function goHome() {
+      detailRef = null;
+      el.input.value = "";
+      rerender();
+      el.body.scrollTop = 0;
     }
 
     /* ---------- tương tác ---------- */
@@ -269,11 +294,7 @@
           if (url) window.open(url, "_blank", "noopener");
           return;
         }
-        if (act === "back") {
-          detailRef = null;
-          el.input.value = "";
-          return rerender();
-        }
+        if (act === "back") return goHome();
         if (act === "note") {
           const hit = api.identify(detailRef);
           if (hit) api.openNote(hit, host.getBoundingClientRect());
@@ -319,13 +340,21 @@
         }
       } else if (ev.key === "Escape") {
         ev.preventDefault();
-        if (detailRef || el.input.value) {
-          detailRef = null;
-          el.input.value = "";
-          rerender();
-        } else hide();
+        if (detailRef || el.input.value) goHome();
+        else hide();
       }
       ev.stopPropagation(); // đừng để phím tắt của GMGN cướp mất
+    });
+
+    // Ô tìm kiếm tự lo phím của nó; đây là cho lúc con trỏ đang ở chỗ khác
+    // trong panel (vừa bấm một nút, vừa cuộn danh sách ghi chú).
+    wrap.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      if (ev.target === el.input) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (detailRef || el.input.value) goHome();
+      else hide();
     });
 
     el.head.addEventListener("pointerdown", startDrag);
@@ -375,6 +404,7 @@
       hide,
       isOpen: () => open,
       update: rerender,
+      home: goHome,
       flash,
     };
   }
