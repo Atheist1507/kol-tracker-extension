@@ -99,7 +99,17 @@
     onSaved: () => {
       // Sheet đã nhận; kéo lại dữ liệu để panel hiện ngay ghi chú vừa lưu
       api.refresh();
-      if (panel) panel.flash("Đã lưu vào Sheet");
+      if (!panel) return;
+      // Ghi chú xong là xong một người — chỗ muốn tới tiếp theo luôn là DANH
+      // SÁCH để chọn người kế, không phải đứng lại ở màn chi tiết của người
+      // vừa ghi. Panel đang đóng (ghi chú bằng phím N từ chart) thì mở ra,
+      // vì đó cũng là cách nhìn thấy ghi chú vừa lưu đã vào Sheet thật.
+      if (!panel.isOpen()) {
+        panel.show();
+        api.savePos({ open: true });
+      }
+      panel.home();
+      panel.flash("Đã lưu vào Sheet");
     },
   };
 
