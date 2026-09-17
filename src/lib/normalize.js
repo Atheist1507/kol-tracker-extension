@@ -106,7 +106,13 @@
     if (!s) return "";
     s = s.split("#")[0].split("?")[0];
     s = s.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
-    s = s.replace(/_(normal|bigger|mini|reasonably_small|\d+x\d+|x\d+)(\.[a-z]{3,4})$/i, "$2");
+    // Hậu tố cỡ ảnh. Ngoài bộ của Twitter còn có bộ của bucket ảnh mà GMGN
+    // đang dùng (prod-fomo-profile-pics…/<hash>_small.jpg — thấy trong HTML
+    // tooltip thật 17/09/2026): cùng một người, hai cỡ, hai URL khác nhau.
+    s = s.replace(
+      /_(normal|bigger|mini|reasonably_small|small|medium|large|big|thumb|thumbnail|orig|original|square|\d+x\d+|x\d+)(\.[a-z]{3,4})$/i,
+      "$2"
+    );
     return s.toLowerCase();
   }
 

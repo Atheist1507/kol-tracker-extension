@@ -82,3 +82,12 @@ test("proxy lồng proxy vẫn về tới URL trong cùng", () => {
   const l2 = "https://gmgn.ai/external/img?url=" + encodeURIComponent(l1);
   assert.strictEqual(KT.avatarKey(l2), KT.avatarKey(goc));
 });
+
+// URL thật lấy từ tooltip GMGN (17/09/2026): ảnh KHÔNG nằm ở pbs.twimg.com mà
+// ở bucket riêng, và hậu tố cỡ ảnh là "_small" chứ không phải "_normal".
+test("hậu tố cỡ ảnh của bucket GMGN đang dùng", () => {
+  const base = "https://prod-fomo-profile-pics.s3.amazonaws.com/d98b47e147219beacb43a82e189ea285";
+  const k = KT.avatarKey(base + "_small.jpg");
+  assert.strictEqual(KT.avatarKey(base + "_large.jpg"), k);
+  assert.strictEqual(KT.avatarKey(base + ".jpg"), k);
+});

@@ -152,6 +152,7 @@
     globalThis.__KT = {
       state,
       diagnose: () => overlay.diagnose(),
+      seen: () => overlay.getSeen(),
       lookup: (q) => KT.lookup(state.db, q),
       panel,
     };

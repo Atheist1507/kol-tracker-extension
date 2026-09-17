@@ -53,6 +53,7 @@
       <code>textContent</code> nối hết lại không có dấu cách):
       <button id="tip-known">Tooltip người ĐÃ có trong DB</button>
       <button id="tip-unknown">Tooltip người LẠ</button>
+      <button id="tip-real">Tooltip THẬT (HTML copy từ GMGN)</button>
       <button id="tip-clear">Đóng tooltip</button>
     </p>
 
@@ -98,6 +99,29 @@
       document.getElementById("tip-unknown").onclick = () => {
         clearTip();
         document.body.appendChild(fakeTooltip("nolifeloser", "Thesis", "nolifeloser", "Ahaa Only up from here stack up!!!!!"));
+      };
+      // HTML copy nguyên văn từ trang GMGN thật (17/09/2026). Giữ y nguyên —
+      // đây là cái duy nhất chứng minh overlay đọc được markup THẬT chứ không
+      // phải chỉ đọc được cái markup do chính mình dựng ra.
+      const REAL_TOOLTIP_HTML =
+        '<div class="border-b border-solid border-line-50 p-12px"><div class="flex items-start gap-12px">' +
+        '<span class="pi-avatar pi-avatar-circle pi-avatar-image flex-shrink-0" style="width: 44px; height: 44px; line-height: 44px; font-size: 18px;">' +
+        '<img src="https://prod-fomo-profile-pics.s3.amazonaws.com/d98b47e147219beacb43a82e189ea285_small.jpg"></span>' +
+        '<div class="flex-1 min-w-0 flex flex-col gap-2px pt-2px"><div class="flex items-center justify-between gap-12px">' +
+        '<div class="flex items-center gap-4px min-w-0"><span class="text-text-100 leading-[20px] truncate">nolifeloser</span>' +
+        '<div class="w-fit h-[16px] shrink-0 rounded-4px py-px px-1 text-sm leading-[16px] font-normal flex items-center gap-1" ' +
+        'style="color: rgb(81, 106, 246); background-color: rgba(81, 106, 246, 0.2);">Thesis</div></div>' +
+        '<span class="flex-shrink-0" style="color: rgb(222, 87, 89);">' +
+        '<div class="text-[13px] leading-[16px]" style="transform: translate(0px, 0px);">2d </div></span></div>' +
+        '<span class="text-text-200 text-[13px] leading-[16px] truncate">@nolifeloser</span></div></div></div>';
+
+      document.getElementById("tip-real").onclick = () => {
+        clearTip();
+        const wrap = document.createElement("div");
+        wrap.className = "gmgn-tip";
+        wrap.style.cssText = "position:fixed;left:120px;top:560px;width:330px;background:#0d0d0d;border:1px solid #222;color:#eee;z-index:10";
+        wrap.innerHTML = REAL_TOOLTIP_HTML;
+        document.body.appendChild(wrap);
       };
       document.getElementById("tip-clear").onclick = clearTip;
     </script>
