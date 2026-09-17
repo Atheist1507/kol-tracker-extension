@@ -22,6 +22,24 @@ const FETCH_TIMEOUT_MS = 20000;
 const SHEET_TIMEOUT_MS = 45000;
 const ALARM = "kt-refresh";
 
+/**
+ * Mã HTTP trần không nói được gì với người dùng. Ba mã dưới đây là ba tình
+ * huống khác hẳn nhau, mà cách sửa cũng khác hẳn nhau.
+ */
+function httpHint(status) {
+  if (status === 404) {
+    return "HTTP 404 — không có bản deploy nào ở URL này. Vào Apps Script → Deploy → Manage deployments, copy lại URL Web app.";
+  }
+  if (status === 403) {
+    return 'HTTP 403 — bản deploy không cho gọi. Manage deployments → ✏️ → "Who has access" phải là Anyone.';
+  }
+  if (status === 401) {
+    return "HTTP 401 — Google đòi đăng nhập. Deploy đang để \"Anyone with Google account\" thay vì \"Anyone\".";
+  }
+  if (status >= 500) return `HTTP ${status} — phía Google đang lỗi, thử lại sau vài phút.`;
+  return "HTTP " + status;
+}
+
 let inFlight = null; // gộp nhiều lời gọi refresh song song vào một lượt fetch
 
 async function fetchCsv(url, label) {
@@ -79,7 +97,7 @@ async function callSheetApi(cfg, params) {
     const qs = new URLSearchParams(Object.assign({ secret: cfg.sheetApiSecret || "" }, params));
     const url = cfg.sheetApiUrl + (cfg.sheetApiUrl.includes("?") ? "&" : "?") + qs.toString();
     const res = await fetch(url, { signal: controller.signal, cache: "no-store", redirect: "follow" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     try {
       return JSON.parse(text);
@@ -127,7 +145,7 @@ async function saveNote(payload) {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(Object.assign({ secret: cfg.sheetApiSecret || "" }, payload)),
     });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     let json;
     try {
@@ -261,7 +279,7 @@ async function sheetPing(url, secret) {
     const target =
       url + (url.includes("?") ? "&" : "?") + "action=ping&secret=" + encodeURIComponent(secret || "");
     const res = await fetch(target, { signal: controller.signal, cache: "no-store", redirect: "follow" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     try {
       return JSON.parse(text);
