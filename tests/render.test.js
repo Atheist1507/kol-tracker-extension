@@ -101,3 +101,36 @@ test("hệ số nhân hiển thị gọn", () => {
   assert.strictEqual(KT.fmtMultiple(0.3), "x0.3");
   assert.strictEqual(KT.fmtMultiple(null), "");
 });
+
+test("x mấy cắt còn một chữ số thập phân, không kéo đuôi", () => {
+  assert.strictEqual(KT.fmtMultiple(1.3456), "x1.3");
+  assert.strictEqual(KT.fmtMultiple(2.96), "x3");
+  assert.strictEqual(KT.fmtMultiple(9.949), "x9.9");
+});
+
+test("từ x10 trở lên thì lấy số nguyên — phần lẻ ở đó vô nghĩa", () => {
+  assert.strictEqual(KT.fmtMultiple(12.345), "x12");
+  assert.strictEqual(KT.fmtMultiple(143.7), "x144");
+  assert.strictEqual(KT.fmtMultiple(1000), "x1000");
+});
+
+// Dưới x1 là đang LỖ, và ở đó hai chữ số mới phân biệt được mức độ: làm tròn
+// một chữ số thì x0.05 (mất 95%) và x0.14 đều thành x0.1.
+test("dưới x1 giữ hai chữ số", () => {
+  assert.strictEqual(KT.fmtMultiple(0.3456), "x0.35");
+  assert.strictEqual(KT.fmtMultiple(0.05), "x0.05");
+  assert.strictEqual(KT.fmtMultiple(0.5), "x0.5");
+});
+
+test("số tròn không đẻ ra đuôi .0", () => {
+  assert.strictEqual(KT.fmtMultiple(1), "x1");
+  assert.strictEqual(KT.fmtMultiple(10), "x10");
+  assert.strictEqual(KT.fmtMultiple(2.04), "x2");
+  assert.strictEqual(KT.fmtMultiple(100.04), "x100"); // regex cũ suýt cắt thành x1
+});
+
+test("chuỗi từ Sheet và rác thì không làm vỡ dòng", () => {
+  assert.strictEqual(KT.fmtMultiple("1.3456"), "x1.3");
+  assert.strictEqual(KT.fmtMultiple("chưa rõ"), "");
+  assert.strictEqual(KT.fmtMultiple(""), "");
+});

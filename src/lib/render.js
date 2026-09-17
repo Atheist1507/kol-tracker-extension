@@ -53,9 +53,24 @@
     return Math.floor(mo / 12) + " năm trước";
   }
 
+  function trimZeros(s) {
+    return s.indexOf(".") < 0 ? s : s.replace(/0+$/, "").replace(/\.$/, "");
+  }
+
+  /**
+   * "x mấy" là con số để liếc, không phải để đối chiếu sổ sách. Một chữ số sau
+   * dấu phẩy đã trả lời xong câu hỏi — x1.3 hay x1.3456 thì cũng là cùng một
+   * kết luận, mà cái đuôi dài thì đẩy phần còn lại của dòng ra khỏi panel.
+   *
+   * Dưới x1 mới giữ hai chữ số: ở đó x0.05 và x0.1 là hai mức lỗ khác hẳn nhau,
+   * làm tròn về một chữ số là bóp cả dải đó thành vài giá trị.
+   */
   function fmtMultiple(m) {
-    if (m == null) return "";
-    return "x" + (Number.isInteger(m) ? m : m.toFixed(m < 10 ? 2 : 1).replace(/\.?0+$/, ""));
+    if (m == null || m === "") return "";
+    const n = Number(m);
+    if (!Number.isFinite(n)) return "";
+    const abs = Math.abs(n);
+    return "x" + trimZeros(n.toFixed(abs >= 10 ? 0 : abs < 1 ? 2 : 1));
   }
 
   /**
