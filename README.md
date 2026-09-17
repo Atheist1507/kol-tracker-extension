@@ -28,6 +28,9 @@ Sheet đó, không cần Google Cloud, không cần OAuth. Nó vừa cho extensi
 **Các bước deploy: xem [`apps-script/README.md`](apps-script/README.md).** Chạy hàm `setup()` một
 lần là script tự dựng 2 tab đúng cột, khỏi gõ tay tiêu đề.
 
+Phần đó làm được **trước khi** cài extension, và tự kiểm được bằng cách dán
+`<URL_WEB_APP>?action=ping&secret=<SECRET>` vào thanh địa chỉ — thấy JSON `"ok":true` là xong.
+
 | Tab | Một dòng là gì | Khoá |
 |---|---|---|
 | `Overview` | một người | `wallet` — ví thì không đổi tên được, username thì có |

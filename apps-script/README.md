@@ -75,9 +75,37 @@ Tab `KOLs` / `Calls` cũ (nếu có) cứ để đó hoặc xoá, không ảnh h
 Copy **Web app URL** — dạng `https://script.google.com/macros/s/AKfy…/exec`.
 Phải kết thúc bằng **`/exec`**. Nếu là `/dev` thì mày đang copy nhầm link test.
 
-## 6. Nối vào extension
+## 6. Kiểm tra ngay, chưa cần extension
 
-Options của extension → mục **1. Kết nối Sheet**:
+Dán cái này vào thanh địa chỉ trình duyệt, thay hai chỗ trong ngoặc:
+
+```
+<URL_WEB_APP>?action=ping&secret=<SECRET>
+```
+
+Đúng thì trang hiện đúng một dòng JSON:
+
+```json
+{"ok":true,"sheet":"Tên Sheet","hasOverview":true,"hasDetail":true,"overviewRows":0,"detailRows":0}
+```
+
+Thấy dòng đó là **xong sạch phần Apps Script**. Các bước dưới để dành tới lúc cài extension.
+
+| Thấy gì | Sai ở đâu |
+|---|---|
+| `{"ok":false,"error":"sai secret"}` | Chuỗi trong URL khác chuỗi trong `Code.gs` — hoặc sửa `Code.gs` rồi mà quên deploy lại (bước 5) |
+| `hasOverview: false` | Chưa chạy `setup()` (bước 4) |
+| Hiện ra trang web/đăng nhập thay vì JSON | "Who has access" chưa để `Anyone` (bước 5) |
+
+## 7. Nối vào extension — SAU KHI đã cài extension
+
+> Bước này cần extension đã được **Load unpacked** vào Chrome (xem README chính của repo).
+> Chưa cài thì chưa có trang Options nào để mở — cứ dừng ở bước 6, quay lại đây sau.
+
+Mở trang Options: `chrome://extensions` → thẻ **KOL Tracker** → **Chi tiết** → **Tuỳ chọn extension**.
+(Hoặc chuột phải vào icon extension trên thanh công cụ → **Tuỳ chọn**.)
+
+Mục **1. Kết nối Sheet**:
 
 - **URL Web App**: dán link `/exec`
 - **SECRET**: dán đúng chuỗi ở bước 3
