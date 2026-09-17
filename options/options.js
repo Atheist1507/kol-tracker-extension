@@ -170,7 +170,10 @@
   }
 
   $("refresh").addEventListener("click", async () => {
-    $("status").textContent = "Đang tải…";
+    // Gỡ class lỗi còn sót: để nguyên thì dòng "Đang tải…" hiện màu đỏ, trông
+    // y như vừa hỏng thêm lần nữa.
+    $("status").className = "status";
+    $("status").textContent = "Đang tải… (lần đầu sau khi deploy có thể mất 30–40 giây)";
     await chrome.runtime.sendMessage({ type: KT.MSG.REFRESH });
     renderStatus();
   });
