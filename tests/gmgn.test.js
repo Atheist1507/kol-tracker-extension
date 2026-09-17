@@ -118,7 +118,7 @@ test("hàng không có cả ví lẫn username thì bỏ qua", () => {
   assert.strictEqual(G.normalizeMessage(null), null);
 });
 
-test("parseMessages: bóc đúng chỗ, bỏ trùng, xếp người post sớm lên đầu", () => {
+test("parseMessages: bóc đúng chỗ, bỏ bài trùng, lấy bài sớm nhất làm đại diện", () => {
   const payload = {
     code: 0,
     data: {
@@ -130,8 +130,11 @@ test("parseMessages: bóc đúng chỗ, bỏ trùng, xếp người post sớm l
     },
   };
   const list = G.parseMessages(payload);
-  assert.strictEqual(list.length, 2);
+  // Ba bài, một bài lặp lại do phân trang chồng nhau → còn hai bài THẬT, và cả
+  // hai đều của cùng một ví nên chỉ ra MỘT dòng.
+  assert.strictEqual(list.length, 1);
   assert.strictEqual(list[0].postId, "a");
+  assert.strictEqual(list[0].postCount, 2);
 });
 
 test("payload lạ không làm vỡ", () => {
@@ -155,4 +158,73 @@ test("encrypted_user_id KHÔNG được lọt vào dữ liệu chuẩn hoá", ()
   // Nếu có ngày nào đó ai thêm nó vào đây thì test này phải đỏ.
   const m = G.normalizeMessage(REAL);
   assert.strictEqual(JSON.stringify(m).includes("encrypted"), false);
+});
+
+// Ca thật trên $CASHCAT (17/09/2026): panel ghi "50 người đã post · 5 đã có hồ
+// sơ" trong khi Sheet chỉ có 2 người. API trả từng BÀI, nên một thằng hô nhiều
+// lần chiếm nhiều dòng và mọi con số đếm theo đều phồng lên.
+function msg(over) {
+  return Object.assign(
+    {
+      id: "p" + Math.random(),
+      wallet_address: "0xAAA",
+      username: "caller",
+      created_at: "2026-09-01T00:00:00Z",
+      multiplier: 2,
+    },
+    over
+  );
+}
+
+test("nhiều bài của cùng một ví gộp thành một dòng", () => {
+  const out = KT.gmgn.parseMessages({
+    data: {
+      messages: [
+        msg({ id: "p1", created_at: "2026-09-01T00:00:00Z", display_content: "call sớm" }),
+        msg({ id: "p2", created_at: "2026-09-05T00:00:00Z", display_content: "hô thêm" }),
+        msg({ id: "p3", created_at: "2026-09-09T00:00:00Z", display_content: "hô nữa" }),
+        msg({ id: "p9", wallet_address: "0xBBB", username: "khac" }),
+      ],
+    },
+  });
+  assert.strictEqual(out.length, 2);
+  assert.strictEqual(out[0].postCount, 3);
+  assert.strictEqual(out[1].postCount, 1);
+});
+
+test("giữ bài SỚM NHẤT làm đại diện, không phải bài mới nhất", () => {
+  const out = KT.gmgn.parseMessages({
+    data: {
+      messages: [
+        msg({ id: "muon", created_at: "2026-09-09T00:00:00Z", display_content: "vào muộn" }),
+        msg({ id: "som", created_at: "2026-09-01T00:00:00Z", display_content: "vào sớm" }),
+      ],
+    },
+  });
+  assert.strictEqual(out.length, 1);
+  assert.strictEqual(out[0].postId, "som");
+  assert.strictEqual(out[0].postText, "vào sớm");
+});
+
+// Giữ hàng là chuyện của cả TÀI KHOẢN, không của riêng một bài — nên phải lấy
+// bản mới nhất, kẻo "đã xả sạch" hôm nay bị một bài từ tháng trước ghi đè ngược.
+test("tình trạng giữ hàng lấy theo bài mới nhất", () => {
+  const out = KT.gmgn.parseMessages({
+    data: {
+      messages: [
+        msg({ id: "a", created_at: "2026-09-01T00:00:00Z", bought_amount: 100, balance: 100 }),
+        msg({ id: "b", created_at: "2026-09-09T00:00:00Z", bought_amount: 100, sold_amount: 100, balance: 0 }),
+      ],
+    },
+  });
+  assert.strictEqual(out[0].postId, "a");
+  assert.strictEqual(out[0].holding, "sold_all");
+});
+
+test("không có ví lẫn username thì không bị gộp nhầm vào nhau", () => {
+  const out = KT.gmgn.groupCallers([
+    { wallet: "", username: "", postId: "x", postCount: undefined },
+    { wallet: "", username: "", postId: "y" },
+  ]);
+  assert.strictEqual(out.length, 2);
 });

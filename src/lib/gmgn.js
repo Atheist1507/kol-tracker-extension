@@ -153,7 +153,52 @@
       if (b.postedTs == null) return -1;
       return a.postedTs - b.postedTs; // ai post SỚM nhất đứng đầu
     });
-    return out;
+    return groupCallers(out);
+  }
+
+  /**
+   * Gộp nhiều BÀI POST của cùng một người thành MỘT dòng.
+   *
+   * API trả về từng bài, và một thằng hô đi hô lại năm lần thì nằm năm dòng.
+   * Không gộp thì panel ghi "50 người đã post" trong khi thật ra là 50 bài của
+   * ít người hơn nhiều — và con số "N đã có hồ sơ" cũng đếm trùng theo.
+   *
+   * Giữ bài SỚM NHẤT làm đại diện: đó mới là cú call. Mấy bài sau là hô thêm
+   * khi giá đã chạy, lấy nó làm mốc thì ai cũng thành người vào sớm.
+   * `postCount` giữ lại số lần hô — hô nhiều tự nó là một tín hiệu.
+   */
+  function groupCallers(list) {
+    const byKey = Object.create(null);
+    const order = [];
+    for (const c of list) {
+      const key = c.wallet || KT.handleKey(c.username);
+      if (!key) {
+        order.push(Object.assign({}, c, { postCount: 1 }));
+        continue;
+      }
+      const prev = byKey[key];
+      if (!prev) {
+        byKey[key] = Object.assign({}, c, { postCount: 1 });
+        order.push(byKey[key]);
+        continue;
+      }
+      prev.postCount++;
+      // Danh sách đã xếp theo thời gian, nên bài sau là bài MỚI hơn. Tình
+      // trạng giữ hàng là chuyện của cả tài khoản chứ không của riêng một
+      // bài — lấy bản mới nhất, nếu không thì "đã xả sạch" từ hôm nay bị một
+      // bài từ tháng trước ghi đè ngược lại.
+      if (c.holding && c.holding !== "unknown") {
+        prev.holding = c.holding;
+        prev.holdingLabel = c.holdingLabel;
+        prev.isHoldingRedFlag = c.isHoldingRedFlag;
+      }
+      if (c.pnlUsd != null) prev.pnlUsd = c.pnlUsd;
+      if (c.followers != null) prev.followers = c.followers;
+      if (!prev.avatar && c.avatar) prev.avatar = c.avatar;
+      if (!prev.twitterUrl && c.twitterUrl) prev.twitterUrl = c.twitterUrl;
+      prev.lastPostedTs = c.postedTs;
+    }
+    return order;
   }
 
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
@@ -167,6 +212,7 @@
     holdingState,
     normalizeMessage,
     parseMessages,
+    groupCallers,
     parseEndpoint,
     HOLDING_LABELS,
     HOLDING_RED_FLAGS,

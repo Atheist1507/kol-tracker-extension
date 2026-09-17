@@ -69,8 +69,8 @@
       const person = hit.person;
       const ring = document.createElement("div");
       ring.className = "kt-ring" + (person.redFlags || (hit.caller && hit.caller.isHoldingRedFlag) ? " kt-flag" : "");
-      ring.style.setProperty("--c", hit.known ? KT.tierColor(person.tier) : "#6E7A88");
-      ring.dataset.tier = hit.known ? person.tierLetter || "?" : "•";
+      ring.style.setProperty("--c", KT.tierColor(person.tier));
+      ring.dataset.tier = person.tierLetter || "?";
       layer.appendChild(ring);
       return ring;
     }
@@ -92,6 +92,10 @@
         if (tracked.has(img) || tracked.size >= MAX_RINGS) continue;
         const hit = api.identifyByAvatar(img.currentSrc || img.src);
         if (!hit) continue;
+        // CHỈ khoanh người đã có hồ sơ trong Sheet. Khoanh cả người lạ thì
+        // trên một chart mà ai cũng có viền, cái viền không còn nói gì —
+        // đúng ý ô chọn trong Options: "quanh avatar QUEN MẶT".
+        if (!hit.known) continue;
         tracked.set(img, { hit, ring: ringFor(hit) });
       }
     }

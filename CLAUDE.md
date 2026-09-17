@@ -67,3 +67,11 @@
   trỏ thì chỉ còn đúng khi con trỏ VẪN nằm trên đúng avatar đó (rê sang avatar bên cạnh là hết hiệu
   lực); mọc từ tooltip GMGN thì nó nằm CẠNH avatar chứ không dưới con trỏ, nên chỉ đòi nó trong tầm
   `NEAR_POINTER_PX`. Gộp hai luật làm một là avatar người lạ sẽ ăn theo thẻ của người vừa hover trước đó.
+- **API `community/messages` trả từng BÀI POST, không phải từng người.** `parseMessages` lọc trùng
+  theo `postId` rồi **gộp theo ví** (`groupCallers`): một thằng hô năm lần thì trước đây nằm năm dòng,
+  panel ghi "50 người đã post" trong khi thật ra là 50 bài, và "N đã có hồ sơ" đếm trùng theo (thấy
+  trên $CASHCAT 17/09/2026: panel ghi 5 trong khi Sheet chỉ có 2 người). Đại diện là bài **sớm nhất** —
+  đó mới là cú call; mấy bài sau là hô thêm khi giá đã chạy. Nhưng **tình trạng giữ hàng lấy theo bài
+  mới nhất**: giữ hay xả là chuyện của cả tài khoản, không của riêng một bài.
+- **Viền trên chart chỉ khoanh người ĐÃ có hồ sơ.** Khoanh cả người lạ thì ai cũng có viền và cái viền
+  không còn nói gì — trên GMGN avatar vốn đã có viền vàng/cam sẵn, thêm một viền xám nữa là vô hình.
