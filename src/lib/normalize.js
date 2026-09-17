@@ -54,12 +54,55 @@
   }
 
   /**
-   * Khoá so khớp URL avatar. Bỏ query/hash, và bỏ hậu tố kích thước của
-   * Twitter (`_normal`, `_400x400`…) vì GMGN thường hiện bản resize khác với
-   * bản mình lưu trong Sheet.
+   * Gỡ lớp proxy ảnh. GMGN không nhúng thẳng ảnh Twitter mà bọc qua endpoint
+   * của nó: `https://gmgn.ai/external/img?url=https%3A%2F%2Fpbs.twimg.com%2F…`
+   * (thấy trên trang thật 17/09/2026). Sheet thì lưu URL GỐC, nên nếu không
+   * gỡ ra thì hai chuỗi chẳng bao giờ bằng nhau và overlay im lặng không khớp
+   * được ai — không lỗi, không cảnh báo, chỉ là không có viền nào hiện lên.
+   *
+   * Lặp tối đa 3 lớp phòng proxy lồng proxy. Không phải proxy thì trả nguyên.
+   */
+  function unwrapProxyUrl(raw) {
+    let s = String(raw == null ? "" : raw).trim();
+    if (!/^https?:\/\//i.test(s)) return s;
+
+    for (let i = 0; i < 3; i++) {
+      let inner = "";
+      try {
+        const u = new URL(s);
+        for (const value of u.searchParams.values()) {
+          if (/^https?:\/\//i.test(value)) {
+            inner = value;
+            break;
+          }
+        }
+        // Có proxy nhét URL thẳng vào đường dẫn: /img/https%3A%2F%2F…
+        if (!inner) {
+          const m = u.pathname.match(/https?%3a%2f%2f.+$/i);
+          if (m) {
+            try {
+              inner = decodeURIComponent(m[0]);
+            } catch (e) {
+              inner = "";
+            }
+          }
+        }
+      } catch (e) {
+        break;
+      }
+      if (!inner || inner === s) break;
+      s = inner;
+    }
+    return s;
+  }
+
+  /**
+   * Khoá so khớp URL avatar. Gỡ proxy, bỏ query/hash, và bỏ hậu tố kích thước
+   * của Twitter (`_normal`, `_400x400`…) vì GMGN thường hiện bản resize khác
+   * với bản mình lưu trong Sheet.
    */
   function avatarKey(raw) {
-    let s = String(raw == null ? "" : raw).trim();
+    let s = unwrapProxyUrl(raw);
     if (!s) return "";
     s = s.split("#")[0].split("?")[0];
     s = s.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
@@ -80,10 +123,20 @@
   KT.displayHandle = displayHandle;
   KT.handleKey = handleKey;
   KT.tokenKey = tokenKey;
+  KT.unwrapProxyUrl = unwrapProxyUrl;
   KT.avatarKey = avatarKey;
   KT.splitList = splitList;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { stripAccents, headerKey, displayHandle, handleKey, tokenKey, avatarKey, splitList };
+    module.exports = {
+      stripAccents,
+      headerKey,
+      displayHandle,
+      handleKey,
+      tokenKey,
+      unwrapProxyUrl,
+      avatarKey,
+      splitList,
+    };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);

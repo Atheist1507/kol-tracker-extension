@@ -107,6 +107,9 @@ hover là hiện note. Có chạy được hay không phụ thuộc GMGN vẽ ma
 
 1. **Avatar là `<img>` thật** → so khớp `avatar_url` với ảnh trên trang, vẽ vòng màu tier quanh nó
    (kèm chữ cái tier ở góc). Viền đứt nét = người này có cờ đỏ.
+   ⚠ GMGN không nhúng thẳng ảnh Twitter mà **bọc qua proxy của nó**
+   (`https://gmgn.ai/external/img?url=<đã mã hoá>`), trong khi Sheet lưu URL gốc. `avatarKey()`
+   gỡ lớp bọc trước khi so — bỏ bước đó là không khớp được ai mà chẳng có lỗi nào hiện ra.
 2. **Chart vẽ bằng canvas** (nhiều khả năng, kiểu TradingView) → không có element để bám. Đường vòng:
    rình cái tooltip mà GMGN tự hiện khi hover vào avatar, đọc handle trong đó, dán thẻ tóm tắt cạnh bên.
 
@@ -138,7 +141,10 @@ Tắt riêng từng phần (viền / thẻ hover) trong Options.
 ## 5. Cấu trúc code
 
 ```
-manifest.json              MV3. content_scripts chạy trên gmgn.ai + gmgn.cc
+manifest.json              MV3. content_scripts chạy trên gmgn.ai + gmgn.cc, TRONG MỌI FRAME
+                           (all_frames + match_origin_as_fallback: GMGN có iframe blob:, chart có
+                           thể nằm trong đó). Panel chỉ mount ở frame trên cùng, overlay thì frame
+                           nào cũng chạy
 background/service-worker.js  CHỖ DUY NHẤT fetch CSV (content script gọi docs.google.com là dính CORS),
                               cache vào chrome.storage.local, chạy alarm làm tươi định kỳ
 content/content.js         Điều phối: nạp storage → dựng db → gắn panel + overlay, phím tắt, tin nhắn
@@ -169,7 +175,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 68 test logic thuần, không cần cài gì
+npm test         # 73 test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```

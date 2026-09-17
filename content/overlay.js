@@ -418,6 +418,10 @@
         avatarSamples: small.slice(0, 12).map((i) => (i.currentSrc || i.src).slice(0, 140)),
         matchedInDb: matched.length,
         ringsActive: tracked.size,
+        iframes: Array.from(document.querySelectorAll("iframe")).map((f) => {
+          const r = f.getBoundingClientRect();
+          return (f.src || "(same-origin)").slice(0, 80) + " " + Math.round(r.width) + "x" + Math.round(r.height);
+        }),
         lastTooltip, // hình dạng tooltip gặp gần nhất — cái quyết định Mức 2 làm được tới đâu
         unknownSeen: getSeen().map((u) => u.handle),
         verdict: canvases.length && !small.length

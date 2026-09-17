@@ -48,3 +48,37 @@ test("tier chưa xếp hạng xuống cuối khi sắp xếp", () => {
   assert.ok(KT.tierRank("S") < KT.tierRank("C"));
   assert.ok(KT.tierRank("C") < KT.tierRank(""));
 });
+
+// GMGN bọc ảnh Twitter qua proxy của nó (quan sát trên trang thật 17/09/2026).
+// Không gỡ lớp này ra thì overlay không khớp được avatar nào.
+test("gỡ proxy ảnh: URL bọc và URL gốc cho cùng một khoá", () => {
+  const goc = "https://pbs.twimg.com/profile_images/1/abc_400x400.jpg";
+  const boc = "https://gmgn.ai/external/img?url=" + encodeURIComponent(goc) + "&w=96&q=75";
+  assert.strictEqual(KT.avatarKey(boc), KT.avatarKey(goc));
+});
+
+test("gỡ proxy rồi vẫn bỏ được hậu tố kích thước của Twitter", () => {
+  const boc = "https://gmgn.ai/external/img?url=" +
+    encodeURIComponent("https://pbs.twimg.com/profile_images/1/abc_normal.jpg");
+  assert.strictEqual(KT.avatarKey(boc), KT.avatarKey("https://pbs.twimg.com/profile_images/1/abc.jpg"));
+});
+
+test("proxy nhét URL vào đường dẫn thay vì query", () => {
+  const goc = "https://pbs.twimg.com/profile_images/1/abc.jpg";
+  const boc = "https://gmgn.ai/img/" + encodeURIComponent(goc);
+  assert.strictEqual(KT.avatarKey(boc), KT.avatarKey(goc));
+});
+
+test("URL thường không bị đụng vào", () => {
+  const u = "https://example.com/a/b.jpg?w=100";
+  assert.strictEqual(KT.unwrapProxyUrl(u), u);
+  assert.strictEqual(KT.unwrapProxyUrl("không phải url"), "không phải url");
+  assert.strictEqual(KT.unwrapProxyUrl(""), "");
+});
+
+test("proxy lồng proxy vẫn về tới URL trong cùng", () => {
+  const goc = "https://pbs.twimg.com/profile_images/1/abc.jpg";
+  const l1 = "https://cdn.a/img?url=" + encodeURIComponent(goc);
+  const l2 = "https://gmgn.ai/external/img?url=" + encodeURIComponent(l1);
+  assert.strictEqual(KT.avatarKey(l2), KT.avatarKey(goc));
+});

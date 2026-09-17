@@ -22,6 +22,11 @@
 - **Quét node lạ thì phải có trần.** MutationObserver `characterData` trả về `parentElement` có thể là
   cả `<body>` (SPA đổi giá liên tục), lúc đó mọi "@ai_đó" trên trang bị coi là một thẻ người. Hai lớp
   chặn: không queue `<body>`/`<html>`, và `MAX_CARD_CHUNKS` — thẻ người chỉ có dăm mẩu chữ.
+- **URL ảnh phải qua `KT.avatarKey()`** — nó gỡ lớp proxy của GMGN (`gmgn.ai/external/img?url=…`)
+  trước khi so. So chuỗi thô với `avatar_url` trong Sheet là trượt 100%, im lặng.
+- **Content script chạy trong mọi frame.** Panel chỉ mount khi `window.top === window`; overlay và
+  `refreshIfStale` cũng phải nhớ mình đang ở frame nào, nếu không là n panel chồng nhau và n lời gọi
+  fetch cho cùng một bảng.
 - **Mọi phép so khớp handle đi qua `KT.handleKey()`**, đừng `.toLowerCase()` tại chỗ: `@Foo`, `foo`,
   `x.com/Foo`, `Foo ` phải là một người.
 - **Hai danh sách content script** (`manifest.json` và `KT.CONTENT_FILES` trong `src/lib/config.js`)

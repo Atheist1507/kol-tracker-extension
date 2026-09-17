@@ -14,6 +14,11 @@
   if (globalThis.__KOL_TRACKER__) return;
   globalThis.__KOL_TRACKER__ = true;
 
+  // Content script chạy trong MỌI frame (chart của GMGN có thể nằm trong một
+  // iframe blob:). Overlay thì frame nào cũng cần — nó vẽ đè lên đúng frame
+  // chứa avatar. Panel thì KHÔNG: mỗi frame một panel là chồng lên nhau.
+  const isTop = window.top === window;
+
   const state = { cfg: KT.withDefaults(null), data: null, db: null };
   let panel = null;
   let overlay = null;
@@ -62,6 +67,7 @@
   function refreshIfStale() {
     const stale = (state.cfg.staleMinutes || 10) * 60000;
     const syncedAt = (state.data && state.data.syncedAt) || 0;
+    if (!isTop) return; // n frame = n lời gọi fetch cho cùng một bảng
     if (!state.cfg.kolsCsvUrl) return;
     if (Date.now() - syncedAt > stale) api.refresh();
   }
@@ -119,6 +125,9 @@
       return;
     }
     if (msg.type === KT.MSG.DIAGNOSE) {
+      // Chỉ frame trên cùng trả lời: nhiều frame cùng sendResponse thì Chrome
+      // chỉ lấy một cái, còn lại thành lỗi lạ trong console.
+      if (!isTop) return;
       sendResponse(overlay ? overlay.diagnose() : { error: "overlay chưa chạy" });
       return;
     }
@@ -127,12 +136,13 @@
   (async function init() {
     await load();
 
-    panel = KT.createPanel(api);
-    panel.mount(state.ui);
+    if (isTop) {
+      panel = KT.createPanel(api);
+      panel.mount(state.ui);
+      if (state.cfg.panelEnabled && state.ui.open !== false) panel.show();
+    }
     overlay = KT.createOverlay(api);
     applyOverlay();
-
-    if (state.cfg.panelEnabled && state.ui.open !== false) panel.show();
 
     window.addEventListener("keydown", onHotkey, true);
     refreshIfStale();
