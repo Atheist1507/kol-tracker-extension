@@ -68,13 +68,101 @@ async function saveData(patch) {
   return next;
 }
 
+/** GET tới Apps Script Web App. Trả về đúng object script gửi lại. */
+async function callSheetApi(cfg, params) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const qs = new URLSearchParams(Object.assign({ secret: cfg.sheetApiSecret || "" }, params));
+    const url = cfg.sheetApiUrl + (cfg.sheetApiUrl.includes("?") ? "&" : "?") + qs.toString();
+    const res = await fetch(url, { signal: controller.signal, cache: "no-store", redirect: "follow" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error(
+        'Script trả về HTML chứ không phải JSON — kiểm lại deploy có để "Who has access: Anyone" chưa.'
+      );
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ghi một lần ghi chú.
+ *
+ * ⚠ Gửi `Content-Type: text/plain` chứ KHÔNG phải `application/json`: Apps
+ * Script không trả lời request OPTIONS, nên bất cứ header nào kích hoạt
+ * preflight là hỏng. text/plain là "simple request", đi thẳng. Thân request
+ * vẫn là chuỗi JSON, phía Code.gs vẫn JSON.parse bình thường.
+ */
+async function saveNote(payload) {
+  const cfg = await KT.getConfig();
+  if (!cfg.sheetApiUrl) {
+    return { ok: false, error: "Chưa cấu hình Apps Script — mở Options, mục Kết nối Sheet." };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(cfg.sheetApiUrl, {
+      method: "POST",
+      signal: controller.signal,
+      redirect: "follow",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ secret: cfg.sheetApiSecret || "" }, payload)),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new Error('Script trả về HTML — deploy chưa để "Who has access: Anyone"?');
+    }
+    if (json && json.ok) refresh(); // kéo lại để panel thấy ngay dòng vừa ghi
+    return json;
+  } catch (err) {
+    if (err.name === "AbortError") return { ok: false, error: "Quá lâu không phản hồi." };
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function doRefresh() {
   const cfg = await KT.getConfig();
+
+  // Đường chính: Apps Script. Đọc và ghi cùng một endpoint, không dính độ trễ
+  // 5 phút của bản CSV publish-to-web.
+  if (cfg.sheetApiUrl) {
+    try {
+      const json = await callSheetApi(cfg, {});
+      if (!json || !json.ok) throw new Error((json && json.error) || "script trả về lỗi");
+      await saveData({
+        overview: json.overview || [],
+        detail: json.detail || [],
+        syncedAt: Date.now(),
+        error: null,
+        errorAt: 0,
+      });
+      await setBadge(null);
+      return { ok: true, counts: { people: (json.overview || []).length, notes: (json.detail || []).length } };
+    } catch (err) {
+      const error = String(err && err.message ? err.message : err);
+      await saveData({ error, errorAt: Date.now() }); // GIỮ dữ liệu cũ
+      await setBadge(error);
+      return { ok: false, error };
+    }
+  }
+
   const kolsUrl = KT.toCsvUrl(cfg.kolsCsvUrl);
   const callsUrl = KT.toCsvUrl(cfg.callsCsvUrl);
 
   if (!cfg.kolsCsvUrl) {
-    const error = "Chưa cấu hình link CSV — mở Options để dán link Google Sheet.";
+    const error = "Chưa nối Sheet — mở Options, mục Kết nối Sheet.";
     await saveData({ error, errorAt: Date.now() });
     await setBadge(error);
     return { ok: false, error };
@@ -92,12 +180,12 @@ async function doRefresh() {
       cfg.callsCsvUrl && !callsUrl.error ? fetchCsv(callsUrl.url, "Tab Calls") : Promise.resolve(""),
     ]);
 
-    const kols = KT.parseTable(kolsCsv).rows;
-    const calls = callsCsv ? KT.parseTable(callsCsv).rows : [];
+    const overview = KT.parseTable(kolsCsv).rows;
+    const detail = callsCsv ? KT.parseTable(callsCsv).rows : [];
 
-    await saveData({ kols, calls, syncedAt: Date.now(), error: null, errorAt: 0 });
+    await saveData({ overview, detail, syncedAt: Date.now(), error: null, errorAt: 0 });
     await setBadge(null);
-    return { ok: true, counts: { kols: kols.length, calls: calls.length } };
+    return { ok: true, counts: { people: overview.length, notes: detail.length } };
   } catch (err) {
     const error = String(err && err.message ? err.message : err);
     // GIỮ dữ liệu cũ: mất mạng một lúc mà xoá sạch DB thì panel thành vô dụng
@@ -222,6 +310,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === KT.MSG.GET_DATA) {
     KT.getData().then(sendResponse);
+    return true;
+  }
+  if (msg.type === KT.MSG.SAVE_NOTE) {
+    saveNote(msg.payload).then(sendResponse);
     return true;
   }
   if (msg.type === KT.MSG.SHEET_PING) {

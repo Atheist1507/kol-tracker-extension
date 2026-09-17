@@ -1,257 +1,257 @@
 /**
- * Dựng "database" trong bộ nhớ từ 2 bảng CSV và tra cứu trên đó.
- * Không có tầng DB thật — vài trăm dòng thì quét tuyến tính là đủ nhanh,
- * đổi lại không phải sync gì cả (xem mục 3 của spec).
+ * Dựng "database người" trong bộ nhớ từ 2 tab Overview/Detail, và tra cứu.
+ *
+ * Khoá là **`wallet`** chứ không phải username: username đổi được, ví thì
+ * không. Người chỉ có username (nhập tay, hoặc Sheet cũ) vẫn tra được — tra
+ * theo ví trước, trượt mới tới username.
  */
 (function (root) {
   "use strict";
   const KT = (root.KT = root.KT || {});
 
-  function firstNonEmpty() {
-    for (let i = 0; i < arguments.length; i++) {
-      const v = arguments[i];
-      if (v != null && String(v).trim() !== "") return String(v).trim();
-    }
-    return "";
+  function text(value) {
+    return value == null ? "" : String(value).trim();
   }
 
-  /**
-   * kolRows + callRows (đã parse từ CSV) → db tra cứu được.
-   * Call của handle CHƯA có hồ sơ trong tab KOLs vẫn được giữ, dưới dạng
-   * "hồ sơ tạm" (ghost) — mất dấu một người vì quên điền tab KOLs thì
-   * đúng lúc cần nhất lại không tra ra.
-   */
-  function buildDb(kolRows, callRows, opts) {
-    const options = opts || {};
-    const kols = [];
-    const byKey = Object.create(null);
-    const byAvatar = Object.create(null);
-    const byToken = Object.create(null);
+  function walletKey(value) {
+    return text(value).toLowerCase();
+  }
 
-    function addKeys(kol, raw) {
-      const key = KT.handleKey(raw);
-      if (!key) return;
-      if (!kol.keys.includes(key)) kol.keys.push(key);
-      if (!byKey[key]) byKey[key] = kol;
-    }
+  function num(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number(String(value).replace(/[,\s]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
 
-    for (const row of kolRows || []) {
-      const handle = KT.displayHandle(firstNonEmpty(row.handle, row.extra && row.extra.Handle));
-      const key = KT.handleKey(handle);
-      if (!key) continue;
+  function truthy(value) {
+    const s = text(value).toLowerCase();
+    return s === "true" || s === "1" || s === "x" || s === "có" || s === "yes";
+  }
 
-      let kol = byKey[key];
-      if (!kol) {
-        kol = {
-          key,
-          handle: handle,
-          keys: [],
-          aliases: [],
-          avatar: "",
-          tier: "",
-          tierLetter: "",
-          description: "",
-          source: "",
-          redFlags: "",
-          addedBy: "",
-          updatedAt: "",
-          extra: {},
-          calls: [],
-          ghost: false,
-          row: row._row || null,
-        };
-        kols.push(kol);
-        byKey[key] = kol;
-      }
-
-      kol.aliases = KT.splitList(row.aliases);
-      kol.avatar = firstNonEmpty(row.avatar_url);
-      kol.tier = firstNonEmpty(row.tier);
-      kol.tierLetter = KT.tierLetter(kol.tier);
-      kol.description = firstNonEmpty(row.description);
-      kol.source = firstNonEmpty(row.source_found);
-      kol.redFlags = firstNonEmpty(row.red_flags);
-      kol.addedBy = firstNonEmpty(row.added_by);
-      kol.updatedAt = firstNonEmpty(row.updated_at);
-      kol.extra = row.extra || {};
-
-      addKeys(kol, handle);
-      for (const alias of kol.aliases) addKeys(kol, alias);
-
-      const avatarKey = KT.avatarKey(kol.avatar);
-      if (avatarKey && !byAvatar[avatarKey]) byAvatar[avatarKey] = kol;
-    }
-
-    for (const row of callRows || []) {
-      const rawHandle = firstNonEmpty(row.handle);
-      const key = KT.handleKey(rawHandle);
-      if (!key) continue;
-
-      let kol = byKey[key];
-      if (!kol) {
-        kol = {
-          key,
-          handle: KT.displayHandle(rawHandle),
-          keys: [key],
-          aliases: [],
-          avatar: "",
-          tier: "",
-          tierLetter: "",
-          description: "",
-          source: "",
-          redFlags: "",
-          addedBy: "",
-          updatedAt: "",
-          extra: {},
-          calls: [],
-          ghost: true, // chỉ xuất hiện ở tab Calls, chưa có hồ sơ
-          row: null,
-        };
-        kols.push(kol);
-        byKey[key] = kol;
-      }
-
-      const call = {
-        token: firstNonEmpty(row.token),
-        tokenKey: KT.tokenKey(row.token),
-        calledAt: firstNonEmpty(row.called_at),
-        calledAtTs: KT.parseDateLoose(row.called_at),
-        price: firstNonEmpty(row.price_at_call),
-        position: KT.parsePosition(row.chart_position),
-        positionRaw: firstNonEmpty(row.chart_position),
-        result: firstNonEmpty(row.result),
-        addedBy: firstNonEmpty(row.added_by),
-        extra: row.extra || {},
-        row: row._row || null,
-      };
-      kol.calls.push(call);
-
-      if (call.tokenKey) {
-        (byToken[call.tokenKey] = byToken[call.tokenKey] || []).push({ key: kol.key, call });
-      }
-    }
-
-    for (const kol of kols) {
-      // Mới nhất lên đầu; call chưa ghi ngày xuống cuối (đừng đoán hộ)
-      kol.calls.sort((a, b) => {
-        if (a.calledAtTs == null && b.calledAtTs == null) return 0;
-        if (a.calledAtTs == null) return 1;
-        if (b.calledAtTs == null) return -1;
-        return b.calledAtTs - a.calledAtTs;
-      });
-      kol.stats = KT.calcStats(kol.calls, options);
-      kol.searchText = KT.stripAccents(
-        [kol.handle, kol.aliases.join(" "), kol.description, kol.source].join(" ")
-      ).toLowerCase();
-    }
-
-    kols.sort((a, b) => KT.tierRank(a.tier) - KT.tierRank(b.tier) || a.handle.localeCompare(b.handle));
-
+  function makePerson(row) {
+    const username = KT.displayHandle(row.username);
     return {
-      kols,
-      byKey,
-      byAvatar,
-      byToken,
-      counts: { kols: kols.filter((k) => !k.ghost).length, calls: (callRows || []).length },
+      wallet: walletKey(row.wallet),
+      username,
+      usernameKey: KT.handleKey(username),
+      displayName: text(row.display_name),
+      twitterUrl: text(row.twitter_url),
+      avatar: text(row.avatar_url),
+      tier: text(row.tier),
+      tierLetter: KT.tierLetter(row.tier),
+      summary: text(row.summary),
+      redFlags: text(row.red_flags),
+      followers: num(row.followers),
+      isKol: truthy(row.is_kol),
+      firstSeen: text(row.first_seen),
+      lastNoted: text(row.last_noted),
+      addedBy: text(row.added_by),
+      extra: row.extra || {},
+      notes: [],
+      row: row._row || null,
     };
   }
 
-  /** Tra chính xác theo handle/alias/URL profile. Trả kol hoặc null. */
-  function lookup(db, raw) {
-    if (!db) return null;
-    const key = KT.handleKey(raw);
-    return (key && db.byKey[key]) || null;
-  }
-
-  /** Tra theo URL ảnh đại diện (dùng cho overlay trên chart). */
-  function lookupByAvatar(db, url) {
-    if (!db) return null;
-    const key = KT.avatarKey(url);
-    return (key && db.byAvatar[key]) || null;
+  function makeNote(row) {
+    const notedAt = text(row.noted_at);
+    const postedAt = text(row.posted_at);
+    return {
+      wallet: walletKey(row.wallet),
+      username: KT.displayHandle(row.username),
+      notedAt,
+      notedTs: notedAt ? KT.parseDateLoose(notedAt) : null,
+      chain: text(row.chain),
+      token: text(row.token),
+      tokenAddress: walletKey(row.token_address),
+      postId: text(row.post_id),
+      postText: text(row.post_text),
+      postedAt,
+      postedTs: postedAt ? KT.parseDateLoose(postedAt) : null,
+      multiple: num(row.multiplier_at_note),
+      holding: text(row.holding_state),
+      pnlUsd: num(row.pnl_usd_at_note),
+      note: text(row.note),
+      position: KT.parsePosition(row.chart_position),
+      positionRaw: text(row.chart_position),
+      result: text(row.result),
+      sourceUrl: text(row.source_url),
+      addedBy: text(row.added_by),
+      extra: row.extra || {},
+      row: row._row || null,
+    };
   }
 
   /**
-   * Tìm mờ. Điểm số theo độ "chắc chắn" của phép khớp chứ không phải theo
-   * thứ tự trong Sheet — gõ 3 ký tự phải ra đúng người trước tiên.
+   * overviewRows + detailRows → db tra cứu được.
+   * Note của một ví CHƯA có dòng Overview vẫn giữ, dưới dạng hồ sơ tạm
+   * (`ghost`) — mất dấu một người vì lỡ xoá dòng Overview thì đúng lúc cần
+   * nhất lại không tra ra.
    */
+  function buildDb(overviewRows, detailRows) {
+    const people = [];
+    const byWallet = Object.create(null);
+    const byUsername = Object.create(null);
+    const byToken = Object.create(null);
+
+    function index(person) {
+      if (person.wallet && !byWallet[person.wallet]) byWallet[person.wallet] = person;
+      if (person.usernameKey && !byUsername[person.usernameKey]) byUsername[person.usernameKey] = person;
+    }
+
+    for (const row of overviewRows || []) {
+      const person = makePerson(row);
+      if (!person.wallet && !person.usernameKey) continue;
+      person.ghost = false;
+      people.push(person);
+      index(person);
+    }
+
+    let noteCount = 0;
+    for (const row of detailRows || []) {
+      const note = makeNote(row);
+      if (!note.wallet && !note.username) continue;
+      noteCount++;
+
+      let person = (note.wallet && byWallet[note.wallet]) || byUsername[KT.handleKey(note.username)];
+      if (!person) {
+        person = makePerson({ wallet: note.wallet, username: note.username });
+        person.ghost = true;
+        people.push(person);
+        index(person);
+      }
+      person.notes.push(note);
+
+      if (note.tokenAddress) {
+        (byToken[note.tokenAddress] = byToken[note.tokenAddress] || []).push(note);
+      }
+    }
+
+    for (const person of people) {
+      // Note mới nhất lên đầu; chưa ghi ngày thì xuống cuối (đừng đoán hộ)
+      person.notes.sort((a, b) => {
+        if (a.notedTs == null && b.notedTs == null) return 0;
+        if (a.notedTs == null) return 1;
+        if (b.notedTs == null) return -1;
+        return b.notedTs - a.notedTs;
+      });
+      person.noteCount = person.notes.length;
+      person.searchText = KT.stripAccents(
+        [person.username, person.displayName, person.summary, person.redFlags].join(" ")
+      ).toLowerCase();
+    }
+
+    people.sort(
+      (a, b) =>
+        KT.tierRank(a.tier) - KT.tierRank(b.tier) ||
+        b.noteCount - a.noteCount ||
+        a.username.localeCompare(b.username)
+    );
+
+    return {
+      people,
+      byWallet,
+      byUsername,
+      byToken,
+      counts: { people: people.filter((p) => !p.ghost).length, notes: noteCount },
+    };
+  }
+
+  /**
+   * Tra một người. `ref` là { wallet, username } — thường lấy thẳng từ một
+   * message của GMGN. Ví trước, username sau.
+   */
+  function findPerson(db, ref) {
+    if (!db || !ref) return null;
+    const wallet = walletKey(ref.wallet);
+    if (wallet && db.byWallet[wallet]) return db.byWallet[wallet];
+    const key = KT.handleKey(ref.username);
+    return (key && db.byUsername[key]) || null;
+  }
+
+  /**
+   * Người này có đổi username không? Tra ra bằng VÍ mà tên trong Sheet khác
+   * tên đang hiện trên GMGN → đúng cái ca username đổi một phát là hồ sơ mồ
+   * côi, nếu khoá bằng tên.
+   */
+  function renamedFrom(person, ref) {
+    if (!person || !ref) return "";
+    const now = KT.handleKey(ref.username);
+    if (!now || !person.usernameKey || person.usernameKey === now) return "";
+    if (!person.wallet || person.wallet !== walletKey(ref.wallet)) return "";
+    return person.username;
+  }
+
+  /** Tìm mờ trong danh sách người (panel + popup dùng chung). */
   function search(db, query, limit) {
-    if (!db || !db.kols.length) return [];
-    const raw = String(query == null ? "" : query).trim();
+    if (!db || !db.people.length) return [];
+    const raw = text(query);
     if (!raw) return [];
 
     const key = KT.handleKey(raw);
     const plain = KT.stripAccents(raw).toLowerCase();
-    const tokenQ = KT.tokenKey(raw);
-    const max = limit || 8;
+    const wallet = walletKey(raw);
     const out = [];
 
-    for (const kol of db.kols) {
+    for (const person of db.people) {
       let score = 0;
       let reason = "";
 
-      for (const k of kol.keys) {
-        if (!key) break;
-        if (k === key) {
-          score = Math.max(score, 120);
-          reason = "handle";
-        } else if (k.startsWith(key)) {
-          score = Math.max(score, 90);
-          reason = reason || "handle";
-        } else if (k.includes(key)) {
-          score = Math.max(score, 70);
-          reason = reason || "handle";
-        }
+      if (wallet.length > 8 && person.wallet.includes(wallet)) {
+        score = 130;
+        reason = "ví";
+      } else if (key && person.usernameKey === key) {
+        score = 120;
+      } else if (key && person.usernameKey.startsWith(key)) {
+        score = 90;
+      } else if (key && person.usernameKey.includes(key)) {
+        score = 70;
+      } else if (plain.length >= 2 && person.searchText.includes(plain)) {
+        score = 40;
+        reason = "khớp ghi chú";
       }
 
-      if (score < 70 && plain.length >= 2 && kol.searchText.includes(plain)) {
-        score = Math.max(score, 40);
-        reason = reason || "khớp mô tả";
-      }
-
-      if (tokenQ.length >= 2 && kol.calls.some((c) => c.tokenKey === tokenQ)) {
-        score = Math.max(score, 60);
-        reason = reason || "đã call token này";
-      }
-
-      if (score > 0) out.push({ kol, score, reason });
+      if (score > 0) out.push({ person, score, reason });
     }
 
     out.sort(
       (a, b) =>
         b.score - a.score ||
-        KT.tierRank(a.kol.tier) - KT.tierRank(b.kol.tier) ||
-        b.kol.calls.length - a.kol.calls.length ||
-        a.kol.handle.localeCompare(b.kol.handle)
+        KT.tierRank(a.person.tier) - KT.tierRank(b.person.tier) ||
+        b.person.noteCount - a.person.noteCount ||
+        a.person.username.localeCompare(b.person.username)
     );
-    return out.slice(0, max);
+    return out.slice(0, limit || 8);
   }
 
-  /** Mọi call của một token, mới nhất trước — "ai đã call con này?". */
-  function callsForToken(db, query) {
-    if (!db) return [];
-    const tokenQ = KT.tokenKey(query);
-    if (!tokenQ || tokenQ.length < 2) return [];
-    const hits = db.byToken[tokenQ] || [];
-    return hits
-      .map((h) => ({ kol: db.byKey[h.key], call: h.call }))
-      .filter((h) => h.kol)
-      .sort((a, b) => {
-        const at = a.call.calledAtTs;
-        const bt = b.call.calledAtTs;
-        if (at == null && bt == null) return 0;
-        if (at == null) return 1;
-        if (bt == null) return -1;
-        return at - bt; // ai call SỚM nhất đứng đầu — đó là câu hỏi thật sự
-      });
+  /**
+   * Người đang hiện trên chart mà CHƯA có trong Sheet → dựng hồ sơ tạm để
+   * panel vẫn mở ra được và bấm ghi chú được ngay. `ghost` = chưa có dòng nào
+   * trong Sheet, đừng nhầm với người đã lưu.
+   */
+  function personFromCaller(caller) {
+    const person = makePerson({
+      wallet: caller.wallet,
+      username: caller.username,
+      display_name: caller.displayName,
+      twitter_url: caller.twitterUrl,
+      avatar_url: caller.avatar,
+      followers: caller.followers == null ? "" : String(caller.followers),
+      is_kol: caller.isKol ? "true" : "",
+    });
+    person.ghost = true;
+    person.fresh = true; // hoàn toàn chưa có trong Sheet, khác với "thiếu dòng Overview"
+    person.noteCount = 0;
+    return person;
   }
 
+  KT.personFromCaller = personFromCaller;
   KT.buildDb = buildDb;
-  KT.lookup = lookup;
-  KT.lookupByAvatar = lookupByAvatar;
+  KT.findPerson = findPerson;
+  KT.renamedFrom = renamedFrom;
   KT.search = search;
-  KT.callsForToken = callsForToken;
+  KT.walletKey = walletKey;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { buildDb, lookup, lookupByAvatar, search, callsForToken };
+    module.exports = { buildDb, findPerson, renamedFrom, search, walletKey, personFromCaller };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);

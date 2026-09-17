@@ -63,6 +63,27 @@ function walk(dir) {
 }
 walk(ROOT);
 
+/* 3b. dev/preview.html phải nạp ĐỦ content script
+ *
+ * Preview nạp script bằng tay nên rất dễ quên một file mới. Lúc đó content.js
+ * ném lỗi giữa chừng và panel đơn giản là KHÔNG hiện — không có thông báo nào,
+ * dễ tưởng mình vừa làm hỏng CSS. (Đã dính đúng ca này với note-box.js.)
+ */
+const previewPath = path.join(ROOT, "dev/preview.html");
+if (fs.existsSync(previewPath)) {
+  const preview = fs.readFileSync(previewPath, "utf8");
+  const missing = shared.filter((f) => !preview.includes(f.replace(/^src\/|^content\//, "")));
+  const reallyMissing = shared.filter((f) => !preview.includes("../" + f));
+  if (reallyMissing.length) {
+    errors.push(
+      "dev/preview.html thiếu content script: " +
+        reallyMissing.join(", ") +
+        "\n  (thiếu là content.js ném lỗi giữa init, panel không hiện mà không báo gì)"
+    );
+  }
+  void missing;
+}
+
 /* 4. <script src> và <link href> trong HTML trỏ đúng chỗ */
 for (const html of ["popup/popup.html", "options/options.html"]) {
   const dir = path.dirname(path.join(ROOT, html));

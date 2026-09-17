@@ -52,18 +52,34 @@
         "src/lib/tier.js",
         "src/lib/stats.js",
         "src/lib/model.js",
+        "src/lib/gmgn.js",
         "src/lib/tooltip-text.js",
         "src/lib/sheet-url.js",
         "src/lib/config.js",
         "src/lib/styles.js",
         "src/lib/render.js",
         "content/overlay.js",
+        "content/note-box.js",
         "content/panel.js",
         "content/content.js"
       ],
       "run_at": "document_idle",
       "all_frames": true,
       "match_origin_as_fallback": true
+    },
+    {
+      "matches": [
+        "https://gmgn.ai/*",
+        "https://*.gmgn.ai/*",
+        "https://gmgn.cc/*",
+        "https://*.gmgn.cc/*"
+      ],
+      "js": [
+        "content/main-world.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
     }
   ],
   "commands": {

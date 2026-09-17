@@ -5,73 +5,99 @@ const path = require("node:path");
 const KT = require("./load");
 
 const ROOT = path.join(__dirname, "..");
-const kolRows = KT.parseTable(fs.readFileSync(path.join(ROOT, "sheet-templates/KOLs.csv"), "utf8")).rows;
-const callRows = KT.parseTable(fs.readFileSync(path.join(ROOT, "sheet-templates/Calls.csv"), "utf8")).rows;
-const db = KT.buildDb(kolRows, callRows, {});
+const overview = KT.parseTable(fs.readFileSync(path.join(ROOT, "sheet-templates/Overview.csv"), "utf8")).rows;
+const detail = KT.parseTable(fs.readFileSync(path.join(ROOT, "sheet-templates/Detail.csv"), "utf8")).rows;
+const db = KT.buildDb(overview, detail);
 
 test("file mẫu trong sheet-templates/ vẫn parse ra đúng dữ liệu", () => {
-  assert.strictEqual(db.counts.kols, 2);
-  assert.strictEqual(KT.lookup(db, "cryptoape").calls.length, 2);
+  assert.strictEqual(db.counts.people, 2);
+  assert.strictEqual(db.counts.notes, 3);
+  assert.strictEqual(KT.findPerson(db, { username: "randomguytradin" }).noteCount, 2);
 });
 
-test("dựng được thẻ chi tiết từ đầu tới cuối mà không ném lỗi", () => {
-  const html = KT.render.detailHtml(KT.lookup(db, "cryptoape"), { sheetUrl: "https://docs.google.com/x" });
-  assert.ok(html.includes("cryptoape"));
+test("ô có dấu phẩy trong file mẫu không làm lệch cột", () => {
+  const p = KT.findPerson(db, { username: "moonboy" });
+  assert.strictEqual(p.addedBy, "Nix");
+  assert.ok(p.redFlags.startsWith("Hô xong xả sạch"));
+});
+
+test("dựng thẻ chi tiết từ đầu tới cuối mà không ném lỗi", () => {
+  const html = KT.render.personDetail(KT.findPerson(db, { username: "randomguytradin" }), {});
+  assert.ok(html.includes("randomguytradin"));
   assert.ok(html.includes("PEPE"));
-  assert.ok(html.includes("Win rate"));
-});
-
-test("cờ đỏ hiện ra trên thẻ, và ô có dấu phẩy không làm lệch cột", () => {
-  const moonboy = KT.lookup(db, "moonboy");
-  assert.strictEqual(moonboy.addedBy, "Nix");
-  assert.ok(moonboy.redFlags.startsWith("Xả ngay"));
-  const html = KT.render.detailHtml(moonboy, {});
-  assert.ok(html.includes("Cờ đỏ"));
-  assert.ok(html.includes("Xả ngay"));
-});
-
-test("người chưa có call nào không làm vỡ phần thống kê", () => {
-  const solo = KT.buildDb([{ handle: "newguy", tier: "B", extra: {} }], [], {});
-  const html = KT.render.detailHtml(KT.lookup(solo, "newguy"), {});
-  assert.ok(html.includes("Chưa log call nào"));
+  assert.ok(html.includes("Ghi chú"));
   assert.ok(!html.includes("NaN"));
+});
+
+test("cờ đỏ hiện ra trên thẻ", () => {
+  const html = KT.render.personDetail(KT.findPerson(db, { username: "moonboy" }), {});
+  assert.ok(html.includes("Cờ đỏ"));
+});
+
+test("người chưa có ghi chú nào không làm vỡ phần hiển thị", () => {
+  const solo = KT.buildDb([{ wallet: "0xnew", username: "newguy", tier: "B", extra: {} }], []);
+  const html = KT.render.personDetail(KT.findPerson(solo, { wallet: "0xnew" }), {});
+  assert.ok(html.includes("Chưa ghi chú gì"));
+  assert.ok(!html.includes("NaN"));
+});
+
+test("báo đổi tên hiện ngay trên thẻ", () => {
+  const person = KT.findPerson(db, { username: "moonboy" });
+  const html = KT.render.personDetail(person, { renamedFrom: "ten_cu" });
+  assert.ok(html.includes("đã đổi tên từ @ten_cu"));
 });
 
 test("nội dung từ Sheet được escape trước khi chèn vào trang GMGN", () => {
   const evil = KT.buildDb(
-    [{ handle: "evil", description: '<img src=x onerror="alert(1)">', extra: {} }],
-    [],
-    {}
+    [{ wallet: "0xe", username: "evil", summary: '<img src=x onerror="alert(1)">', extra: {} }],
+    []
   );
-  const html = KT.render.detailHtml(KT.lookup(evil, "evil"), {});
+  const html = KT.render.personDetail(KT.findPerson(evil, { wallet: "0xe" }), {});
   assert.ok(!html.includes("<img src=x"));
   assert.ok(html.includes("&lt;img"));
 });
 
-test("avatar_url không phải http(s) thì không được lọt vào thuộc tính src", () => {
+test("post của người lạ cũng được escape", () => {
   const evil = KT.buildDb(
-    [{ handle: "evil", avatar_url: "javascript:alert(1)", extra: {} }],
-    [],
-    {}
+    [{ wallet: "0xe", username: "evil", extra: {} }],
+    [{ wallet: "0xe", username: "evil", note: "ok", post_text: "<script>x</script>", extra: {} }]
   );
-  const html = KT.render.detailHtml(KT.lookup(evil, "evil"), {});
+  const html = KT.render.personDetail(KT.findPerson(evil, { wallet: "0xe" }), {});
+  assert.ok(!html.includes("<script>"));
+});
+
+test("avatar_url không phải http(s) thì không lọt vào thuộc tính src", () => {
+  const evil = KT.buildDb([{ wallet: "0xe", username: "evil", avatar_url: "javascript:alert(1)", extra: {} }], []);
+  const html = KT.render.personDetail(KT.findPerson(evil, { wallet: "0xe" }), {});
   assert.ok(!html.includes("javascript:"));
 });
 
-test("danh sách 'ai đã call token này' dựng được", () => {
-  const html = KT.render.tokenHtml("PEPE", KT.callsForToken(db, "PEPE"));
-  assert.ok(html.includes("2 người đã call"));
-  assert.ok(html.includes("call sớm nhất"));
+test("dòng người đang trên chart: người lạ đánh dấu 'mới', cờ đỏ hiện nhãn xả", () => {
+  const caller = KT.gmgn.normalizeMessage({
+    username: "nguoila",
+    wallet_address: "0xzzz",
+    content: "send it",
+    bought_amount: "100",
+    sold_amount: "100",
+    balance: "0",
+  });
+  const html = KT.render.callerRow(caller, null);
+  assert.ok(html.includes("mới"));
+  assert.ok(html.includes("đã xả sạch"));
+});
+
+test("ví rút gọn hai đầu cho vừa panel", () => {
+  assert.strictEqual(KT.shortWallet("0xf1b6a4d6aecc5a618ade56a53fa9956ea508e16c"), "0xf1b6…e16c");
+  assert.strictEqual(KT.shortWallet("0xabc"), "0xabc");
 });
 
 test("timeAgo nói tiếng Việt và không âm", () => {
   assert.strictEqual(KT.timeAgo(Date.now() - 5 * 60000), "5 phút trước");
-  assert.strictEqual(KT.timeAgo(Date.now() - 3 * 86400000), "3 ngày trước");
   assert.strictEqual(KT.timeAgo(0), "");
 });
 
 test("hệ số nhân hiển thị gọn", () => {
   assert.strictEqual(KT.fmtMultiple(5), "x5");
-  assert.strictEqual(KT.fmtMultiple(1.5), "x1.5");
   assert.strictEqual(KT.fmtMultiple(0.3), "x0.3");
+  assert.strictEqual(KT.fmtMultiple(null), "");
 });

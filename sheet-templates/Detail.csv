@@ -1,0 +1,4 @@
+wallet,username,noted_at,chain,token,token_address,post_id,post_text,posted_at,multiplier_at_note,holding_state,pnl_usd_at_note,note,chart_position,result,source_url,added_by
+0xf1b6a4d6aecc5a618ade56a53fa9956ea508e16c,randomguytradin,2026-09-10T10:00:00Z,robinhood,PEPE,0xtok1,gmgn_01,giga runner,2026-09-03T23:05:28Z,5,còn giữ,120,"Call sớm, có luận điểm rõ ràng",đầu sóng,,https://gmgn.ai/...,Tam
+0xf1b6a4d6aecc5a618ade56a53fa9956ea508e16c,randomguytradin,2026-09-12T10:00:00Z,robinhood,WIF,0xtok2,gmgn_02,send it,2026-09-11T08:00:00Z,0.4,đã xả sạch,-80,"Lần này hô xong xả ngay — để ý",giữa sóng,,https://gmgn.ai/...,Nix
+0xaaa2222222222222222222222222222222222222,moonboy,2026-09-11T10:00:00Z,robinhood,PEPE,0xtok1,gmgn_03,ONLY UP,2026-09-05T10:00:00Z,0.6,đã xả sạch,-40,Đu đỉnh rồi hô,đu đỉnh,,https://gmgn.ai/...,Nix

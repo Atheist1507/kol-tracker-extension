@@ -67,20 +67,39 @@
    * tiếng Việt — cả hai đều phải ăn, nếu không extension im lặng trả rỗng.
    */
   const COLUMN_ALIASES = {
-    handle: ["handle", "kol", "ten", "name", "username", "twitter", "tai_khoan", "nick"],
-    aliases: ["aliases", "alias", "ten_khac", "ten_goi_khac", "biet_danh"],
-    avatar_url: ["avatar_url", "avatar", "anh", "anh_dai_dien", "image", "img", "photo"],
+    // --- Overview: một dòng một người ---
+    wallet: ["wallet", "wallet_address", "vi", "dia_chi_vi", "address"],
+    username: ["username", "handle", "user", "ten_x", "x", "twitter", "nick"],
+    display_name: ["display_name", "ten_hien_thi", "name", "ten"],
+    twitter_url: ["twitter_url", "user_twitter_url", "x_url", "link_x", "link"],
+    avatar_url: ["avatar_url", "avatar", "anh", "anh_dai_dien", "profile_image_url", "image"],
     tier: ["tier", "hang", "xep_hang", "rank", "grade", "level"],
-    description: ["description", "mo_ta", "dac_diem", "note", "notes", "ghi_chu"],
-    source_found: ["source_found", "source", "nguon", "phat_hien_tu", "tim_thay_tu"],
+    summary: ["summary", "tom_tat", "mo_ta", "description", "dac_diem"],
     red_flags: ["red_flags", "red_flag", "co_do", "canh_bao", "warning", "warnings"],
-    added_by: ["added_by", "nguoi_them", "by", "author", "added"],
-    updated_at: ["updated_at", "cap_nhat", "ngay_cap_nhat", "updated", "last_update"],
+    followers: ["followers", "follower_count", "so_follower"],
+    is_kol: ["is_kol", "kol"],
+    first_seen: ["first_seen", "lan_dau_thay", "source_found", "nguon"],
+    last_noted: ["last_noted", "lan_note_cuoi", "updated_at", "cap_nhat"],
+    note_count: ["note_count", "so_note"],
+
+    // --- Detail: một dòng một lần ghi chú ---
+    noted_at: ["noted_at", "ngay_note", "thoi_diem_note"],
+    chain: ["chain", "mang"],
     token: ["token", "coin", "ticker", "symbol", "ma_token"],
-    called_at: ["called_at", "thoi_diem_call", "ngay_call", "date", "time", "called"],
-    price_at_call: ["price_at_call", "gia_luc_call", "price", "gia", "entry", "mc", "marketcap"],
+    token_address: ["token_address", "dia_chi_token", "contract"],
+    post_id: ["post_id", "id_post", "message_id"],
+    post_text: ["post_text", "noi_dung_post", "content", "post"],
+    posted_at: ["posted_at", "ngay_post", "called_at", "thoi_diem_call"],
+    multiplier_at_note: ["multiplier_at_note", "multiplier", "x", "he_so"],
+    holding_state: ["holding_state", "tinh_trang_nam_giu", "holding"],
+    pnl_usd_at_note: ["pnl_usd_at_note", "pnl", "pnl_usd", "lai_lo"],
+    note: ["note", "ghi_chu", "notes", "nhan_xet"],
     chart_position: ["chart_position", "vi_tri", "vi_tri_song", "doan_song", "timing", "position"],
-    result: ["result", "ket_qua", "outcome", "pnl", "ket_qua_sau_do"],
+    result: ["result", "ket_qua", "outcome"],
+    source_url: ["source_url", "link_nguon", "url"],
+
+    // --- cả hai tab ---
+    added_by: ["added_by", "nguoi_them", "by", "author", "added"],
   };
 
   const HEADER_MAP = (() => {

@@ -174,6 +174,57 @@
   display: flex; gap: 8px; align-items: center;
 }
 .kt-err { color: #FFB4AE; }
+
+/* --- ghi chú --- */
+.kt-note {
+  padding: 7px 8px; margin-bottom: 6px;
+  background: var(--kt-bg-2); border: 1px solid var(--kt-border); border-radius: 8px;
+}
+.kt-note-head { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.kt-note-body { white-space: pre-wrap; }
+.kt-note-post {
+  margin-top: 4px; padding-left: 7px;
+  border-left: 2px solid var(--kt-border);
+  color: var(--kt-fg-subtle); font-style: italic; white-space: pre-wrap;
+}
+.kt-snap {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 9px; padding: 7px 9px;
+  background: var(--kt-bg-2); border: 1px solid var(--kt-border); border-radius: 8px;
+}
+.kt-snap .kt-note-post { flex: 1 0 100%; margin-top: 2px; }
+
+/* --- hộp ghi chú --- */
+.kt-sheet {
+  width: 380px; max-height: min(80vh, 620px);
+  display: flex; flex-direction: column;
+  background: var(--kt-bg); border: 1px solid var(--kt-border);
+  border-radius: 12px; box-shadow: 0 20px 56px rgba(0,0,0,.6);
+  overflow: hidden;
+}
+.kt-sheet .kt-body { padding: 12px; }
+.kt-field { margin-top: 10px; }
+.kt-field > label {
+  display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--kt-fg-subtle); margin-bottom: 4px;
+}
+.kt-ta {
+  width: 100%; min-height: 84px; resize: vertical;
+  padding: 8px 10px; background: var(--kt-bg-2); color: var(--kt-fg);
+  border: 1px solid var(--kt-border); border-radius: 8px;
+  font: inherit; line-height: 1.5; outline: none;
+}
+.kt-ta:focus { border-color: var(--kt-accent); }
+.kt-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.kt-chip {
+  appearance: none; font: inherit; font-size: 11px; cursor: pointer;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--kt-bg-2); color: var(--kt-fg-dim);
+  border: 1px solid var(--kt-border);
+}
+.kt-chip[aria-pressed="true"] { background: rgba(88,166,255,.16); border-color: rgba(88,166,255,.45); color: #9CCBFF; }
+.kt-chip:active { transform: scale(.97); }
+.kt-saving { opacity: .55; pointer-events: none; }
 .kt-link { color: var(--kt-accent); cursor: pointer; text-decoration: none; }
 .kt-link:hover { text-decoration: underline; }
 `;

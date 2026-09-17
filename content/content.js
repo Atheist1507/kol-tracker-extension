@@ -1,46 +1,113 @@
 /**
- * Điều phối phía trang web: nạp dữ liệu từ storage, dựng db, gắn panel +
- * overlay, nghe phím tắt và tin nhắn từ popup.
+ * Điều phối phía trang web.
  *
- * Không fetch gì ở đây — mọi lượt lấy CSV đều nhờ service worker (xem
- * background/service-worker.js).
+ * Luồng dữ liệu:
+ *   GMGN gọi API  →  main-world.js bọc fetch, postMessage sang đây
+ *                 →  KT.gmgn.parseMessages  →  state.callers (người đang trên chart)
+ *   Apps Script   →  service worker fetch   →  storage.local  →  state.db (hồ sơ trong Sheet)
+ *
+ * Ghép hai cái đó lại bằng VÍ là ra "ai trên chart này mình đã biết".
  */
 (function () {
   "use strict";
   const KT = globalThis.KT;
 
-  // File này có thể được chèn tay (popup → "Bật panel trên tab này") lên một
-  // tab đã có sẵn content script. Chèn hai lần = hai panel chồng nhau.
+  // Panel chỉ ở frame trên cùng; overlay thì frame nào cũng chạy.
+  const isTop = window.top === window;
+
   if (globalThis.__KOL_TRACKER__) return;
   globalThis.__KOL_TRACKER__ = true;
 
-  // Content script chạy trong MỌI frame (chart của GMGN có thể nằm trong một
-  // iframe blob:). Overlay thì frame nào cũng cần — nó vẽ đè lên đúng frame
-  // chứa avatar. Panel thì KHÔNG: mỗi frame một panel là chồng lên nhau.
-  const isTop = window.top === window;
+  const state = {
+    cfg: KT.withDefaults(null),
+    data: null,
+    db: null,
+    callers: [], // người đang hiện trên chart (từ API GMGN)
+    token: null, // { symbol, address, chain }
+    hovered: null, // { caller, person } — để phím N biết đang nói về ai
+    ui: {},
+  };
 
-  const state = { cfg: KT.withDefaults(null), data: null, db: null };
   let panel = null;
   let overlay = null;
+  let noteBox = null;
+
+  /* ---------- ghép hồ sơ Sheet với người trên chart ---------- */
+
+  function identify(ref) {
+    if (!ref) return null;
+    const key = KT.handleKey(ref.username);
+    const wallet = KT.walletKey(ref.wallet);
+    const caller =
+      state.callers.find((c) => (wallet && c.wallet === wallet) || (key && KT.handleKey(c.username) === key)) ||
+      null;
+    const merged = caller || ref;
+    const person = KT.findPerson(state.db, merged);
+    if (!caller && !person) return null;
+    return {
+      caller,
+      person: person || KT.personFromCaller(merged),
+      known: !!person,
+      renamedFrom: person ? KT.renamedFrom(person, merged) : "",
+    };
+  }
+
+  function identifyByAvatar(url) {
+    const key = KT.avatarKey(url);
+    if (!key) return null;
+    const caller = state.callers.find((c) => KT.avatarKey(c.avatar) === key);
+    if (caller) return identify(caller);
+    // Ảnh lưu trong Sheet (người nhập tay, không có trên chart lúc này)
+    const person = state.db && state.db.people.find((p) => p.avatar && KT.avatarKey(p.avatar) === key);
+    return person ? { caller: null, person, known: true, renamedFrom: "" } : null;
+  }
 
   const api = {
     getState: () => state,
     refresh: () => chrome.runtime.sendMessage({ type: KT.MSG.REFRESH }).catch((e) => ({ error: String(e) })),
     openOptions: () => chrome.runtime.sendMessage({ type: "kt:openOptions" }).catch(() => {}),
-    getSeen: () => (overlay ? overlay.getSeen() : []),
-    onCapture: () => {
-      if (panel && panel.isOpen()) panel.update();
-    },
+    identify,
+    identifyByAvatar,
     savePos: (pos) => {
-      const ui = Object.assign({}, state.ui, pos);
-      state.ui = ui;
-      chrome.storage.local.set({ [KT.STORAGE.UI]: ui });
+      state.ui = Object.assign({}, state.ui, pos);
+      chrome.storage.local.set({ [KT.STORAGE.UI]: state.ui });
+    },
+
+    /** Overlay báo "chuột đang ở trên người này" → phím N dùng lại. */
+    setHovered: (hit, rect) => {
+      state.hovered = hit ? Object.assign({}, hit, { rect: rect || null }) : null;
+    },
+
+    openNote: (hit, rect) => {
+      if (!noteBox || !hit) return;
+      noteBox.open({
+        caller: hit.caller,
+        person: hit.person,
+        renamedFrom: hit.renamedFrom,
+        token: (state.token && state.token.symbol) || "",
+        tokenAddress: (state.token && state.token.address) || "",
+        chain: (state.token && state.token.chain) || "",
+        rect: rect || (hit.rect || null),
+      });
+    },
+
+    saveNote: (payload) =>
+      chrome.runtime
+        .sendMessage({ type: KT.MSG.SAVE_NOTE, payload })
+        .catch((e) => ({ ok: false, error: String(e) })),
+
+    onSaved: () => {
+      // Sheet đã nhận; kéo lại dữ liệu để panel hiện ngay ghi chú vừa lưu
+      api.refresh();
+      if (panel) panel.flash("Đã lưu vào Sheet");
     },
   };
 
+  /* ---------- dữ liệu ---------- */
+
   function rebuildDb() {
     const d = state.data;
-    state.db = d ? KT.buildDb(d.kols, d.calls, state.cfg) : null;
+    state.db = d ? KT.buildDb(d.overview, d.detail) : null;
   }
 
   async function load() {
@@ -55,31 +122,46 @@
     rebuildDb();
   }
 
-  function applyOverlay() {
-    if (!overlay) return;
-    const want = state.cfg.overlayRings || state.cfg.overlayHover;
-    if (want && !overlay.isRunning()) overlay.start();
-    else if (!want && overlay.isRunning()) overlay.stop();
-    else if (want) overlay.reset();
+  /* ---------- cầu nối với main world ---------- */
+
+  function onWindowMessage(event) {
+    // Chỉ nhận tin của CHÍNH trang này, do main-world.js của mình gửi
+    if (event.source !== window) return;
+    const msg = event.data;
+    if (!msg || msg.source !== "kol-tracker") return;
+
+    try {
+      if (msg.kind === "messages") {
+        const callers = KT.gmgn.parseMessages(msg.payload);
+        if (!callers.length) return;
+        state.callers = callers;
+        const where = KT.gmgn.parseEndpoint(msg.url);
+        if (where) {
+          state.token = Object.assign({}, state.token, {
+            chain: where.chain,
+            address: where.tokenAddress,
+          });
+        }
+        if (panel) panel.update();
+        if (overlay) overlay.reset();
+      } else if (msg.kind === "token") {
+        const list = (msg.payload && msg.payload.data) || [];
+        const first = Array.isArray(list) ? list[0] : list;
+        if (first && first.symbol) {
+          state.token = Object.assign({}, state.token, {
+            symbol: first.symbol,
+            name: first.name,
+            address: KT.walletKey(first.address),
+          });
+          if (panel) panel.update();
+        }
+      }
+    } catch (e) {
+      /* dữ liệu GMGN đổi hình dạng — im lặng, đừng làm hỏng trang */
+    }
   }
 
-  /** Dữ liệu cũ quá thì tự làm tươi — spec: fetch lại mỗi khi mở trang GMGN. */
-  function refreshIfStale() {
-    const stale = (state.cfg.staleMinutes || 10) * 60000;
-    const syncedAt = (state.data && state.data.syncedAt) || 0;
-    if (!isTop) return; // n frame = n lời gọi fetch cho cùng một bảng
-    if (!state.cfg.kolsCsvUrl) return;
-    if (Date.now() - syncedAt > stale) api.refresh();
-  }
-
-  function onHotkey(ev) {
-    // Alt+K. Bắt luôn ở đây chứ không chỉ dựa vào chrome.commands: phím tắt
-    // của extension có thể bị extension khác giành mất mà không báo gì.
-    if (!ev.altKey || ev.ctrlKey || ev.metaKey) return;
-    if ((ev.key || "").toLowerCase() !== "k") return;
-    ev.preventDefault();
-    togglePanel();
-  }
+  /* ---------- phím tắt ---------- */
 
   function selectedText() {
     try {
@@ -88,6 +170,32 @@
     } catch (e) {
       return "";
     }
+  }
+
+  function onHotkey(ev) {
+    if (ev.ctrlKey || ev.metaKey) return;
+    if (noteBox && noteBox.isOpen()) return; // đang gõ trong hộp note
+    const key = (ev.key || "").toLowerCase();
+
+    if (ev.altKey && key === "k") {
+      ev.preventDefault();
+      return togglePanel();
+    }
+
+    // N: ghi chú người đang hover. Không dùng Alt để gõ cho nhanh, nên phải
+    // né mọi ô nhập của GMGN — bằng không gõ chữ "n" trong ô tìm kiếm của họ
+    // là bật hộp note.
+    if (key === "n" && !ev.altKey && !ev.shiftKey && !isTyping(ev.target)) {
+      if (!state.hovered) return;
+      ev.preventDefault();
+      api.openNote(state.hovered, state.hovered.rect);
+    }
+  }
+
+  function isTyping(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
   }
 
   function togglePanel(query) {
@@ -102,6 +210,24 @@
     }
   }
 
+  function applyOverlay() {
+    if (!overlay) return;
+    const want = state.cfg.overlayRings || state.cfg.overlayHover;
+    if (want && !overlay.isRunning()) overlay.start();
+    else if (!want && overlay.isRunning()) overlay.stop();
+    else if (want) overlay.reset();
+  }
+
+  function refreshIfStale() {
+    if (!isTop) return;
+    const stale = (state.cfg.staleMinutes || 10) * 60000;
+    const syncedAt = (state.data && state.data.syncedAt) || 0;
+    if (!state.cfg.sheetApiUrl && !state.cfg.kolsCsvUrl) return;
+    if (Date.now() - syncedAt > stale) api.refresh();
+  }
+
+  /* ---------- sự kiện ---------- */
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes[KT.STORAGE.DATA]) {
       state.data = changes[KT.STORAGE.DATA].newValue;
@@ -111,7 +237,6 @@
     }
     if (area === "sync" && changes[KT.STORAGE.CONFIG]) {
       state.cfg = KT.withDefaults(changes[KT.STORAGE.CONFIG].newValue);
-      rebuildDb();
       if (panel) panel.update();
       applyOverlay();
     }
@@ -125,10 +250,15 @@
       return;
     }
     if (msg.type === KT.MSG.DIAGNOSE) {
-      // Chỉ frame trên cùng trả lời: nhiều frame cùng sendResponse thì Chrome
-      // chỉ lấy một cái, còn lại thành lỗi lạ trong console.
       if (!isTop) return;
-      sendResponse(overlay ? overlay.diagnose() : { error: "overlay chưa chạy" });
+      const base = overlay ? overlay.diagnose() : { error: "overlay chưa chạy" };
+      sendResponse(
+        Object.assign(base, {
+          callers: state.callers.length,
+          token: state.token,
+          sheetPeople: state.db ? state.db.counts.people : 0,
+        })
+      );
       return;
     }
   });
@@ -136,9 +266,13 @@
   (async function init() {
     await load();
 
+    window.addEventListener("message", onWindowMessage, false);
+
     if (isTop) {
       panel = KT.createPanel(api);
       panel.mount(state.ui);
+      noteBox = KT.createNoteBox(api);
+      noteBox.mount();
       if (state.cfg.panelEnabled && state.ui.open !== false) panel.show();
     }
     overlay = KT.createOverlay(api);
@@ -147,13 +281,10 @@
     window.addEventListener("keydown", onHotkey, true);
     refreshIfStale();
 
-    // Cửa hậu để debug từ console của trang (isolated world):
-    //   __KT.diagnose()  → chart này canvas hay DOM?
     globalThis.__KT = {
       state,
       diagnose: () => overlay.diagnose(),
-      seen: () => overlay.getSeen(),
-      lookup: (q) => KT.lookup(state.db, q),
+      identify,
       panel,
     };
   })();

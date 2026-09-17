@@ -20,13 +20,13 @@
     diagBtn: document.getElementById("diag-btn"),
   };
 
-  const state = { cfg: KT.withDefaults(null), data: null, db: null, detailKey: null };
+  const state = { cfg: KT.withDefaults(null), data: null, db: null, detailRef: null };
 
   async function load() {
     const [cfg, data] = await Promise.all([KT.getConfig(), KT.getData()]);
     state.cfg = cfg;
     state.data = data;
-    state.db = KT.buildDb(data.kols, data.calls, cfg);
+    state.db = KT.buildDb(data.overview, data.detail);
   }
 
   function renderFoot(msg) {
@@ -41,7 +41,7 @@
     }
     const db = state.db;
     const when = state.data && state.data.syncedAt ? KT.timeAgo(state.data.syncedAt) : "chưa tải";
-    el.foot.textContent = db ? `${db.counts.kols} KOL · ${when}` : "chưa có dữ liệu";
+    el.foot.textContent = db ? `${db.counts.people} người · ${when}` : "chưa có dữ liệu";
     el.dot.className = "kt-dot ok";
   }
 
@@ -49,19 +49,20 @@
     const q = el.q.value.trim();
     const db = state.db;
 
-    if (state.detailKey && db && db.byKey[state.detailKey]) {
-      el.content.innerHTML = KT.render.detailHtml(db.byKey[state.detailKey], {
-        sheetUrl: state.cfg.sheetUrl,
-        callLimit: 8,
-      });
-      KT.render.hydrateAvatars(el.content);
-      renderFoot();
-      return;
+    if (state.detailRef && db) {
+      const person = KT.findPerson(db, state.detailRef);
+      if (person) {
+        el.content.innerHTML = KT.render.personDetail(person, { noteLimit: 6 });
+        KT.render.hydrateAvatars(el.content);
+        renderFoot();
+        return;
+      }
+      state.detailRef = null;
     }
 
-    if (!db || !db.kols.length) {
+    if (!db || !db.people.length) {
       el.content.innerHTML = `<div class="kt-empty">
-        <b>Chưa có dữ liệu.</b><br>Dán link CSV của Google Sheet trong Options.
+        <b>Chưa có dữ liệu.</b><br>Mở Options để nối Sheet qua Apps Script.
         <div class="kt-btns" style="justify-content:center">
           <button class="kt-btn kt-primary" data-act="options">Mở Options</button>
         </div></div>`;
@@ -70,35 +71,24 @@
     }
 
     if (!q) {
-      const top = db.kols.filter((k) => !k.ghost).slice(0, 8);
+      const top = db.people.filter((p) => !p.ghost).slice(0, 8);
       el.content.innerHTML =
-        `<div class="kt-sec-title">Hạng cao nhất</div>` + top.map((k) => KT.render.rowHtml(k)).join("");
+        `<div class="kt-sec-title">Hạng cao nhất</div>` + top.map((p) => KT.render.personRow(p)).join("");
       KT.render.hydrateAvatars(el.content);
       renderFoot();
       return;
     }
 
     const hits = KT.search(db, q, 10);
-    const tokenHits = KT.callsForToken(db, q);
-    const listed = tokenHits.length ? hits.filter((h) => h.reason !== "đã call token này") : hits;
-
-    let html = "";
-    if (listed.length) html += `<div class="kt-sec-title">Kết quả</div>` + KT.render.resultsHtml(listed);
-    if (tokenHits.length) html += KT.render.tokenHtml(KT.tokenKey(q), tokenHits);
-    if (!html) {
-      html = `<div class="kt-empty"><b>${KT.esc(KT.displayHandle(q))}</b> chưa có trong database.
-        <div class="kt-btns" style="justify-content:center">
-          <button class="kt-btn" data-act="copy" data-value="${KT.esc(KT.displayHandle(q))}">Copy handle</button>
-          ${state.cfg.sheetUrl ? `<button class="kt-btn kt-primary" data-act="open-sheet">Thêm vào Sheet</button>` : ""}
-        </div></div>`;
-    }
-    el.content.innerHTML = html;
+    el.content.innerHTML = hits.length
+      ? `<div class="kt-sec-title">Kết quả</div>` + KT.render.resultsHtml(hits)
+      : `<div class="kt-empty">Không có ai khớp <b>${KT.esc(q)}</b>.</div>`;
     KT.render.hydrateAvatars(el.content);
     renderFoot();
   }
 
   el.q.addEventListener("input", () => {
-    state.detailKey = null;
+    state.detailRef = null;
     render();
   });
 
@@ -107,8 +97,16 @@
     if (actEl) {
       const act = actEl.dataset.act;
       if (act === "back") {
-        state.detailKey = null;
+        state.detailRef = null;
         return render();
+      }
+      if (act === "open-x") {
+        const url = KT.safeUrl(actEl.dataset.value);
+        if (url) chrome.tabs.create({ url });
+        return;
+      }
+      if (act === "note") {
+        return renderFoot("Ghi chú thì làm trên trang GMGN: hover một người rồi bấm N.");
       }
       if (act === "copy") {
         await navigator.clipboard.writeText(actEl.dataset.value || "");
@@ -121,9 +119,10 @@
       }
       if (act === "options") return chrome.runtime.openOptionsPage();
     }
-    const row = ev.target.closest(".kt-row");
-    if (row && row.dataset.key) {
-      state.detailKey = row.dataset.key;
+    const row = ev.target.closest(".kt-row[data-key]");
+    if (row) {
+      const key = row.dataset.key;
+      state.detailRef = key.startsWith("0x") ? { wallet: key } : { username: key };
       render();
     }
   });
@@ -165,7 +164,7 @@
       await navigator.clipboard.writeText(text);
       el.content.innerHTML = `<div class="kt-sec-title">Chẩn đoán (đã copy vào clipboard)</div>
         <div class="kt-hint" style="white-space:pre-wrap;font-family:ui-monospace,monospace">${KT.esc(text)}</div>`;
-      state.detailKey = null;
+      state.detailRef = null;
     } catch (e) {
       renderFoot("Tab này chưa chạy content script.");
     }

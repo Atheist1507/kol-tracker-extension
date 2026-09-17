@@ -53,6 +53,7 @@
       <code>textContent</code> nối hết lại không có dấu cách):
       <button id="tip-known">Tooltip người ĐÃ có trong DB</button>
       <button id="tip-unknown">Tooltip người LẠ</button>
+      <button id="feed-api">Giả lập GMGN trả API (3 người)</button>
       <button id="tip-real">Tooltip THẬT (HTML copy từ GMGN)</button>
       <button id="tip-clear">Đóng tooltip</button>
     </p>
@@ -124,6 +125,7 @@
         document.body.appendChild(wrap);
       };
       document.getElementById("tip-clear").onclick = clearTip;
+      document.getElementById("feed-api").onclick = () => globalThis.__ktFeedApi();
     </script>
 
     <script src="../src/lib/normalize.js"></script>
@@ -131,6 +133,7 @@
     <script src="../src/lib/tier.js"></script>
     <script src="../src/lib/stats.js"></script>
     <script src="../src/lib/model.js"></script>
+    <script src="../src/lib/gmgn.js"></script>
     <script src="../src/lib/tooltip-text.js"></script>
     <script src="../src/lib/sheet-url.js"></script>
     <script src="../src/lib/config.js"></script>
@@ -154,6 +157,7 @@
       }
     </script>
     <script src="../content/overlay.js"></script>
+    <script src="../content/note-box.js"></script>
     <script src="../content/panel.js"></script>
     <script src="../content/content.js"></script>
   </body>

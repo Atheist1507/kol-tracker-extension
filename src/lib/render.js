@@ -1,9 +1,10 @@
 /**
  * Dựng HTML cho panel (content script) VÀ popup — một bản dựng duy nhất,
- * hai vỏ khác nhau. Tách ra đây vì đã có lần định "chỉ copy tạm sang popup".
+ * hai vỏ khác nhau.
  *
  * ⚠ Mọi giá trị đi vào HTML đều phải qua esc(): nội dung là chữ người khác
- * gõ vào Google Sheet, và nó được chèn vào trang gmgn.ai.
+ * gõ (ghi chú của hai đứa, và post của người lạ trên GMGN), và nó được chèn
+ * vào trang gmgn.ai.
  */
 (function (root) {
   "use strict";
@@ -18,34 +19,22 @@
       .replace(/'/g, "&#39;");
   }
 
-  /** Chỉ cho http(s) vào thuộc tính src/href — ô avatar_url là chữ gõ tay. */
+  /** Chỉ cho http(s) vào src/href — avatar_url là chữ gõ tay trong Sheet. */
   function safeUrl(raw) {
     const s = String(raw == null ? "" : raw).trim();
-    if (!/^https?:\/\//i.test(s)) return "";
-    return s;
+    return /^https?:\/\//i.test(s) ? s : "";
   }
 
-  function initials(handle) {
-    const parts = KT.stripAccents(handle).replace(/[^A-Za-z0-9 ]/g, " ").trim().split(/\s+/);
+  function initials(name) {
+    const parts = KT.stripAccents(name).replace(/[^A-Za-z0-9 ]/g, " ").trim().split(/\s+/);
     if (!parts[0]) return "?";
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
-  function avatarHtml(kol, big) {
-    const color = KT.tierColor(kol.tier);
-    const url = safeUrl(kol.avatar);
-    const cls = "kt-av" + (big ? " kt-lg" : "");
-    const ini = esc(initials(kol.handle));
-    const inner = url ? `<img src="${esc(url)}" alt="" data-ini="${ini}">` : ini;
-    return `<span class="${cls}" style="border-color:${color}">${inner}</span>`;
-  }
-
-  function tierBadgeHtml(kol) {
-    const letter = kol.tierLetter || "?";
-    const color = KT.tierColor(kol.tier);
-    const label = kol.tier ? kol.tier : "chưa xếp hạng";
-    return `<span class="kt-tier" style="color:${color}" title="${esc(label)}">${esc(letter)}</span>`;
+  function shortWallet(wallet) {
+    const w = String(wallet || "");
+    return w.length > 12 ? w.slice(0, 6) + "…" + w.slice(-4) : w;
   }
 
   function timeAgo(ts) {
@@ -69,137 +58,167 @@
     return "x" + (Number.isInteger(m) ? m : m.toFixed(m < 10 ? 2 : 1).replace(/\.?0+$/, ""));
   }
 
-  /** Dòng kết quả trong danh sách tìm kiếm. */
-  function rowHtml(kol, note) {
-    const calls = kol.calls.length;
-    const sub = note || (calls ? `${calls} call` : kol.ghost ? "chưa có hồ sơ" : "chưa có call nào");
-    const flag = kol.redFlags ? ' <span style="color:#F85149" title="có cờ đỏ">⚑</span>' : "";
-    return `<div class="kt-row" data-key="${esc(kol.key)}" role="option" tabindex="-1">
-      ${avatarHtml(kol)}
+  const HOLDING_COLOR = {
+    no_buy: "#F85149",
+    sold_all: "#F85149",
+    sold_part: "#F0883E",
+    holding: "#3FB950",
+    unknown: "#6E7A88",
+  };
+
+  function avatarHtml(person, big) {
+    const color = KT.tierColor(person.tier);
+    const url = safeUrl(person.avatar);
+    const ini = esc(initials(person.username || person.displayName || person.wallet));
+    const inner = url ? `<img src="${esc(url)}" alt="" data-ini="${ini}">` : ini;
+    return `<span class="kt-av${big ? " kt-lg" : ""}" style="border-color:${color}">${inner}</span>`;
+  }
+
+  function tierBadgeHtml(person) {
+    const color = KT.tierColor(person.tier);
+    const label = person.tier || "chưa xếp hạng";
+    return `<span class="kt-tier" style="color:${color}" title="${esc(label)}">${esc(
+      person.tierLetter || "?"
+    )}</span>`;
+  }
+
+  function holdingHtml(state, label) {
+    if (!state || state === "unknown") return "";
+    const color = HOLDING_COLOR[state] || HOLDING_COLOR.unknown;
+    return `<span class="kt-pos" style="color:${color};background:${color}22">${esc(
+      label || KT.gmgn.HOLDING_LABELS[state] || state
+    )}</span>`;
+  }
+
+  /** Dòng một người trong danh sách kết quả tìm kiếm. */
+  function personRow(person, note) {
+    const sub =
+      note ||
+      (person.noteCount ? `${person.noteCount} ghi chú` : person.ghost ? "chưa có hồ sơ" : "chưa ghi chú nào");
+    const flag = person.redFlags ? ' <span style="color:#F85149" title="có cờ đỏ">⚑</span>' : "";
+    return `<div class="kt-row" data-key="${esc(person.wallet || person.usernameKey)}" role="option" tabindex="-1">
+      ${avatarHtml(person)}
       <span class="kt-grow kt-trunc">
-        <span class="kt-name">${esc(kol.handle)}</span>${flag}
+        <span class="kt-name">${esc(person.username || shortWallet(person.wallet))}</span>${flag}
         <span class="kt-sub kt-trunc" style="display:block">${esc(sub)}</span>
       </span>
-      ${tierBadgeHtml(kol)}
+      ${tierBadgeHtml(person)}
     </div>`;
   }
 
   function resultsHtml(hits) {
-    if (!hits.length) return "";
-    return hits.map((h) => rowHtml(h.kol, h.reason === "handle" ? null : h.reason)).join("");
+    return hits.map((h) => personRow(h.person, h.reason || null)).join("");
   }
 
-  function statsHtml(kol) {
-    const s = kol.stats || KT.calcStats([]);
-    const winRate =
-      s.winRate == null ? "—" : Math.round(s.winRate * 100) + "%";
-    const best = s.bestMultiple == null ? "—" : fmtMultiple(s.bestMultiple);
+  /**
+   * Một người đang hiện trên chart. `caller` là message đã chuẩn hoá từ API,
+   * `person` là hồ sơ trong Sheet (có thể null = người lạ).
+   */
+  function callerRow(caller, person) {
+    const known = !!person;
+    const bits = [];
+    if (caller.multiple != null) bits.push(fmtMultiple(caller.multiple));
+    if (caller.followers != null) bits.push(caller.followers + " follower");
+    if (caller.postedTs) bits.push(timeAgo(caller.postedTs));
 
-    const total = Math.max(1, s.win + s.loss + s.neutral + s.unknown);
-    const seg = (n, color) =>
-      n ? `<i style="width:${(n / total) * 100}%;background:${color}"></i>` : "";
+    const flag = person && person.redFlags ? ' <span style="color:#F85149" title="có cờ đỏ">⚑</span>' : "";
+    const tier = known
+      ? tierBadgeHtml(person)
+      : '<span class="kt-tier" style="color:#6E7A88" title="chưa có trong Sheet">mới</span>';
 
-    const warn = !s.enoughSample && s.total > 0
-      ? `<div class="kt-hint">Mới ${s.total} case — cần ≥ ${s.minSample || KT.MIN_SAMPLE} case win rate mới đáng tin.</div>`
-      : "";
-
-    return `<div class="kt-stats">
-        <div class="kt-stat"><div class="kt-stat-v">${s.total}</div><div class="kt-stat-l">Call</div></div>
-        <div class="kt-stat"><div class="kt-stat-v" style="color:${s.winRate != null && s.winRate >= 0.5 ? "#3FB950" : "#E6EDF3"}">${winRate}</div><div class="kt-stat-l">Win rate</div></div>
-        <div class="kt-stat"><div class="kt-stat-v">${esc(best)}</div><div class="kt-stat-l">Cao nhất</div></div>
-      </div>
-      <div class="kt-bar" title="${s.win} thắng · ${s.loss} thua · ${s.neutral} huề · ${s.unknown} chưa rõ">
-        ${seg(s.win, "#3FB950")}${seg(s.neutral, "#8B949E")}${seg(s.loss, "#F85149")}${seg(s.unknown, "#2A313B")}
-      </div>${warn}`;
-  }
-
-  function positionHtml(s) {
-    const p = s.position || {};
-    const parts = [];
-    if (p.early) parts.push(`${p.early} vào sớm`);
-    if (p.mid) parts.push(`${p.mid} giữa sóng`);
-    if (p.late) parts.push(`${p.late} đu đỉnh`);
-    if (!parts.length) return "";
-    return `<div class="kt-hint">Timing: ${esc(parts.join(" · "))}</div>`;
-  }
-
-  function callsTableHtml(calls, limit) {
-    if (!calls.length) return `<div class="kt-hint">Chưa log call nào cho người này.</div>`;
-    const rows = calls
-      .slice(0, limit || 10)
-      .map((c) => {
-        const r = KT.parseResult(c.result);
-        const when = c.calledAtTs ? timeAgo(c.calledAtTs) : c.calledAt || "";
-        const pos = c.position
-          ? `<span class="kt-pos kt-pos-${c.position}">${esc(KT.POSITION_LABELS[c.position])}</span>`
-          : "";
-        return `<tr>
-          <td class="kt-tok">${esc(c.token || "—")}</td>
-          <td class="kt-res-${r.outcome}">${esc(c.result || "—")}</td>
-          <td>${pos}</td>
-          <td style="color:#6E7A88;white-space:nowrap">${esc(when)}</td>
-        </tr>`;
-      })
-      .join("");
-    const more =
-      calls.length > (limit || 10)
-        ? `<div class="kt-hint">… và ${calls.length - (limit || 10)} call cũ hơn.</div>`
-        : "";
-    return `<table class="kt-table">
-      <thead><tr><th>Token</th><th>Kết quả</th><th>Timing</th><th>Khi nào</th></tr></thead>
-      <tbody>${rows}</tbody></table>${more}`;
-  }
-
-  /** Thẻ chi tiết một KOL. */
-  function detailHtml(kol, opts) {
-    const o = opts || {};
-    const meta = [];
-    if (kol.source) meta.push("Nguồn: " + kol.source);
-    if (kol.addedBy) meta.push("Thêm bởi " + kol.addedBy);
-    if (kol.updatedAt) meta.push("Cập nhật " + kol.updatedAt);
-
-    const extras = Object.keys(kol.extra || {})
-      .map((k) => `<div class="kt-hint"><b style="color:#9BA6B2">${esc(k)}:</b> ${esc(kol.extra[k])}</div>`)
-      .join("");
-
-    return `<div class="kt-detail">
-      <div class="kt-detail-head">
-        ${avatarHtml(kol, true)}
-        <div class="kt-grow">
-          <div class="kt-handle">${esc(kol.handle)} ${tierBadgeHtml(kol)}</div>
-          ${kol.aliases.length ? `<div class="kt-aliases">còn gọi: ${esc(kol.aliases.join(", "))}</div>` : ""}
-          ${kol.ghost ? `<div class="kt-aliases" style="color:#F0883E">Chưa có hồ sơ ở tab KOLs — chỉ thấy trong Calls</div>` : ""}
-        </div>
-      </div>
-      ${kol.description ? `<div class="kt-desc">${esc(kol.description)}</div>` : ""}
-      ${kol.redFlags ? `<div class="kt-flags"><b>⚑ Cờ đỏ:</b> ${esc(kol.redFlags)}</div>` : ""}
-      ${statsHtml(kol)}
-      ${positionHtml(kol.stats || {})}
-      ${extras}
-      <div class="kt-sec-title">Lịch sử call</div>
-      ${callsTableHtml(kol.calls, o.callLimit || 10)}
-      ${meta.length ? `<div class="kt-hint">${esc(meta.join(" · "))}</div>` : ""}
-      <div class="kt-btns">
-        <button class="kt-btn" data-act="copy" data-value="${esc(kol.handle)}">Copy handle</button>
-        ${o.sheetUrl ? `<button class="kt-btn" data-act="open-sheet">Mở Sheet</button>` : ""}
-        <button class="kt-btn" data-act="back">← Danh sách</button>
-      </div>
+    return `<div class="kt-row" data-caller="${esc(caller.postId || caller.wallet)}" role="option" tabindex="-1">
+      ${avatarHtml({ tier: known ? person.tier : "", avatar: caller.avatar, username: caller.username })}
+      <span class="kt-grow kt-trunc">
+        <span class="kt-name">${esc(caller.username || shortWallet(caller.wallet))}</span>${flag}
+        <span class="kt-sub kt-trunc" style="display:block">${esc(caller.postText || "—")}</span>
+        <span class="kt-sub" style="display:block">${holdingHtml(caller.holding, caller.holdingLabel)} ${esc(
+          bits.join(" · ")
+        )}</span>
+      </span>
+      ${tier}
     </div>`;
   }
 
-  /** "Ai đã call token này" — xếp theo AI CALL SỚM NHẤT. */
-  function tokenHtml(token, hits) {
-    if (!hits.length) return "";
-    const rows = hits
-      .map(({ kol, call }, i) => {
-        const when = call.calledAtTs ? timeAgo(call.calledAtTs) : call.calledAt || "";
-        const note = [i === 0 ? "call sớm nhất" : "", when, call.result || ""]
+  /** Bảng ghi chú của một người. */
+  function notesHtml(notes, limit) {
+    if (!notes.length) return `<div class="kt-hint">Chưa ghi chú gì về người này.</div>`;
+    const rows = notes
+      .slice(0, limit || 8)
+      .map((n) => {
+        const when = n.notedTs ? timeAgo(n.notedTs) : n.notedAt || "";
+        const meta = [n.token, fmtMultiple(n.multiple), n.positionRaw, n.result]
           .filter(Boolean)
           .join(" · ");
-        return rowHtml(kol, note);
+        return `<div class="kt-note">
+          <div class="kt-note-head">
+            <span class="kt-tok">${esc(n.token || "—")}</span>
+            ${holdingHtml(n.holding)}
+            <span class="kt-spacer"></span>
+            <span class="kt-sub">${esc(when)}${n.addedBy ? " · " + esc(n.addedBy) : ""}</span>
+          </div>
+          <div class="kt-note-body">${esc(n.note || "—")}</div>
+          ${n.postText ? `<div class="kt-note-post">“${esc(n.postText)}”</div>` : ""}
+          ${meta && meta !== n.token ? `<div class="kt-sub">${esc(meta)}</div>` : ""}
+        </div>`;
       })
       .join("");
-    return `<div class="kt-sec-title">$${esc(token)} — ${hits.length} người đã call</div>${rows}`;
+    const more =
+      notes.length > (limit || 8)
+        ? `<div class="kt-hint">… và ${notes.length - (limit || 8)} ghi chú cũ hơn.</div>`
+        : "";
+    return rows + more;
+  }
+
+  /** Thẻ chi tiết một người. */
+  function personDetail(person, opts) {
+    const o = opts || {};
+    const meta = [];
+    if (person.wallet) meta.push(shortWallet(person.wallet));
+    if (person.followers != null) meta.push(person.followers + " follower");
+    if (person.firstSeen) meta.push("thấy lần đầu " + person.firstSeen);
+
+    return `<div class="kt-detail">
+      <div class="kt-detail-head">
+        ${avatarHtml(person, true)}
+        <div class="kt-grow">
+          <div class="kt-handle">${esc(person.username || shortWallet(person.wallet))} ${tierBadgeHtml(person)}</div>
+          ${person.displayName ? `<div class="kt-aliases">${esc(person.displayName)}</div>` : ""}
+          ${o.renamedFrom ? `<div class="kt-aliases" style="color:#F0883E">đã đổi tên từ @${esc(o.renamedFrom)}</div>` : ""}
+          ${
+            person.fresh
+              ? `<div class="kt-aliases" style="color:#3FB950">Người mới — chưa có trong Sheet</div>`
+              : person.ghost
+              ? `<div class="kt-aliases" style="color:#F0883E">Chưa có dòng Overview — chỉ thấy trong Detail</div>`
+              : ""
+          }
+        </div>
+      </div>
+      ${person.summary ? `<div class="kt-desc">${esc(person.summary)}</div>` : ""}
+      ${person.redFlags ? `<div class="kt-flags"><b>⚑ Cờ đỏ:</b> ${esc(person.redFlags)}</div>` : ""}
+      ${o.caller ? callerSnapshot(o.caller) : ""}
+      <div class="kt-btns">
+        <button class="kt-btn kt-primary" data-act="note" data-key="${esc(person.wallet || person.usernameKey)}">Ghi chú (N)</button>
+        ${person.twitterUrl ? `<button class="kt-btn" data-act="open-x" data-value="${esc(safeUrl(person.twitterUrl))}">Mở X</button>` : ""}
+        <button class="kt-btn" data-act="copy" data-value="${esc(person.wallet || person.username)}">Copy ví</button>
+        <button class="kt-btn" data-act="back">← Danh sách</button>
+      </div>
+      <div class="kt-sec-title">Ghi chú (${person.noteCount || 0})</div>
+      ${notesHtml(person.notes || [], o.noteLimit || 8)}
+      ${meta.length ? `<div class="kt-hint">${esc(meta.join(" · "))}</div>` : ""}
+    </div>`;
+  }
+
+  /** Ảnh chụp tình trạng hiện tại của người này với token đang mở. */
+  function callerSnapshot(caller) {
+    const bits = [];
+    if (caller.multiple != null) bits.push("hiện " + fmtMultiple(caller.multiple));
+    if (caller.pnlUsd != null) bits.push("PnL $" + Math.round(caller.pnlUsd));
+    if (caller.postedTs) bits.push("post " + timeAgo(caller.postedTs));
+    return `<div class="kt-snap">
+      ${holdingHtml(caller.holding, caller.holdingLabel)}
+      <span class="kt-sub">${esc(bits.join(" · "))}</span>
+      ${caller.postText ? `<div class="kt-note-post">“${esc(caller.postText)}”</div>` : ""}
+    </div>`;
   }
 
   /**
@@ -220,11 +239,21 @@
   KT.esc = esc;
   KT.safeUrl = safeUrl;
   KT.initials = initials;
+  KT.shortWallet = shortWallet;
   KT.timeAgo = timeAgo;
   KT.fmtMultiple = fmtMultiple;
-  KT.render = { rowHtml, resultsHtml, detailHtml, tokenHtml, statsHtml, callsTableHtml, hydrateAvatars };
+  KT.render = {
+    personRow,
+    resultsHtml,
+    callerRow,
+    personDetail,
+    notesHtml,
+    callerSnapshot,
+    hydrateAvatars,
+    HOLDING_COLOR,
+  };
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { esc, safeUrl, initials, timeAgo, fmtMultiple };
+    module.exports = { esc, safeUrl, initials, shortWallet, timeAgo, fmtMultiple };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);

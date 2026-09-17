@@ -2,88 +2,93 @@ const test = require("node:test");
 const assert = require("node:assert");
 const KT = require("./load");
 
-const KOLS = [
-  { handle: "CryptoApe", aliases: "Ape, khỉ", tier: "S", description: "hay call presale kỹ thuật", avatar_url: "https://pbs.twimg.com/profile_images/1/ape_normal.jpg", extra: {} },
-  { handle: "moonboy", tier: "C", red_flags: "xả ngay sau khi call", extra: {} },
-  { handle: "", tier: "S", extra: {} },
+const W1 = "0xf1b6a4d6aecc5a618ade56a53fa9956ea508e16c";
+const W2 = "0xaaa2222222222222222222222222222222222222";
+
+const OVERVIEW = [
+  { wallet: W1.toUpperCase(), username: "@randomguytradin", display_name: "marv", tier: "S",
+    summary: "đọc contract trước khi vào", followers: "8", extra: {} },
+  { wallet: W2, username: "moonboy", tier: "C", red_flags: "xả ngay sau khi hô", extra: {} },
 ];
 
-const CALLS = [
-  { handle: "CryptoApe", token: "$PEPE", called_at: "2026-01-02", result: "x5", chart_position: "đầu sóng", extra: {} },
-  { handle: "cryptoape", token: "WIF", called_at: "2026-02-10", result: "x0.4", extra: {} },
-  { handle: "moonboy", token: "pepe", called_at: "2026-01-05", result: "sai", chart_position: "đu đỉnh", extra: {} },
-  { handle: "ghostcaller", token: "BONK", called_at: "2026-03-01", result: "x2", extra: {} },
+const DETAIL = [
+  { wallet: W1, username: "randomguytradin", noted_at: "2026-09-10T10:00:00Z", token: "PEPE",
+    token_address: "0xtok1", note: "call sớm, có luận điểm", chart_position: "đầu sóng",
+    multiplier_at_note: "5", holding_state: "holding", extra: {} },
+  { wallet: W1, username: "randomguytradin", noted_at: "2026-09-12T10:00:00Z", token: "WIF",
+    token_address: "0xtok2", note: "lần này hô xong xả", holding_state: "sold_all", extra: {} },
+  { wallet: W2, username: "moonboy", noted_at: "2026-09-11T10:00:00Z", token: "PEPE",
+    token_address: "0xtok1", note: "đu đỉnh", chart_position: "đu đỉnh", extra: {} },
+  { wallet: "0xghost000000000000000000000000000000000", username: "nguoila",
+    noted_at: "2026-09-13T10:00:00Z", token: "BONK", extra: {} },
 ];
 
-const db = KT.buildDb(KOLS, CALLS, {});
+const db = KT.buildDb(OVERVIEW, DETAIL);
 
-test("hàng không có handle bị bỏ qua", () => {
-  assert.strictEqual(db.counts.kols, 2);
+test("đếm người có hồ sơ và tổng số note", () => {
+  assert.strictEqual(db.counts.people, 2);
+  assert.strictEqual(db.counts.notes, 4);
 });
 
-test("alias tra ra đúng người", () => {
-  assert.strictEqual(KT.lookup(db, "Ape").handle, "CryptoApe");
-  assert.strictEqual(KT.lookup(db, "khỉ").handle, "CryptoApe");
+test("ví viết hoa hay thường đều là một người", () => {
+  const p = KT.findPerson(db, { wallet: W1 });
+  assert.ok(p);
+  assert.strictEqual(p.wallet, W1);
+  assert.strictEqual(KT.findPerson(db, { wallet: W1.toUpperCase() }), p);
 });
 
-test("call viết hoa/thường khác nhau vẫn gộp về một người", () => {
-  assert.strictEqual(KT.lookup(db, "@cryptoape").calls.length, 2);
+test("note gom đúng về chủ, mới nhất trước", () => {
+  const p = KT.findPerson(db, { wallet: W1 });
+  assert.strictEqual(p.noteCount, 2);
+  assert.strictEqual(p.notes[0].token, "WIF");
 });
 
-test("handle chỉ có trong tab Calls vẫn tra được, đánh dấu là chưa có hồ sơ", () => {
-  const ghost = KT.lookup(db, "ghostcaller");
+test("tra được bằng username khi chưa biết ví", () => {
+  assert.strictEqual(KT.findPerson(db, { username: "@moonboy" }).wallet, W2);
+});
+
+test("VÍ được ưu tiên hơn username — đây là lý do đổi khoá", () => {
+  // Cùng lúc gửi ví của người 1 và username của người 2 → phải ra người 1
+  const p = KT.findPerson(db, { wallet: W1, username: "moonboy" });
+  assert.strictEqual(p.wallet, W1);
+});
+
+test("note của ví chưa có dòng Overview vẫn tra ra được, đánh dấu ghost", () => {
+  const ghost = KT.findPerson(db, { username: "nguoila" });
   assert.ok(ghost);
   assert.strictEqual(ghost.ghost, true);
-  assert.strictEqual(ghost.calls.length, 1);
-  assert.strictEqual(db.counts.kols, 2, "ghost không được tính vào số KOL có hồ sơ");
+  assert.strictEqual(ghost.noteCount, 1);
+  assert.strictEqual(db.counts.people, 2, "ghost không tính vào số người có hồ sơ");
 });
 
-test("call sắp xếp mới nhất trước", () => {
-  assert.strictEqual(KT.lookup(db, "cryptoape").calls[0].token, "WIF");
+test("phát hiện đổi username: cùng ví, khác tên", () => {
+  const p = KT.findPerson(db, { wallet: W1 });
+  assert.strictEqual(KT.renamedFrom(p, { wallet: W1, username: "ten_moi_toanh" }), "randomguytradin");
+  assert.strictEqual(KT.renamedFrom(p, { wallet: W1, username: "@randomguytradin" }), "");
 });
 
-test("tra theo URL avatar bỏ qua hậu tố kích thước", () => {
-  const kol = KT.lookupByAvatar(db, "https://pbs.twimg.com/profile_images/1/ape_400x400.jpg");
-  assert.strictEqual(kol.handle, "CryptoApe");
+test("khác ví thì KHÔNG báo đổi tên (hai người khác nhau)", () => {
+  const p = KT.findPerson(db, { wallet: W1 });
+  assert.strictEqual(KT.renamedFrom(p, { wallet: W2, username: "ten_khac" }), "");
 });
 
-test("gõ đúng handle thì người đó đứng đầu, không phải người tier cao hơn", () => {
-  const hits = KT.search(db, "moonboy");
-  assert.strictEqual(hits[0].kol.handle, "moonboy");
+test("tra theo token: ai đã được note ở token này", () => {
+  assert.strictEqual(db.byToken["0xtok1"].length, 2);
 });
 
-test("tìm được theo chữ trong mô tả", () => {
-  const hits = KT.search(db, "presale");
-  assert.strictEqual(hits[0].kol.handle, "CryptoApe");
-});
-
-test("tìm theo token ra những người đã call token đó", () => {
-  const hits = KT.search(db, "$PEPE");
-  const names = hits.map((h) => h.kol.handle);
-  assert.ok(names.includes("CryptoApe"));
-  assert.ok(names.includes("moonboy"));
-});
-
-test("ai call token này — xếp người call SỚM nhất lên đầu", () => {
-  const rows = KT.callsForToken(db, "pepe");
-  assert.strictEqual(rows.length, 2);
-  assert.strictEqual(rows[0].kol.handle, "CryptoApe");
-});
-
-test("stats dựng sẵn cho từng người", () => {
-  const ape = KT.lookup(db, "cryptoape");
-  assert.strictEqual(ape.stats.total, 2);
-  assert.strictEqual(ape.stats.win, 1);
-  assert.strictEqual(ape.stats.loss, 1);
+test("tìm theo tên, theo ví, theo chữ trong ghi chú", () => {
+  assert.strictEqual(KT.search(db, "moonboy")[0].person.wallet, W2);
+  assert.strictEqual(KT.search(db, W1)[0].person.wallet, W1);
+  assert.strictEqual(KT.search(db, "contract")[0].person.wallet, W1);
 });
 
 test("truy vấn rỗng không trả về cả kho", () => {
   assert.deepStrictEqual(KT.search(db, "  "), []);
-  assert.deepStrictEqual(KT.callsForToken(db, ""), []);
 });
 
 test("db rỗng không ném lỗi", () => {
-  const empty = KT.buildDb([], [], {});
-  assert.deepStrictEqual(empty.kols, []);
-  assert.strictEqual(KT.lookup(empty, "ai đó"), null);
+  const empty = KT.buildDb([], []);
+  assert.deepStrictEqual(empty.people, []);
+  assert.strictEqual(KT.findPerson(empty, { wallet: "0x1" }), null);
+  assert.strictEqual(KT.renamedFrom(null, null), "");
 });

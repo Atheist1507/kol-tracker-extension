@@ -1,39 +1,30 @@
 /**
- * Mức 2 của spec: gắn thông tin thẳng lên chart, không phải gõ gì.
+ * Lớp phủ trên chart: viền màu quanh avatar quen mặt + thẻ tóm tắt khi hover.
  *
- * Spec để ngỏ "canvas hay DOM?" nên ở đây làm CẢ HAI đường, cùng một lớp
- * overlay, và cái nào bắt được thì cái đó chạy:
- *
- *  (a) Avatar là <img> thật → so khớp URL ảnh với cột avatar_url, vẽ VIỀN
- *      MÀU theo tier quanh nó.
- *  (b) Chart vẽ bằng canvas (giống TradingView, khả năng cao) → không có
- *      element nào để bám. Đường vòng: rình cái tooltip mà GMGN tự hiện khi
- *      hover vào avatar, đọc handle trong đó, rồi dán thẻ tóm tắt cạnh bên.
+ * Nguồn danh tính là API `community/messages` (xem content.js) chứ không phải
+ * chữ trên màn hình — nên so khớp avatar giờ là so URL ảnh mà chính GMGN đưa
+ * ra, chính xác tuyệt đối. Phần đọc chữ trong tooltip vẫn giữ làm ĐƯỜNG DỰ
+ * PHÒNG cho lúc API đổi hình dạng hoặc chưa kịp về.
  *
  * ⚠ TUYỆT ĐỐI không sửa DOM của trang chủ nhà. GMGN là SPA — chèn node vào
- * giữa cây của nó là React ghi đè lại (nhẹ) hoặc vỡ render (nặng), mà mình
- * thì không debug được app của người khác. Mọi thứ mình vẽ đều nằm trong
- * shadow root riêng, `position: fixed`, `pointer-events: none`.
+ * giữa cây của nó là React ghi đè lại (nhẹ) hoặc vỡ render (nặng). Mọi thứ
+ * mình vẽ nằm trong shadow root riêng, `position: fixed`, `pointer-events: none`.
  */
 (function (root) {
   "use strict";
   const KT = (root.KT = root.KT || {});
 
-  const MAX_RINGS = 60; // chart dày đặc thì vẽ hết là giật, cắt ở đây
+  const MAX_RINGS = 60;
   const MIN_AVATAR_PX = 12;
   const SCAN_DEBOUNCE_MS = 250;
   const TOOLTIP_DEBOUNCE_MS = 80;
 
-  // Giới hạn khi soi một node vừa xuất hiện. Node đó có thể là cái tooltip
-  // bé tí, mà cũng có thể là cả nửa trang vừa render lại — không chặn thì một
-  // lần GMGN đổi route là quét cả nghìn text node.
+  // Giới hạn khi soi một node vừa xuất hiện: nó có thể là cái tooltip bé tí,
+  // mà cũng có thể là cả nửa trang vừa render lại.
   const MAX_TEXT_NODES = 60;
-  // Một thẻ người chỉ có dăm mẩu chữ (tên, nhãn, @handle, thời gian, nội dung).
-  // Nhiều hơn ngần này = mình đang cầm cả một khối trang, không phải tooltip.
   const MAX_CARD_CHUNKS = 24;
-  const MAX_TOOLTIP_W = 700; // thẻ neo vào khối to hơn thế = neo nhầm vào cả trang
+  const MAX_TOOLTIP_W = 700;
   const MAX_TOOLTIP_H = 600;
-  const MAX_SEEN = 20;
 
   function createOverlay(api) {
     const host = document.createElement("div");
@@ -54,10 +45,8 @@
     card.style.display = "none";
     layer.appendChild(card);
 
-    /** img đang được theo dõi → { kol, ring } */
+    /** img đang theo dõi → { hit, ring } */
     const tracked = new Map();
-    /** handle thấy trên chart mà chưa có trong Sheet → { handle, avatar, at } */
-    const seenUnknown = new Map();
     let lastTooltip = null;
     let scanTimer = null;
     let tooltipTimer = null;
@@ -66,13 +55,14 @@
     let running = false;
     let observer = null;
 
-    /* ---------- (a) avatar là <img> thật ---------- */
+    /* ---------- viền quanh avatar ---------- */
 
-    function ringFor(kol) {
+    function ringFor(hit) {
+      const person = hit.person;
       const ring = document.createElement("div");
-      ring.className = "kt-ring" + (kol.redFlags ? " kt-flag" : "");
-      ring.style.setProperty("--c", KT.tierColor(kol.tier));
-      ring.dataset.tier = kol.tierLetter || "?";
+      ring.className = "kt-ring" + (person.redFlags || (hit.caller && hit.caller.isHoldingRedFlag) ? " kt-flag" : "");
+      ring.style.setProperty("--c", hit.known ? KT.tierColor(person.tier) : "#6E7A88");
+      ring.dataset.tier = hit.known ? person.tierLetter || "?" : "•";
       layer.appendChild(ring);
       return ring;
     }
@@ -86,15 +76,15 @@
     }
 
     function scanImages(scope) {
-      const { db, cfg } = api.getState();
-      if (!db || !cfg || !cfg.overlayRings) return;
+      const { cfg } = api.getState();
+      if (!cfg || !cfg.overlayRings) return;
 
       const imgs = (scope || document).querySelectorAll("img[src]");
       for (const img of imgs) {
         if (tracked.has(img) || tracked.size >= MAX_RINGS) continue;
-        const kol = KT.lookupByAvatar(db, img.currentSrc || img.src);
-        if (!kol) continue;
-        tracked.set(img, { kol, ring: ringFor(kol) });
+        const hit = api.identifyByAvatar(img.currentSrc || img.src);
+        if (!hit) continue;
+        tracked.set(img, { hit, ring: ringFor(hit) });
       }
     }
 
@@ -128,16 +118,11 @@
       if (rafId == null && running) rafId = requestAnimationFrame(syncRings);
     }
 
-    /* ---------- (b) đường vòng cho chart canvas: đọc tooltip ---------- */
+    /* ---------- đường dự phòng: đọc chữ trong tooltip ---------- */
 
     /**
-     * Gom chữ của một node thành từng MẨU theo text node.
-     *
-     * ⚠ KHÔNG dùng `node.textContent`: nó nối mọi chữ lại KHÔNG có dấu cách.
-     * Tooltip của GMGN in tên hiển thị, nhãn, rồi @handle ở ba element liền
-     * nhau, nên textContent ra "nolifeloserThesis@nolifeloser2dAhaa Only up…"
-     * và regex @handle nuốt luôn phần đuôi thành "@nolifeloser2dAhaa" — tra
-     * không bao giờ trúng, mà cũng chẳng có lỗi nào hiện ra.
+     * ⚠ KHÔNG dùng `node.textContent`: nó nối mọi chữ lại KHÔNG có dấu cách,
+     * làm regex @handle nuốt sang chữ bên cạnh. Đi theo từng text node.
      */
     function textChunks(node) {
       if (!node) return [];
@@ -157,95 +142,72 @@
       return out;
     }
 
-    /** Ghi lại hình dạng tooltip gặp gần nhất — diagnose() in ra để còn chỉnh tiếp. */
     function rememberTooltip(el, chunks, matchedAs, found) {
       lastTooltip = {
         tag: el && el.tagName ? el.tagName.toLowerCase() : "?",
         cls: el ? String(el.className || "").slice(0, 120) : "",
         chunks: chunks.slice(0, 10),
-        imgs: el && el.querySelectorAll
-          ? Array.from(el.querySelectorAll("img[src]"))
-              .slice(0, 3)
-              .map((i) => (i.currentSrc || i.src).slice(0, 160))
-          : [],
         matchedAs: matchedAs || null,
-        foundInDb: !!found,
+        found: !!found,
         at: new Date().toISOString(),
       };
     }
 
-    /**
-     * Thấy một handle LẠ trên chart thì nhớ lại (kèm URL avatar bắt được trong
-     * chính tooltip đó). Đây là nửa còn lại của vòng làm việc: thấy người lạ →
-     * panel có sẵn dòng dán thẳng vào Sheet, khỏi phải gõ tay lại cái tên vừa
-     * nhìn thấy rồi đi mò ảnh đại diện.
-     */
-    function captureUnknown(handle, el) {
-      const key = KT.handleKey(handle);
-      if (!key || seenUnknown.has(key)) return;
-
-      let avatar = "";
-      if (el && el.querySelector) {
-        const img = el.querySelector("img[src]");
-        if (img) avatar = img.currentSrc || img.src;
-      }
-      if (/^data:/i.test(avatar)) avatar = ""; // ảnh nhúng thì copy sang Sheet vô nghĩa
-
-      seenUnknown.set(key, { handle, avatar, at: Date.now() });
-      while (seenUnknown.size > MAX_SEEN) seenUnknown.delete(seenUnknown.keys().next().value);
-      if (api.onCapture) api.onCapture();
-    }
-
-    /** Tìm handle quen mặt trong chữ của một node vừa xuất hiện. */
     function matchHandleIn(node) {
       const chunks = textChunks(node);
       if (!chunks.length || chunks.length > MAX_CARD_CHUNKS) return null;
 
       const el = node.nodeType === 1 ? node : node.parentElement;
-      const { db } = api.getState();
       const { standalone, at, plain } = KT.candidateHandles(chunks);
 
-      for (const c of standalone.concat(at, plain)) {
-        const key = KT.handleKey(c);
-        if (key.length < 2) continue;
-        const kol = db && db.byKey[key];
-        if (kol) {
-          rememberTooltip(el, chunks, c, true);
-          return kol;
+      for (const name of standalone.concat(at, plain)) {
+        if (KT.handleKey(name).length < 2) continue;
+        const hit = api.identify({ username: name });
+        if (hit) {
+          rememberTooltip(el, chunks, name, true);
+          return hit;
         }
       }
-
-      if (standalone.length) {
-        rememberTooltip(el, chunks, standalone[0], false);
-        // Ghi vào danh sách "người lạ" CHỈ khi khối này còn có ảnh đại diện —
-        // tức là một thẻ người, không phải một câu văn có nhắc tên ai đó.
-        // Thiếu vế này thì mỗi bài post nhắc "@ai_đó" là một dòng rác.
-        const hasAvatar = el && el.querySelector && el.querySelector("img[src]");
-        if (hasAvatar && db && db.kols.length) captureUnknown(standalone[0], el);
-      }
+      if (standalone.length) rememberTooltip(el, chunks, standalone[0], false);
       return null;
     }
 
-    function cardHtml(kol) {
-      const s = kol.stats || {};
+    /* ---------- thẻ tóm tắt ---------- */
+
+    function cardHtml(hit) {
+      const person = hit.person;
+      const caller = hit.caller;
       const bits = [];
-      if (s.total) bits.push(`${s.total} call`);
-      if (s.winRate != null) bits.push(`win ${Math.round(s.winRate * 100)}%`);
-      if (s.bestMultiple != null) bits.push(`cao nhất ${KT.fmtMultiple(s.bestMultiple)}`);
-      if (s.position && s.position.late) bits.push(`${s.position.late} lần đu đỉnh`);
+      if (person.noteCount) bits.push(`${person.noteCount} ghi chú`);
+      if (caller && caller.multiple != null) bits.push("hiện " + KT.fmtMultiple(caller.multiple));
+      if (caller && caller.followers != null) bits.push(caller.followers + " follower");
+
+      const color = hit.known ? KT.tierColor(person.tier) : "#6E7A88";
+      const avatar = KT.safeUrl(person.avatar || (caller && caller.avatar));
+
       return `<div class="kt-root">
         <div class="kt-card-head">
-          <span class="kt-av" style="border-color:${KT.tierColor(kol.tier)}">${
-            KT.safeUrl(kol.avatar)
-              ? `<img src="${KT.esc(KT.safeUrl(kol.avatar))}" alt="" data-ini="${KT.esc(KT.initials(kol.handle))}">`
-              : KT.esc(KT.initials(kol.handle))
+          <span class="kt-av" style="border-color:${color}">${
+            avatar
+              ? `<img src="${KT.esc(avatar)}" alt="" data-ini="${KT.esc(KT.initials(person.username))}">`
+              : KT.esc(KT.initials(person.username || person.wallet))
           }</span>
-          <span class="kt-card-name">${KT.esc(kol.handle)}</span>
-          <span class="kt-tier" style="color:${KT.tierColor(kol.tier)}">${KT.esc(kol.tierLetter || "?")}</span>
+          <span class="kt-card-name">${KT.esc(person.username || KT.shortWallet(person.wallet))}</span>
+          <span class="kt-tier" style="color:${color}">${KT.esc(
+            hit.known ? person.tierLetter || "?" : "mới"
+          )}</span>
         </div>
-        ${kol.description ? `<div class="kt-card-desc">${KT.esc(kol.description)}</div>` : ""}
+        ${person.summary ? `<div class="kt-card-desc">${KT.esc(person.summary)}</div>` : ""}
+        ${
+          caller && caller.holdingLabel
+            ? `<div class="kt-card-stat" style="color:${
+                caller.isHoldingRedFlag ? "#F85149" : "#9BA6B2"
+              }">${KT.esc(caller.holdingLabel)}</div>`
+            : ""
+        }
         ${bits.length ? `<div class="kt-card-stat">${KT.esc(bits.join(" · "))}</div>` : ""}
-        ${kol.redFlags ? `<div class="kt-card-flag">⚑ ${KT.esc(kol.redFlags)}</div>` : ""}
+        ${person.redFlags ? `<div class="kt-card-flag">⚑ ${KT.esc(person.redFlags)}</div>` : ""}
+        <div class="kt-card-stat" style="color:#6E7A88">N để ghi chú</div>
       </div>`;
     }
 
@@ -254,9 +216,9 @@
     let cardWatch = null;
 
     /**
-     * Tooltip của GMGN tự biến mất khi chuột rời đi, mà nó biến mất KHÔNG kèm
-     * sự kiện nào mình nghe được. Không canh thì thẻ của mình ở lại giữa màn
-     * hình sau khi cái nó chú thích đã đi mất.
+     * Tooltip của GMGN biến mất mà không bắn sự kiện nào mình nghe được.
+     * Không canh thì thẻ của mình ở lại giữa màn hình sau khi cái nó chú
+     * thích đã đi mất.
      */
     function watchAnchor() {
       clearInterval(cardWatch);
@@ -268,17 +230,19 @@
       }, 300);
     }
 
-    function showCard(kol, anchorRect, anchorNode) {
+    function showCard(hit, anchorRect, anchorNode) {
       const { cfg } = api.getState();
+      api.setHovered(hit, anchorRect);
       if (!cfg || !cfg.overlayHover) return;
+
       clearTimeout(hideTimer);
       cardAnchor = anchorNode || null;
       watchAnchor();
-      card.innerHTML = cardHtml(kol);
+
+      card.innerHTML = cardHtml(hit);
       KT.render.hydrateAvatars(card);
       card.style.display = "block";
 
-      // Đặt bên phải mỏm neo, lật sang trái / lên trên nếu tràn màn hình
       const w = 250;
       const h = card.offsetHeight || 120;
       let left = anchorRect.right + 10;
@@ -301,19 +265,12 @@
     }
 
     function onPointerOver(ev) {
-      const { db, cfg } = api.getState();
-      if (!db || !cfg || !cfg.overlayHover) return;
       const target = ev.target;
       if (!target || target.nodeType !== 1) return;
+      if (target.tagName !== "IMG") return;
 
-      if (target.tagName === "IMG") {
-        const kol = KT.lookupByAvatar(db, target.currentSrc || target.src);
-        if (kol) {
-          showCard(kol, target.getBoundingClientRect(), target);
-          return;
-        }
-      }
-      hideCard();
+      const hit = api.identifyByAvatar(target.currentSrc || target.src);
+      if (hit) showCard(hit, target.getBoundingClientRect(), target);
     }
 
     /* ---------- quét ---------- */
@@ -334,11 +291,6 @@
       if (tooltipTimer == null) tooltipTimer = setTimeout(processTooltipQueue, TOOLTIP_DEBOUNCE_MS);
     }
 
-    /**
-     * Soi những node vừa xuất hiện/đổi chữ, tìm cái nào là tooltip của một
-     * người mình biết. Gộp một nhịp rồi xử lý một lượt: mở một tooltip là
-     * MutationObserver bắn ra cả chục record.
-     */
     function processTooltipQueue() {
       tooltipTimer = null;
       const nodes = Array.from(pendingNodes).slice(0, 30);
@@ -346,39 +298,29 @@
 
       for (const node of nodes) {
         if (!node.isConnected) continue;
-        const kol = matchHandleIn(node);
-        if (!kol) continue;
+        const hit = matchHandleIn(node);
+        if (!hit) continue;
 
         const el = node.nodeType === 1 ? node : node.parentElement;
         if (!el) continue;
         const rect = el.getBoundingClientRect();
         if (!rect.width || !rect.height) continue;
-        // Khối to hơn cỡ một cái tooltip = mình đang neo nhầm vào nguyên trang
         if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) continue;
 
-        showCard(kol, rect, el);
+        showCard(hit, rect, el);
         return;
       }
     }
 
     function onMutation(records) {
-      const { cfg } = api.getState();
-      const watchText = !!(cfg && cfg.overlayHover);
       let needScan = false;
-
       for (const rec of records) {
         if (rec.type === "characterData") {
-          // GMGN có thể DÙNG LẠI một node tooltip và chỉ thay chữ bên trong —
-          // lúc đó không có addedNodes nào để bắt.
           // ⚠ KHÔNG queue thẳng parentElement: một text node con trực tiếp của
-          // <body> đổi chữ (SPA đổi giá liên tục) sẽ đẩy cả <body> vào hàng
-          // đợi, rồi mọi "@ai_đó" trên trang bị coi là một thẻ người.
-          // MAX_CARD_CHUNKS chặn ca đó, đây là lớp chặn thứ hai cho rẻ.
-          if (watchText) {
-            const parent = rec.target.parentElement;
-            if (parent && parent !== document.body && parent !== document.documentElement) {
-              queueTooltip(parent);
-            }
+          // <body> đổi chữ (SPA đổi giá liên tục) sẽ đẩy cả <body> vào hàng đợi.
+          const parent = rec.target.parentElement;
+          if (parent && parent !== document.body && parent !== document.documentElement) {
+            queueTooltip(parent);
           }
           continue;
         }
@@ -386,65 +328,47 @@
           if (node.nodeType !== 1 && node.nodeType !== 3) continue;
           if (shadow.contains(node) || host.contains(node)) continue;
           needScan = true;
-          if (watchText) queueTooltip(node);
+          queueTooltip(node);
         }
         if (rec.removedNodes && rec.removedNodes.length) needScan = true;
       }
       if (needScan) queueScan();
     }
 
-    /* ---------- chẩn đoán (bước 3 trong roadmap của spec) ---------- */
+    /* ---------- chẩn đoán ---------- */
 
     function diagnose() {
-      const { db } = api.getState();
       const canvases = Array.from(document.querySelectorAll("canvas")).map((c) => ({
         w: c.width,
         h: c.height,
         css: `${Math.round(c.clientWidth)}x${Math.round(c.clientHeight)}`,
-        cls: (c.className || "").toString().slice(0, 60),
       }));
       const imgs = Array.from(document.querySelectorAll("img[src]"));
       const small = imgs.filter((i) => {
         const r = i.getBoundingClientRect();
-        return r.width >= MIN_AVATAR_PX && r.width <= 64 && Math.abs(r.width - r.height) <= 4;
+        return r.width >= MIN_AVATAR_PX && r.width <= 72 && Math.abs(r.width - r.height) <= 6;
       });
-      const matched = db ? small.filter((i) => KT.lookupByAvatar(db, i.currentSrc || i.src)) : [];
       return {
         url: location.href,
         canvases: canvases.length,
-        canvasDetail: canvases.slice(0, 6),
+        canvasDetail: canvases.slice(0, 4),
         images: imgs.length,
         avatarLike: small.length,
-        avatarSamples: small.slice(0, 12).map((i) => (i.currentSrc || i.src).slice(0, 140)),
-        matchedInDb: matched.length,
+        avatarSamples: small.slice(0, 8).map((i) => (i.currentSrc || i.src).slice(0, 140)),
         ringsActive: tracked.size,
-        iframes: Array.from(document.querySelectorAll("iframe")).map((f) => {
-          const r = f.getBoundingClientRect();
-          return (f.src || "(same-origin)").slice(0, 80) + " " + Math.round(r.width) + "x" + Math.round(r.height);
-        }),
-        lastTooltip, // hình dạng tooltip gặp gần nhất — cái quyết định Mức 2 làm được tới đâu
-        unknownSeen: getSeen().map((u) => u.handle),
-        verdict: canvases.length && !small.length
-          ? "Chart nhiều khả năng vẽ bằng CANVAS — avatar không phải element riêng, phải đi đường tooltip."
-          : small.length
-          ? "Có element ảnh cỡ avatar — overlay viền màu bám thẳng vào được."
-          : "Chưa thấy gì giống avatar. Hover vào avatar trên chart rồi chạy lại.",
+        iframes: Array.from(document.querySelectorAll("iframe")).map((f) =>
+          (f.src || "(same-origin)").slice(0, 80)
+        ),
+        lastTooltip,
       };
     }
 
     /* ---------- vòng đời ---------- */
 
-    /** Người lạ gặp trên chart, mới nhất trước. */
-    function getSeen() {
-      return Array.from(seenUnknown.values()).sort((a, b) => b.at - a.at);
-    }
-
     return {
       host,
-      getSeen,
-      clearSeen() {
-        seenUnknown.clear();
-      },
+      diagnose,
+      isRunning: () => running,
       start() {
         if (running) return;
         running = true;
@@ -478,8 +402,6 @@
         for (const img of Array.from(tracked.keys())) untrack(img);
         if (running) queueScan();
       },
-      diagnose,
-      isRunning: () => running,
     };
   }
 

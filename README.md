@@ -1,11 +1,19 @@
 # KOL Tracker
 
-Chrome extension tra cứu "tướng tá" (KOL/caller crypto) **ngay trên trang GMGN**: gõ hoặc bôi đen một
-handle là ra tier, mô tả, cờ đỏ và track record — không phải chuyển tab sang Notion/Sheet để tra.
+Chrome extension để research "tướng tá" (KOL/caller crypto) **ngay trên trang GMGN**.
 
-Dữ liệu nằm ở **một Google Sheet 2 tab**, extension chỉ ĐỌC (qua CSV publish-to-web). Không có server,
-không có database, không có lớp sync nào để hỏng im lặng. Hai người cùng nhập liệu thẳng trên Sheet,
-quyền ngang nhau — Sheet tự lo version history và sửa đồng thời.
+Mở một chart, panel liệt kê luôn **mọi người đã post về token đó**, ai mình đã có hồ sơ, ai có cờ đỏ.
+Hover một người → thẻ tóm tắt. Bấm **N** → hộp ghi chú mở ra với mọi thứ đã điền sẵn, gõ nhận xét rồi
+`⌘Enter` là ghi thẳng vào Google Sheet.
+
+Dữ liệu nằm ở **một Google Sheet 2 tab**, nối qua một Apps Script sống trong chính file đó. Không có
+server, không có database. Hai người quyền ngang nhau — Sheet tự lo version history và sửa đồng thời.
+
+**Thứ extension tự điền, mày không phải gõ:** ví, username, tên hiển thị, avatar, link X, nội dung
+post, thời điểm post, x mấy kể từ lúc post, và — quan trọng nhất — người đó **có thật sự mua không,
+hay hô xong xả sạch**. Tất cả lấy thẳng từ API của GMGN.
+
+Mày chỉ gõ phần máy không biết: nhận xét, và xếp hạng.
 
 ---
 
@@ -108,22 +116,34 @@ nhiêu dòng và nhận ra những cột nào.
 
 | Thao tác | Kết quả |
 |---|---|
-| **Alt+K** trên trang GMGN | Bật/tắt panel. Đang bôi đen một cái tên thì tra luôn cái đó. |
-| Gõ vào ô tìm kiếm | Tìm theo handle, alias, chữ trong mô tả, **hoặc theo token** ("ai đã call con này"). |
-| ↑ ↓ + Enter | Chọn kết quả bằng bàn phím. |
-| Kéo thanh tiêu đề | Đổi chỗ panel, vị trí được nhớ lại. |
-| Bấm icon extension | Popup — cùng chức năng tra cứu, dùng được ở MỌI trang (Twitter, Telegram Web…). |
-| Nút **Panel** trong popup | Chèn panel vào tab hiện tại kể cả tab đó không phải GMGN. |
+| Mở một chart trên GMGN | Panel tự liệt kê mọi người đã post về token đó, kèm x hiện tại và trạng thái nắm giữ |
+| **Hover** một avatar | Thẻ tóm tắt: hạng, ghi chú cũ, cờ đỏ, "đã xả sạch"/"còn giữ" |
+| **N** | Mở hộp ghi chú cho người đang hover. `⌘Enter` lưu · `Esc` huỷ |
+| **Alt+K** | Bật/tắt panel. Đang bôi đen một cái tên thì tra luôn cái đó |
+| Gõ vào ô tìm kiếm | Tìm theo username, **ví**, hoặc chữ trong ghi chú |
+| ↑ ↓ + Enter | Chọn kết quả bằng bàn phím |
+| Kéo thanh tiêu đề | Đổi chỗ panel, vị trí được nhớ lại |
+| Bấm icon extension | Popup — tra cứu ở MỌI trang (Twitter, Telegram Web…) |
+
+Phím **N** cố tình không kèm Alt (gõ cho nhanh), nên nó tự né mọi ô nhập của GMGN — đang gõ trong ô
+tìm kiếm của họ thì chữ "n" vẫn là chữ "n".
 
 Dữ liệu tự làm tươi khi mở GMGN (nếu bản cache cũ hơn 10 phút) và theo chu kỳ 30 phút — chỉnh được
 trong Options. Nút ⟳ luôn tải lại ngay lập tức.
 
-### Win rate tính thế nào
+### Cờ đỏ tự tính
 
-- Ô `result` **có số** (`x5`, `+300%`) → số quyết định: `≥ x2` thắng, `< x1` thua, ở giữa là huề.
-- **Không có số** → đọc từ khoá (`đúng`/`sai`/`rug`/`thắng`/`lãi`…).
-- Không đọc được → *chưa rõ*, **không tính vào mẫu số** của win rate.
-- Ngưỡng `x2` và ngưỡng "bao nhiêu case mới đáng tin" chỉnh trong Options.
+GMGN trả về số liệu mua/bán của chính người đó với chính token đó. Từ đó suy ra:
+
+| Điều kiện | Nhãn | Cờ đỏ? |
+|---|---|---|
+| `bought = 0` | **hô mà không mua** | ✕ |
+| bán hết, còn ~0 | **đã xả sạch** | ✕ |
+| bán rồi nhưng còn giữ | đã xả một phần | |
+| chưa bán | còn giữ | |
+
+Còn vài đồng bụi sau khi bán vẫn tính là **xả sạch** — đòi đúng `balance = 0` là bỏ sót đúng cái cờ
+đỏ cần bắt. Thiếu hẳn mấy cột số thì là *"không biết"*, **không** quy về 0.
 
 ## 4. Overlay trên chart (Mức 2)
 
@@ -131,11 +151,9 @@ Mục tiêu cuối của spec: avatar nào có trong database thì **tự có vi
 hover là hiện note. Có chạy được hay không phụ thuộc GMGN vẽ marker bằng gì, nên extension làm sẵn
 **cả hai đường** và đường nào bắt được thì đường đó chạy:
 
-1. **Avatar là `<img>` thật** → so khớp `avatar_url` với ảnh trên trang, vẽ vòng màu tier quanh nó
-   (kèm chữ cái tier ở góc). Viền đứt nét = người này có cờ đỏ.
-   ⚠ GMGN không nhúng thẳng ảnh Twitter mà **bọc qua proxy của nó**
-   (`https://gmgn.ai/external/img?url=<đã mã hoá>`), trong khi Sheet lưu URL gốc. `avatarKey()`
-   gỡ lớp bọc trước khi so — bỏ bước đó là không khớp được ai mà chẳng có lỗi nào hiện ra.
+1. **Avatar là `<img>` thật** → so URL ảnh với `profile_image_url` mà chính API GMGN đưa ra, vẽ vòng
+   màu tier quanh nó (kèm chữ cái tier ở góc). Viền đứt nét = người này có cờ đỏ.
+   Vì danh tính đến từ API chứ không phải đoán, phép so này chính xác tuyệt đối.
 2. **Chart vẽ bằng canvas** (nhiều khả năng, kiểu TradingView) → không có element để bám. Đường vòng:
    rình cái tooltip mà GMGN tự hiện khi hover vào avatar, đọc handle trong đó, dán thẻ tóm tắt cạnh bên.
 
@@ -173,7 +191,11 @@ manifest.json              MV3. content_scripts chạy trên gmgn.ai + gmgn.cc, 
                            nào cũng chạy
 background/service-worker.js  CHỖ DUY NHẤT fetch CSV (content script gọi docs.google.com là dính CORS),
                               cache vào chrome.storage.local, chạy alarm làm tươi định kỳ
-content/content.js         Điều phối: nạp storage → dựng db → gắn panel + overlay, phím tắt, tin nhắn
+content/main-world.js      Chạy CÙNG thế giới JS với GMGN (world: MAIN): bọc fetch/XHR để nghe
+                           response của API community/messages, postMessage sang thế giới cách ly.
+                           CHỈ ĐỌC, không sửa gì của trang
+content/content.js         Điều phối: ghép người-trên-chart (API) với hồ sơ (Sheet), phím tắt, tin nhắn
+content/note-box.js        Hộp ghi chú — phím N, điền sẵn tất cả, ⌘Enter ghi vào Sheet
 content/panel.js           Mức 1 — panel nổi (shadow DOM, kéo thả, tìm kiếm, thẻ chi tiết)
 content/overlay.js         Mức 2 — viền tier quanh avatar + thẻ hover + hàm chẩn đoán canvas/DOM
 popup/                     Bản rút gọn của panel, dùng được ở mọi trang
@@ -185,7 +207,7 @@ src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ
   csv.js                     parser CSV (RFC 4180) + map tên cột Việt/Anh → khoá chuẩn
   tier.js                    S/A/B/C → chữ cái + màu
   stats.js                   đọc "x5"/"đu đỉnh"/"+300%" → win rate, timing, mốc thời gian
-  model.js                   dựng db trong bộ nhớ + tìm kiếm có xếp hạng
+  model.js                   dựng db người/ghi chú trong bộ nhớ (khoá là VÍ) + tìm kiếm + dò đổi tên
   tooltip-text.js            mẩu chữ trong tooltip → ứng viên handle (chủ thẻ vs tên bị nhắc tới)
   gmgn.js                    đọc API community/messages của GMGN: danh tính, nội dung post, x mấy,
                              và "mua thật hay hô xong xả sạch"
@@ -205,7 +227,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 88 test logic thuần, không cần cài gì
+npm test         # 92 test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```

@@ -7,6 +7,7 @@
     // Apps Script Web App — đường ĐỌC và GHI chính (xem apps-script/README.md)
     sheetApiUrl: "",
     sheetApiSecret: "",
+    addedBy: "", // tên của mày, ghi vào cột added_by để biết ai note cái gì
     // CSV publish-to-web — đường đọc cũ, chỉ đọc, giữ làm dự phòng
     kolsCsvUrl: "",
     callsCsvUrl: "",
@@ -34,6 +35,7 @@
     DIAGNOSE: "kt:diagnose", // popup hỏi content script: chart này canvas hay DOM?
     TEST_URL: "kt:testUrl", // Options thử một link CSV trước khi lưu
     SHEET_PING: "kt:sheetPing", // Options thử kết nối Apps Script
+    SAVE_NOTE: "kt:saveNote", // hộp ghi chú → Apps Script → Sheet
   };
 
   /**
@@ -48,12 +50,14 @@
     "src/lib/tier.js",
     "src/lib/stats.js",
     "src/lib/model.js",
+    "src/lib/gmgn.js",
     "src/lib/tooltip-text.js",
     "src/lib/sheet-url.js",
     "src/lib/config.js",
     "src/lib/styles.js",
     "src/lib/render.js",
     "content/overlay.js",
+    "content/note-box.js",
     "content/panel.js",
     "content/content.js",
   ];
@@ -76,7 +80,7 @@
 
   async function getData() {
     const got = await chrome.storage.local.get(STORAGE.DATA);
-    return got[STORAGE.DATA] || { kols: [], calls: [], syncedAt: 0, error: null };
+    return got[STORAGE.DATA] || { overview: [], detail: [], syncedAt: 0, error: null };
   }
 
   KT.DEFAULTS = DEFAULTS;

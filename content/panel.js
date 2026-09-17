@@ -1,10 +1,8 @@
 /**
- * Mức 1 của spec: panel nổi trên trang GMGN — gõ/paste handle là ra tier +
- * note, không phải rời trang.
+ * Panel nổi trên trang GMGN: ai đang trên chart này, mình đã biết gì về họ.
  *
- * Panel sống trong shadow DOM riêng: CSS của GMGN (một SPA trading đổi liên
- * tục) không với vào được, và CSS của mình cũng không rơi ra ngoài làm hỏng
- * trang của người ta.
+ * Panel sống trong shadow DOM riêng — CSS của GMGN (một SPA trading đổi liên
+ * tục) không với vào được, và CSS của mình cũng không rơi ra ngoài.
  */
 (function (root) {
   "use strict";
@@ -15,8 +13,7 @@
   function createPanel(api) {
     const host = document.createElement("div");
     host.id = "kol-tracker-panel";
-    host.style.cssText =
-      "position:fixed;z-index:2147483000;right:16px;bottom:16px;display:none;";
+    host.style.cssText = "position:fixed;z-index:2147483000;right:16px;bottom:16px;display:none;";
     const shadow = host.attachShadow({ mode: "open" });
 
     const style = document.createElement("style");
@@ -26,7 +23,7 @@
     const wrap = document.createElement("div");
     wrap.className = "kt-root";
     wrap.innerHTML = `
-      <div class="kt-panel" part="panel">
+      <div class="kt-panel">
         <div class="kt-head">
           <span class="kt-dot" data-el="dot"></span>
           <span class="kt-title">KOL Tracker</span>
@@ -36,7 +33,7 @@
           <button class="kt-icon" data-act="close" title="Đóng (Alt+K để mở lại)">×</button>
         </div>
         <div class="kt-body" data-el="body">
-          <input class="kt-input" data-el="input" placeholder="Handle, tên, hoặc token…"
+          <input class="kt-input" data-el="input" placeholder="Tên, ví, hoặc chữ trong ghi chú…"
                  spellcheck="false" autocomplete="off" autocapitalize="none" autocorrect="off">
           <div data-el="content"></div>
         </div>
@@ -56,8 +53,8 @@
 
     let open = false;
     let collapsed = false;
-    let detailKey = null; // đang mở chi tiết của ai
-    let activeIndex = -1; // dòng đang chọn bằng bàn phím
+    let detailRef = null; // { wallet, username } — đang mở chi tiết của ai
+    let activeIndex = -1;
 
     /* ---------- vị trí ---------- */
 
@@ -65,10 +62,9 @@
       if (!pos || typeof pos.left !== "number") return;
       const w = 340;
       const h = el.panel.offsetHeight || 320;
-      const left = Math.min(Math.max(MARGIN, pos.left), window.innerWidth - w - MARGIN);
-      const top = Math.min(Math.max(MARGIN, pos.top), window.innerHeight - Math.min(h, 200) - MARGIN);
-      host.style.left = left + "px";
-      host.style.top = top + "px";
+      host.style.left = Math.min(Math.max(MARGIN, pos.left), window.innerWidth - w - MARGIN) + "px";
+      host.style.top =
+        Math.min(Math.max(MARGIN, pos.top), window.innerHeight - Math.min(h, 200) - MARGIN) + "px";
       host.style.right = "auto";
       host.style.bottom = "auto";
     }
@@ -112,6 +108,13 @@
       list[activeIndex].scrollIntoView({ block: "nearest" });
     }
 
+    let flashTimer = null;
+    function flash(msg) {
+      el.foot.textContent = msg;
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(renderFoot, 2400);
+    }
+
     function renderFoot() {
       const { data, db } = api.getState();
       if (!data) return;
@@ -121,134 +124,117 @@
         return;
       }
       const when = data.syncedAt ? KT.timeAgo(data.syncedAt) : "chưa tải";
-      const counts = db ? `${db.counts.kols} KOL · ${db.counts.calls} call` : "trống";
-      el.foot.textContent = `${counts} · cập nhật ${when}`;
+      const counts = db ? `${db.counts.people} người · ${db.counts.notes} ghi chú` : "trống";
+      el.foot.textContent = `${counts} · ${when}`;
       el.dot.className = "kt-dot ok";
     }
 
-    /**
-     * Dòng dán thẳng vào tab KOLs của Sheet. Ngăn bằng TAB chứ không phải dấu
-     * phẩy: dán chuỗi có tab vào Google Sheets là nó tự rải ra từng cột, dán
-     * chuỗi có dấu phẩy thì nằm gọn trong một ô.
-     * Thứ tự cột: handle · aliases · avatar_url · tier · description ·
-     * source_found · red_flags · added_by · updated_at
-     */
-    function sheetRow(handle, avatar) {
-      const today = new Date().toISOString().slice(0, 10);
-      return [handle, "", avatar || "", "", "", "GMGN chart", "", "", today].join("\t");
-    }
+    /** Khối "ai đang trên chart này" — phần đáng giá nhất của panel. */
+    function callersHtml() {
+      const { callers, token } = api.getState();
+      if (!callers.length) return "";
 
-    function seenHtml() {
-      const seen = api.getSeen ? api.getSeen() : [];
-      if (!seen.length) return "";
-      const rows = seen
-        .map(
-          (u) => `<div class="kt-row" data-act="copy-row"
-              data-handle="${KT.esc(u.handle)}" data-avatar="${KT.esc(u.avatar || "")}">
-            <span class="kt-av">${KT.esc(KT.initials(u.handle))}</span>
-            <span class="kt-grow kt-trunc">
-              <span class="kt-name">@${KT.esc(u.handle)}</span>
-              <span class="kt-sub kt-trunc" style="display:block">bấm để copy dòng dán vào Sheet${
-                u.avatar ? " (kèm avatar)" : ""
-              }</span>
-            </span>
-          </div>`
-        )
+      let known = 0;
+      let flagged = 0;
+      const rowsHtml = callers
+        .map((caller) => {
+          const hit = api.identify(caller);
+          const person = hit && hit.known ? hit.person : null;
+          if (person) known++;
+          // Một người có cả cờ đỏ trong Sheet lẫn "đã xả sạch" vẫn chỉ là MỘT
+          // người đáng ngờ — cộng hai lần thì con số to hơn cả danh sách.
+          if ((person && person.redFlags) || caller.isHoldingRedFlag) flagged++;
+          return KT.render.callerRow(caller, person);
+        })
         .join("");
-      return `<div class="kt-sec-title">Vừa thấy trên chart · chưa có trong DB</div>${rows}`;
+
+      const label = token && token.symbol ? "$" + token.symbol : "token này";
+      const bits = [`${callers.length} người đã post về ${label}`];
+      if (known) bits.push(`${known} đã có hồ sơ`);
+      if (flagged) bits.push(`${flagged} cờ đỏ`);
+
+      return `<div class="kt-sec-title">${KT.esc(bits.join(" · "))}</div>${rowsHtml}`;
     }
 
-    function renderEmptyQuery() {
-      const { db, cfg } = api.getState();
-      if (!db || !db.kols.length) {
-        el.content.innerHTML = `<div class="kt-empty">
-          <b>Chưa có dữ liệu.</b><br>Dán link CSV của Google Sheet trong Options rồi bấm ⟳.
-          <div class="kt-btns" style="justify-content:center"><button class="kt-btn kt-primary" data-act="options">Mở Options</button></div>
-        </div>`;
+    function renderHome() {
+      const { db, callers } = api.getState();
+      const callersBlock = callersHtml();
+
+      if (!db || !db.people.length) {
+        el.content.innerHTML =
+          callersBlock ||
+          `<div class="kt-empty">
+            <b>Chưa nối Sheet.</b><br>Mở Options để dán URL Apps Script.
+            <div class="kt-btns" style="justify-content:center">
+              <button class="kt-btn kt-primary" data-act="options">Mở Options</button>
+            </div>
+          </div>`;
+        if (callersBlock && (!db || !db.people.length)) {
+          el.content.innerHTML += `<div class="kt-hint">Chưa nối Sheet nên chưa biết ai là ai. Options → Kết nối Sheet.</div>`;
+        }
+        KT.render.hydrateAvatars(el.content);
         return;
       }
-      const top = db.kols.filter((k) => !k.ghost).slice(0, 6);
+
+      const top = db.people.filter((p) => !p.ghost).slice(0, 6);
       el.content.innerHTML =
-        seenHtml() +
+        callersBlock +
         `<div class="kt-sec-title">Hạng cao nhất</div>` +
-        top.map((k) => KT.render.rowHtml(k)).join("") +
-        `<div class="kt-hint">Alt+K để bật/tắt panel. Bôi đen một cái tên trên trang rồi Alt+K là tra luôn cái đó.</div>` +
-        (cfg && cfg.sheetUrl
-          ? `<div class="kt-btns"><button class="kt-btn" data-act="open-sheet">Mở Sheet để thêm người</button></div>`
-          : "");
+        top.map((p) => KT.render.personRow(p)).join("") +
+        `<div class="kt-hint">Alt+K bật/tắt panel · hover một người trên chart rồi bấm N để ghi chú${
+          callers.length ? "" : " (chưa thấy ai — mở một chart có người post)"
+        }</div>`;
       KT.render.hydrateAvatars(el.content);
     }
 
     function renderSearch(query) {
-      const { db, cfg } = api.getState();
-      if (!db) return renderEmptyQuery();
+      const { db } = api.getState();
+      if (!db) return renderHome();
 
-      const hits = KT.search(db, query, 8);
-      const tokenHits = KT.callsForToken(db, query);
-      const exact = KT.lookup(db, query);
-
-      // Gõ đúng khớp một người → vào thẳng chi tiết, khỏi bấm thêm một nhịp
-      if (exact && hits.length && hits[0].kol === exact && hits[0].score >= 120) {
-        return renderDetail(exact.key, { keepQuery: true });
+      const hits = KT.search(db, query, 10);
+      if (!hits.length) {
+        el.content.innerHTML = `<div class="kt-empty">Không có ai khớp <b>${KT.esc(query)}</b>.</div>`;
+        return;
       }
-
-      // Có mục "$TOKEN — ai đã call" rồi thì đừng kể lại cùng những người đó
-      // ở mục Kết quả: cùng một thông tin, hai lần, trong một panel 340px.
-      const listed = tokenHits.length
-        ? hits.filter((h) => h.reason !== "đã call token này")
-        : hits;
-
-      let html = "";
-      if (listed.length) html += `<div class="kt-sec-title">Kết quả</div>` + KT.render.resultsHtml(listed);
-      if (tokenHits.length) html += KT.render.tokenHtml(KT.tokenKey(query), tokenHits);
-
-      if (!html) {
-        const handle = KT.displayHandle(query);
-        html = `<div class="kt-empty">
-            <b>${KT.esc(handle)}</b> chưa có trong database.
-            <div class="kt-btns" style="justify-content:center">
-              <button class="kt-btn" data-act="copy" data-value="${KT.esc(handle)}">Copy handle</button>
-              ${cfg && cfg.sheetUrl ? `<button class="kt-btn kt-primary" data-act="open-sheet">Thêm vào Sheet</button>` : ""}
-            </div>
-          </div>`;
-      }
-      el.content.innerHTML = html;
+      el.content.innerHTML = `<div class="kt-sec-title">Kết quả</div>` + KT.render.resultsHtml(hits);
       KT.render.hydrateAvatars(el.content);
       setActive(0);
     }
 
-    function renderDetail(key, opts) {
-      const { db, cfg } = api.getState();
-      const kol = db && db.byKey[key];
-      if (!kol) return renderEmptyQuery();
-      detailKey = key;
-      el.content.innerHTML = KT.render.detailHtml(kol, {
-        sheetUrl: cfg && cfg.sheetUrl,
-        callLimit: 10,
+    function renderDetail(ref) {
+      const hit = api.identify(ref);
+      if (!hit) {
+        detailRef = null;
+        return renderHome();
+      }
+      detailRef = { wallet: hit.person.wallet, username: hit.person.username };
+      el.content.innerHTML = KT.render.personDetail(hit.person, {
+        caller: hit.caller,
+        renamedFrom: hit.renamedFrom,
+        noteLimit: 8,
       });
       KT.render.hydrateAvatars(el.content);
-      if (!opts || !opts.keepQuery) el.input.value = kol.handle;
       el.body.scrollTop = 0;
     }
 
     function rerender() {
       const q = el.input.value.trim();
-      if (detailKey && !q) detailKey = null;
-      if (detailKey) renderDetail(detailKey, { keepQuery: true });
-      else if (q) renderSearch(q);
-      else renderEmptyQuery();
+      if (detailRef && !q) renderDetail(detailRef);
+      else if (q) {
+        detailRef = null;
+        renderSearch(q);
+      } else renderHome();
       renderFoot();
     }
 
     /* ---------- tương tác ---------- */
 
-    async function copy(text) {
+    async function copy(textValue) {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(textValue);
       } catch (e) {
-        // clipboard API cần document focus — panel trong shadow DOM không phải lúc nào cũng có
         const ta = document.createElement("textarea");
-        ta.value = text;
+        ta.value = textValue;
         ta.style.cssText = "position:fixed;opacity:0";
         document.body.appendChild(ta);
         ta.select();
@@ -259,21 +245,14 @@
         }
         ta.remove();
       }
-      flashFoot("Đã copy: " + text);
-    }
-
-    let flashTimer = null;
-    function flashFoot(msg) {
-      el.foot.textContent = msg;
-      clearTimeout(flashTimer);
-      flashTimer = setTimeout(renderFoot, 2200);
+      flash("Đã copy: " + textValue);
     }
 
     async function doRefresh() {
       el.dot.className = "kt-dot load";
       const res = await api.refresh();
-      if (res && res.error) flashFoot(res.error);
-      else flashFoot("Đã tải lại từ Sheet");
+      if (res && res.error) flash(res.error);
+      else flash("Đã tải lại từ Sheet");
     }
 
     wrap.addEventListener("click", (ev) => {
@@ -283,31 +262,44 @@
         if (act === "close") return hide();
         if (act === "collapse") return setCollapsed(!collapsed);
         if (act === "refresh") return doRefresh();
-        if (act === "back") {
-          detailKey = null;
-          el.input.value = "";
-          el.input.focus();
-          return rerender();
-        }
+        if (act === "options") return api.openOptions();
         if (act === "copy") return copy(actEl.dataset.value || "");
-        if (act === "copy-row") {
-          copy(sheetRow(actEl.dataset.handle, actEl.dataset.avatar));
-          return flashFoot("Đã copy — dán vào ô cột A của tab KOLs");
-        }
-        if (act === "open-sheet") {
-          const { cfg } = api.getState();
-          const url = KT.safeUrl(cfg && cfg.sheetUrl);
+        if (act === "open-x") {
+          const url = KT.safeUrl(actEl.dataset.value);
           if (url) window.open(url, "_blank", "noopener");
           return;
         }
-        if (act === "options") return api.openOptions();
+        if (act === "back") {
+          detailRef = null;
+          el.input.value = "";
+          return rerender();
+        }
+        if (act === "note") {
+          const hit = api.identify(detailRef);
+          if (hit) api.openNote(hit, host.getBoundingClientRect());
+          return;
+        }
       }
-      const row = ev.target.closest(".kt-row");
-      if (row && row.dataset.key) renderDetail(row.dataset.key);
+
+      const callerRow = ev.target.closest("[data-caller]");
+      if (callerRow) {
+        const key = callerRow.dataset.caller;
+        const caller = api
+          .getState()
+          .callers.find((c) => (c.postId || c.wallet) === key);
+        if (caller) renderDetail(caller);
+        return;
+      }
+
+      const row = ev.target.closest(".kt-row[data-key]");
+      if (row) {
+        const key = row.dataset.key;
+        renderDetail(key.startsWith("0x") ? { wallet: key } : { username: key });
+      }
     });
 
     el.input.addEventListener("input", () => {
-      detailKey = null;
+      detailRef = null;
       rerender();
     });
 
@@ -321,19 +313,17 @@
       } else if (ev.key === "Enter") {
         const list = rows();
         const target = list[activeIndex] || list[0];
-        if (target && target.dataset.key) {
+        if (target) {
           ev.preventDefault();
-          renderDetail(target.dataset.key);
+          target.click();
         }
       } else if (ev.key === "Escape") {
         ev.preventDefault();
-        if (detailKey) {
-          detailKey = null;
+        if (detailRef || el.input.value) {
+          detailRef = null;
           el.input.value = "";
           rerender();
-        } else {
-          hide();
-        }
+        } else hide();
       }
       ev.stopPropagation(); // đừng để phím tắt của GMGN cướp mất
     });
@@ -360,7 +350,7 @@
       host.style.display = "block";
       if (query != null) {
         el.input.value = query;
-        detailKey = null;
+        detailRef = null;
       }
       rerender();
       el.input.focus();
@@ -370,11 +360,6 @@
     function hide() {
       open = false;
       host.style.display = "none";
-    }
-
-    function toggle(query) {
-      if (open && !query) hide();
-      else show(query);
     }
 
     return {
@@ -388,12 +373,9 @@
       },
       show,
       hide,
-      toggle,
       isOpen: () => open,
       update: rerender,
-      setLoading(on) {
-        el.dot.className = on ? "kt-dot load" : "kt-dot ok";
-      },
+      flash,
     };
   }
 
