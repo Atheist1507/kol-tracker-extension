@@ -153,8 +153,9 @@ async function saveNote(payload) {
     return { ok: false, error: "Chưa cấu hình Apps Script — mở Options, mục Kết nối Sheet." };
   }
 
+  const started = Date.now();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), SHEET_TIMEOUT_MS);
   try {
     const res = await fetch(bust(cfg.sheetApiUrl), {
       method: "POST",
@@ -175,9 +176,15 @@ async function saveNote(payload) {
     return json;
   } catch (err) {
     if (err.name === "AbortError") {
+      // ⚠ Hết giờ khi ĐANG GHI khác hẳn hết giờ khi đang đọc: Apps Script rất
+      // có thể đã ghi xong rồi, chỉ là trả lời chậm. Báo "hỏng" thì người dùng
+      // bấm lưu lại và ra HAI dòng trùng. Nói thật là "không biết", và kéo lại
+      // dữ liệu để chính họ nhìn thấy câu trả lời.
+      refresh();
       return {
         ok: false,
-        error: `Quá ${SHEET_TIMEOUT_MS / 1000}s không phản hồi. Dán "URL?action=ping&secret=…" vào thanh địa chỉ: ra JSON thì vấn đề nằm ở extension, không ra thì nằm ở bản deploy.`,
+        timedOut: true,
+        error: `Quá ${SHEET_TIMEOUT_MS / 1000}s chưa thấy trả lời. Ghi chú CÓ THỂ đã lưu rồi — mở Sheet kiểm tra trước khi bấm lưu lại, kẻo thành hai dòng trùng.`,
       };
     }
     return {
@@ -313,9 +320,15 @@ async function sheetPing(url, secret) {
     }
   } catch (err) {
     if (err.name === "AbortError") {
+      // ⚠ Hết giờ khi ĐANG GHI khác hẳn hết giờ khi đang đọc: Apps Script rất
+      // có thể đã ghi xong rồi, chỉ là trả lời chậm. Báo "hỏng" thì người dùng
+      // bấm lưu lại và ra HAI dòng trùng. Nói thật là "không biết", và kéo lại
+      // dữ liệu để chính họ nhìn thấy câu trả lời.
+      refresh();
       return {
         ok: false,
-        error: `Quá ${SHEET_TIMEOUT_MS / 1000}s không phản hồi. Dán "URL?action=ping&secret=…" vào thanh địa chỉ: ra JSON thì vấn đề nằm ở extension, không ra thì nằm ở bản deploy.`,
+        timedOut: true,
+        error: `Quá ${SHEET_TIMEOUT_MS / 1000}s chưa thấy trả lời. Ghi chú CÓ THỂ đã lưu rồi — mở Sheet kiểm tra trước khi bấm lưu lại, kẻo thành hai dòng trùng.`,
       };
     }
     return {

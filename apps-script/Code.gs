@@ -208,21 +208,41 @@ function saveNote_(body) {
   const found = findRowByWallet_(overview, wallet);
   const created = !found;
 
+  const noteCount = countNotesFor_(detailSheet, wallet);
+
   if (created) {
     person.wallet = wallet;
     person.first_seen = person.first_seen || nowIso;
     person.last_noted = nowIso;
-    const row = rowFor_(OVERVIEW_HEADERS, person);
-    // note_count để công thức tự đếm, khỏi phải cộng dồn bằng tay
-    const countIdx = OVERVIEW_HEADERS.indexOf("note_count");
-    const rowNumber = overview.getLastRow() + 1;
-    row[countIdx] = '=COUNTIF(' + DETAIL + "!$A:$A, $A" + rowNumber + ")";
-    overview.appendRow(row);
+    person.note_count = noteCount;
+    overview.appendRow(rowFor_(OVERVIEW_HEADERS, person));
   } else {
-    updateOverviewRow_(overview, found, person, nowIso);
+    updateOverviewRow_(overview, found, person, nowIso, noteCount);
   }
 
-  return { ok: true, wallet: wallet, createdPerson: created };
+  return { ok: true, wallet: wallet, createdPerson: created, noteCount: noteCount };
+}
+
+/**
+ * Đếm số ghi chú của một ví, bằng SỐ chứ không phải công thức.
+ *
+ * ⚠ Bản đầu ghi `=COUNTIF(Detail!$A:$A, $A2)` vào ô. Sai, và chỉ lộ ra trên
+ * Sheet thật: Sheet để locale Việt Nam thì dấu ngăn tham số là `;` chứ không
+ * phải `,`, nên công thức thành #ERROR!. Mà `appendRow` ghi chuỗi mở đầu bằng
+ * `=` thì Sheets parse THEO LOCALE của file, không theo cú pháp Mỹ.
+ *
+ * Đếm sẵn rồi ghi số thì không phụ thuộc locale, và cũng không có gì để hỏng
+ * khi ai đó kéo-thả hay sắp xếp lại các dòng.
+ */
+function countNotesFor_(detailSheet, wallet) {
+  const last = detailSheet.getLastRow();
+  if (last < 2) return 0;
+  const values = detailSheet.getRange(2, 1, last - 1, 1).getValues();
+  let n = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim().toLowerCase() === wallet) n++;
+  }
+  return n;
 }
 
 /**
@@ -231,14 +251,18 @@ function saveNote_(body) {
  * `tier`/`summary`/`red_flags` là chữ người viết — không bao giờ đụng vào,
  * trừ khi lần lưu này gửi giá trị mới cho đúng cột đó.
  */
-function updateOverviewRow_(sheet, rowNumber, person, nowIso) {
+function updateOverviewRow_(sheet, rowNumber, person, nowIso, noteCount) {
   const width = OVERVIEW_HEADERS.length;
   const range = sheet.getRange(rowNumber, 1, 1, width);
   const current = range.getValues()[0];
 
   for (let c = 0; c < width; c++) {
     const key = OVERVIEW_HEADERS[c];
-    if (key === "wallet" || key === "first_seen" || key === "note_count") continue;
+    if (key === "wallet" || key === "first_seen") continue;
+    if (key === "note_count") {
+      current[c] = noteCount;
+      continue;
+    }
     if (key === "last_noted") {
       current[c] = nowIso;
       continue;

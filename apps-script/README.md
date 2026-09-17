@@ -139,4 +139,6 @@ khác — đó là lúc phải cập nhật Options.
   chữ mày viết, script **không bao giờ ghi đè** trừ khi lần lưu đó gửi giá trị mới cho đúng cột đó.
 - **`Detail`** — một dòng một lần ghi chú, kèm ảnh chụp tình trạng lúc đó (post gì, x mấy, còn giữ
   hay đã xả).
-- `note_count` bên Overview là **công thức** `COUNTIF` tự đếm, đừng gõ đè lên.
+- `note_count` bên Overview là **số**, script tự đếm lại mỗi lần lưu. Không dùng công thức: Sheet
+  để locale Việt Nam thì dấu ngăn tham số là `;` chứ không phải `,`, công thức ghi bằng cú pháp Mỹ
+  sẽ thành `#ERROR!`.

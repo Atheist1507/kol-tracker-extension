@@ -161,6 +161,16 @@
 
       if (!res || !res.ok) {
         setStatus((res && res.error) || "Không lưu được.", true);
+        // Hết giờ ≠ hỏng: rất có thể đã ghi xong. Khoá nút Lưu lại để không
+        // bấm thêm phát nữa thành hai dòng trùng; muốn lưu thật thì đóng hộp
+        // rồi mở lại, lúc đó đã nhìn Sheet rồi.
+        if (res && res.timedOut) {
+          const save = wrap.querySelector('[data-act="save"]');
+          if (save) {
+            save.disabled = true;
+            save.textContent = "Đã gửi — kiểm tra Sheet";
+          }
+        }
         return;
       }
       api.onSaved(res, ctx);
