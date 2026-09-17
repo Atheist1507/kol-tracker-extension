@@ -17,6 +17,9 @@ importScripts(
 
 const KT = globalThis.KT;
 const FETCH_TIMEOUT_MS = 20000;
+// Apps Script khởi động nguội mất lâu hơn hẳn một lời gọi HTTP thường, nhất là
+// lần đầu sau khi deploy. 20s là quá ngắn, cắt oan rồi báo như thể hỏng.
+const SHEET_TIMEOUT_MS = 45000;
 const ALARM = "kt-refresh";
 
 let inFlight = null; // gộp nhiều lời gọi refresh song song vào một lượt fetch
@@ -71,7 +74,7 @@ async function saveData(patch) {
 /** GET tới Apps Script Web App. Trả về đúng object script gửi lại. */
 async function callSheetApi(cfg, params) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), SHEET_TIMEOUT_MS);
   try {
     const qs = new URLSearchParams(Object.assign({ secret: cfg.sheetApiSecret || "" }, params));
     const url = cfg.sheetApiUrl + (cfg.sheetApiUrl.includes("?") ? "&" : "?") + qs.toString();
@@ -85,6 +88,16 @@ async function callSheetApi(cfg, params) {
         'Script trả về HTML chứ không phải JSON — kiểm lại deploy có để "Who has access: Anyone" chưa.'
       );
     }
+  } catch (err) {
+    // ⚠ Đừng để DOMException lọt nguyên văn ra màn hình: người dùng đọc được
+    // "signal is aborted without reason" thì chẳng biết phải làm gì.
+    if (err && err.name === "AbortError") {
+      throw new Error(
+        `Quá ${SHEET_TIMEOUT_MS / 1000}s không phản hồi — Apps Script không trả lời. ` +
+          "Thử dán URL kèm ?action=ping&secret=… vào thanh địa chỉ xem có ra JSON không."
+      );
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -125,8 +138,16 @@ async function saveNote(payload) {
     if (json && json.ok) refresh(); // kéo lại để panel thấy ngay dòng vừa ghi
     return json;
   } catch (err) {
-    if (err.name === "AbortError") return { ok: false, error: "Quá lâu không phản hồi." };
-    return { ok: false, error: String(err && err.message ? err.message : err) };
+    if (err.name === "AbortError") {
+      return {
+        ok: false,
+        error: `Quá ${SHEET_TIMEOUT_MS / 1000}s không phản hồi. Dán "URL?action=ping&secret=…" vào thanh địa chỉ: ra JSON thì vấn đề nằm ở extension, không ra thì nằm ở bản deploy.`,
+      };
+    }
+    return {
+      ok: false,
+      error: String(err && err.message ? err.message : err) + ` (sau ${Math.round((Date.now() - started) / 1000)}s)`,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -226,8 +247,16 @@ async function sheetPing(url, secret) {
   if (!/^https:\/\/script\.google\.com\//i.test(url)) {
     return { ok: false, error: "Phải là URL /exec của Apps Script (script.google.com)." };
   }
+  if (/\/dev\s*$/.test(url)) {
+    return { ok: false, error: "Đây là link /dev của trình soạn thảo. Cần link /exec của bản deploy." };
+  }
+  if (!/\/exec\s*$/.test(url.split("?")[0])) {
+    return { ok: false, error: "URL phải kết thúc bằng /exec." };
+  }
+
+  const started = Date.now();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), SHEET_TIMEOUT_MS);
   try {
     const target =
       url + (url.includes("?") ? "&" : "?") + "action=ping&secret=" + encodeURIComponent(secret || "");
@@ -247,8 +276,16 @@ async function sheetPing(url, secret) {
       };
     }
   } catch (err) {
-    if (err.name === "AbortError") return { ok: false, error: "Quá lâu không phản hồi." };
-    return { ok: false, error: String(err && err.message ? err.message : err) };
+    if (err.name === "AbortError") {
+      return {
+        ok: false,
+        error: `Quá ${SHEET_TIMEOUT_MS / 1000}s không phản hồi. Dán "URL?action=ping&secret=…" vào thanh địa chỉ: ra JSON thì vấn đề nằm ở extension, không ra thì nằm ở bản deploy.`,
+      };
+    }
+    return {
+      ok: false,
+      error: String(err && err.message ? err.message : err) + ` (sau ${Math.round((Date.now() - started) / 1000)}s)`,
+    };
   } finally {
     clearTimeout(timer);
   }
