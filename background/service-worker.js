@@ -26,6 +26,24 @@ const ALARM = "kt-refresh";
  * Mã HTTP trần không nói được gì với người dùng. Ba mã dưới đây là ba tình
  * huống khác hẳn nhau, mà cách sửa cũng khác hẳn nhau.
  */
+/**
+ * Mỗi lời gọi Apps Script phải có một URL DUY NHẤT.
+ *
+ * ⚠ Vì sao: /exec không trả dữ liệu ngay mà chuyển hướng sang
+ * script.googleusercontent.com/macros/echo?user_content_key=… — cái key đó
+ * dùng một lần. Chrome cache lại cú chuyển hướng, nên lần gọi sau đi thẳng
+ * tới key đã hết hạn và nhận 404. Sửa cấu hình cho đúng cũng vô ích vì nó
+ * không hỏi lại Google nữa.
+ *
+ * Triệu chứng đã gặp thật: gõ sai secret MỘT lần là 404 vĩnh viễn, sửa đúng
+ * rồi thử lại vẫn 404, chỉ gỡ extension rồi cài lại mới hết (gỡ extension =
+ * xoá vùng cache mạng riêng của nó). `cache: "no-store"` không chặn được
+ * phần redirect.
+ */
+function bust(url) {
+  return url + (url.includes("?") ? "&" : "?") + "_=" + Date.now();
+}
+
 function httpHint(status) {
   if (status === 404) {
     return "HTTP 404 — không có bản deploy nào ở URL này. Vào Apps Script → Deploy → Manage deployments, copy lại URL Web app.";
@@ -96,7 +114,7 @@ async function callSheetApi(cfg, params) {
   try {
     const qs = new URLSearchParams(Object.assign({ secret: cfg.sheetApiSecret || "" }, params));
     const url = cfg.sheetApiUrl + (cfg.sheetApiUrl.includes("?") ? "&" : "?") + qs.toString();
-    const res = await fetch(url, { signal: controller.signal, cache: "no-store", redirect: "follow" });
+    const res = await fetch(bust(url), { signal: controller.signal, cache: "no-store", redirect: "follow" });
     if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     try {
@@ -138,7 +156,7 @@ async function saveNote(payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(cfg.sheetApiUrl, {
+    const res = await fetch(bust(cfg.sheetApiUrl), {
       method: "POST",
       signal: controller.signal,
       redirect: "follow",
@@ -278,7 +296,7 @@ async function sheetPing(url, secret) {
   try {
     const target =
       url + (url.includes("?") ? "&" : "?") + "action=ping&secret=" + encodeURIComponent(secret || "");
-    const res = await fetch(target, { signal: controller.signal, cache: "no-store", redirect: "follow" });
+    const res = await fetch(bust(target), { signal: controller.signal, cache: "no-store", redirect: "follow" });
     if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     try {
