@@ -58,10 +58,16 @@
     return "x" + (Number.isInteger(m) ? m : m.toFixed(m < 10 ? 2 : 1).replace(/\.?0+$/, ""));
   }
 
+  /**
+   * Chỉ `no_buy` màu đỏ. `sold_all` là kết cục bình thường của một bài post cũ,
+   * tô đỏ thì cả danh sách đỏ lòm và mắt hết phân biệt được gì (xem
+   * HOLDING_RED_FLAGS trong gmgn.js). `holding` màu xanh vì còn tiền trong đó
+   * là tín hiệu tốt duy nhất đo được.
+   */
   const HOLDING_COLOR = {
     no_buy: "#F85149",
-    sold_all: "#F85149",
-    sold_part: "#F0883E",
+    sold_all: "#8B949E",
+    sold_part: "#8B949E",
     holding: "#3FB950",
     unknown: "#6E7A88",
   };

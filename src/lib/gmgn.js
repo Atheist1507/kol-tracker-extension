@@ -35,8 +35,21 @@
     unknown: "",
   };
 
-  /** Hai trạng thái này là cờ đỏ theo đúng nghĩa của spec. */
-  const HOLDING_RED_FLAGS = ["no_buy", "sold_all"];
+  /**
+   * CHỈ "hô mà không mua" là cờ đỏ.
+   *
+   * ⚠ Bản đầu tính cả "đã xả sạch" — sai, và chỉ lộ ra khi chạy trên dữ liệu
+   * thật: một token bình thường cho 46/50 người dính cờ đỏ. Vì gần như ai post
+   * từ một tháng trước thì giờ cũng đã bán xong; đó là kết cục bình thường,
+   * không phải dấu hiệu xấu. Cờ đỏ mà 92% dính thì không phân loại được gì.
+   *
+   * Spec viết là "xả NGAY sau khi gọi" — mấu chốt nằm ở chữ NGAY, mà API chỉ
+   * cho biết BÂY GIỜ còn giữ hay không, không cho biết bán lúc nào. Suy ra
+   * "bán nhanh" từ "hiện không còn giữ" là suy bừa.
+   *
+   * Còn `no_buy` thì bẩn bất kể thời gian: mồm hô, tiền không bỏ.
+   */
+  const HOLDING_RED_FLAGS = ["no_buy"];
 
   /**
    * Nó có ăn theo chính lời nó hô không?

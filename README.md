@@ -137,13 +137,22 @@ GMGN trả về số liệu mua/bán của chính người đó với chính tok
 
 | Điều kiện | Nhãn | Cờ đỏ? |
 |---|---|---|
-| `bought = 0` | **hô mà không mua** | ✕ |
-| bán hết, còn ~0 | **đã xả sạch** | ✕ |
+| `bought = 0` | **hô mà không mua** | ✕ đỏ |
+| bán hết, còn ~0 | đã xả sạch | |
 | bán rồi nhưng còn giữ | đã xả một phần | |
-| chưa bán | còn giữ | |
+| chưa bán | còn giữ | (xanh — còn tiền trong đó) |
 
-Còn vài đồng bụi sau khi bán vẫn tính là **xả sạch** — đòi đúng `balance = 0` là bỏ sót đúng cái cờ
-đỏ cần bắt. Thiếu hẳn mấy cột số thì là *"không biết"*, **không** quy về 0.
+⚠ **Chỉ `hô mà không mua` là cờ đỏ.** Bản đầu tính cả "đã xả sạch" và chỉ lộ ra khi chạy trên dữ
+liệu thật: một token bình thường cho **46/50 người** dính cờ đỏ, vì gần như ai post từ một tháng
+trước thì giờ cũng đã bán xong — kết cục bình thường, không phải dấu hiệu xấu. Cờ đỏ mà 92% dính
+thì không phân loại được gì.
+
+Spec viết *"xả **ngay** sau khi gọi"*, mấu chốt ở chữ **ngay** — mà API chỉ cho biết **bây giờ** còn
+giữ hay không, không cho biết bán lúc nào. Suy ra "bán nhanh" từ "hiện không còn giữ" là suy bừa.
+`no_buy` thì bẩn bất kể thời gian: mồm hô, tiền không bỏ.
+
+Còn vài đồng bụi sau khi bán vẫn tính là **xả sạch** — đòi đúng `balance = 0` là xếp nhầm sang "còn
+giữ". Thiếu hẳn mấy cột số thì là *"không biết"*, **không** quy về 0.
 
 ## 4. Overlay trên chart (Mức 2)
 
@@ -227,7 +236,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 92 test logic thuần, không cần cài gì
+npm test         # 94 test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```

@@ -55,12 +55,25 @@ test("mua bao nhiêu bán đúng bấy nhiêu, còn 0 → đã xả sạch", () 
   const m = G.normalizeMessage(REAL);
   assert.strictEqual(m.holding, "sold_all");
   assert.strictEqual(m.holdingLabel, "đã xả sạch");
-  assert.strictEqual(m.isHoldingRedFlag, true);
+});
+
+test("REGRESSION: 'đã xả sạch' KHÔNG phải cờ đỏ", () => {
+  // Đo trên trang thật (17/09/2026): một token bình thường cho 46/50 người
+  // dính cờ đỏ vì gần như ai post từ một tháng trước giờ cũng đã bán xong.
+  // Cờ đỏ mà 92% dính thì không phân loại được gì. API không cho biết bán
+  // LÚC NÀO, nên không suy ra được "xả ngay sau khi hô".
+  assert.strictEqual(G.normalizeMessage(REAL).isHoldingRedFlag, false);
+  assert.deepStrictEqual(G.HOLDING_RED_FLAGS, ["no_buy"]);
 });
 
 test("bán rồi nhưng còn giữ kha khá → xả một phần, không phải cờ đỏ", () => {
   const m = G.normalizeMessage(Object.assign({}, REAL, { sold_amount: "100", balance: "66.5" }));
   assert.strictEqual(m.holding, "sold_part");
+  assert.strictEqual(m.isHoldingRedFlag, false);
+});
+
+test("còn giữ nguyên cũng không phải cờ đỏ — đó là tín hiệu tốt", () => {
+  const m = G.normalizeMessage(Object.assign({}, REAL, { sold_amount: "0", balance: "166.5" }));
   assert.strictEqual(m.isHoldingRedFlag, false);
 });
 
