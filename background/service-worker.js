@@ -443,6 +443,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     relay(sender, msg); // không nêu frameId = mọi frame trong tab
     return;
   }
+  if (msg.type === KT.MSG.POINTER) {
+    relay(sender, msg, 0);
+    return;
+  }
   if (msg.type === KT.MSG.NOTE_FOR) {
     relay(sender, msg, 0); // frame 0 = trên cùng, nơi có hộp ghi chú
     return;

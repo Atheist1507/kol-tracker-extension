@@ -41,6 +41,7 @@
     CALLERS: "kt:callers", // frame trên cùng → SW → mọi frame: ai đang trên chart
     NOTE_FOR: "kt:noteFor", // frame con → SW → frame trên cùng: mở hộp ghi chú giúp
     FRAME_HELLO: "kt:frameHello", // mỗi frame tự khai báo, để Chẩn đoán thấy được
+    POINTER: "kt:pointer", // frame chart → SW → frame trên cùng: chuột đang ở đâu
     FRAMES: "kt:frames", // popup hỏi SW: content script đã vào được những frame nào
   };
 

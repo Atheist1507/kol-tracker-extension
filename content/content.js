@@ -242,6 +242,35 @@
       .catch(() => {});
   }
 
+  /**
+   * Frame con báo toạ độ chuột cho frame trên cùng.
+   *
+   * Chuột vào iframe là frame cha NGỪNG nhận pointermove — nó giữ nguyên toạ
+   * độ cũ và không biết mình đang cầm số liệu chết. Chart nằm trong iframe nên
+   * cả overlay lẫn phím N ở frame cha đều đo từ một điểm sai.
+   *
+   * Hãm lại 80ms/lần: đây là tin đi vòng qua service worker, bắn theo nhịp
+   * pointermove là vài trăm tin mỗi giây.
+   */
+  let lastPointerSent = 0;
+  function reportPointer(ev) {
+    const now = Date.now();
+    if (now - lastPointerSent < 80 || !alive()) return;
+    lastPointerSent = now;
+    chrome.runtime
+      .sendMessage({ type: KT.MSG.POINTER, x: ev.clientX, y: ev.clientY, url: location.href })
+      .catch(() => {});
+  }
+
+  /** Iframe nào đang gửi tin, và nó nằm ở đâu trong trang. */
+  function frameOffset(url) {
+    const frames = document.querySelectorAll("iframe");
+    for (const f of frames) {
+      if (f.src === url) return f.getBoundingClientRect();
+    }
+    return frames.length === 1 ? frames[0].getBoundingClientRect() : null;
+  }
+
   /* ---------- phím tắt ---------- */
 
   function selectedText() {
@@ -268,9 +297,10 @@
     // là bật hộp note.
     if (key === "n" && !ev.altKey && !ev.shiftKey && !isTyping(ev.target)) {
       const hit = overlay && overlay.hitAtPointer();
-      if (!hit) return;
+      if (!hit && isTop) return;
       ev.preventDefault();
-      api.openNote(hit, hit.rect);
+      if (hit) api.openNote(hit, hit.rect);
+      else api.openNote({ person: {} }, null); // nhờ frame trên cùng tự quyết
     }
   }
 
@@ -334,9 +364,18 @@
       setTimeout(sayHello, 1200); // chờ quét xong rồi hãy khai lại số liệu
       return;
     }
+    if (msg.type === KT.MSG.POINTER) {
+      if (!isTop || !overlay) return;
+      const box = frameOffset(msg.url);
+      if (box) overlay.setPointer(box.left + msg.x, box.top + msg.y);
+      return;
+    }
     if (msg.type === KT.MSG.NOTE_FOR) {
       if (!isTop) return;
-      const hit = identify(msg.ref);
+      // Không kèm định danh = frame con không tự nhận ra ai (avatar trên chart
+      // là nét vẽ trên canvas, không phải thẻ <img>). Frame trên cùng tự quyết:
+      // nó có thẻ tooltip của GMGN và giờ có cả toạ độ chuột đúng.
+      const hit = msg.ref && (msg.ref.wallet || msg.ref.username) ? identify(msg.ref) : overlay && overlay.hitAtPointer();
       if (hit) api.openNote(hit, null);
       return;
     }
@@ -375,6 +414,10 @@
     }
     overlay = KT.createOverlay(api);
     applyOverlay();
+
+    if (!isTop) {
+      document.addEventListener("pointermove", reportPointer, { capture: true, passive: true });
+    }
 
     window.addEventListener("keydown", onHotkey, true);
     refreshIfStale();
