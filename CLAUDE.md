@@ -137,3 +137,10 @@
 - **`lastTooltip.ketQua` nói vì sao thẻ (không) hiện ra.** Trước đây `found: true` bị đọc nhầm thành
   "đã hiện thẻ" — nó chỉ có nghĩa là ĐỌC RA được cái tên; thẻ vẫn có thể bị vứt ở bước sau mà không
   để lại dấu vết nào. Mỗi nhánh loại bỏ giờ tự khai lý do, kèm toạ độ con trỏ và tuổi của nó.
+- **Tooltip của GMGN là MỘT phần tử dùng đi dùng lại.** Rê sang người khác thì nó đổi NỘI DUNG chứ
+  không bị xoá đi dựng lại — nên `cardAnchor.isConnected` vẫn true và `watchAnchor()` không dọn gì,
+  trong khi cái tên mình nhớ đã cũ. Đó là lý do hộp ghi chú mở ra tên một người đã hover từ TRƯỚC.
+  `hitAtPointer` phải ĐỌC LẠI phần tử đó ngay lúc bấm N (`matchHandleIn(cardAnchor)`), không tin vào
+  cái đã nhớ.
+- ⚠ Trong `processTooltipQueue`, một node bị loại phải `continue` chứ KHÔNG `return`: hàng đợi có thể
+  chứa cả mẩu text lẻ lẫn cả thẻ tooltip thật, bỏ cuộc ở mẩu đầu là không bao giờ tới được thẻ thật.
