@@ -287,6 +287,7 @@
     let cardFromPointer = false; // thẻ mọc từ chính avatar dưới con trỏ, hay từ tooltip cạnh nó
     let lastPerson = null; // { hit, el, at } — sống qua cả lúc thẻ bị ẩn
     let recentCards = []; // vài thẻ tooltip gần đây, để chọn cái ĐANG HIỆN
+    let poolRoot = null; // chỗ GMGN chứa đám thẻ tooltip — để quét lại lúc bấm N
     let lastHit = null; // vì sao lần hỏi gần nhất ra (hoặc không ra) ai
     let cardWatch = null;
 
@@ -393,6 +394,35 @@
     }
 
     /**
+     * Quét tìm thẻ giới thiệu người ĐANG HIỆN trên màn hình.
+     *
+     * ⚠ Sổ `recentCards` chỉ chứa thẻ mình BẮT ĐƯỢC LÚC NÓ MỌC RA. Nhưng GMGN
+     * dựng sẵn thẻ cho từng mốc rồi chỉ bỏ giấu khi hover — không thêm node,
+     * không đổi chữ, nên MutationObserver không thấy gì và thẻ đó không bao
+     * giờ vào sổ. Triệu chứng: hover người thứ hai thì N im, chẩn đoán báo
+     * "thẻ đã bị xoá N giây trước" trong khi tooltip đang hiện rành rành.
+     *
+     * Chỉ chạy lúc bấm N nên quét được, và quét trong đúng cái khung chứa đám
+     * thẻ đó chứ không phải cả trang.
+     */
+    function scanVisibleCard() {
+      const root = poolRoot && poolRoot.isConnected ? poolRoot : document.body;
+      if (!root) return null;
+      let seen = 0;
+      for (const el of root.querySelectorAll("div")) {
+        if (++seen > 600) break;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        if (r.width > MAX_TOOLTIP_W || r.height > MAX_TOOLTIP_H) continue;
+        if (!el.querySelector("img")) continue;
+        if (!isReallyVisible(el)) continue;
+        const hit = matchHandleIn(el, true);
+        if (hit) return { hit: hit, el: el, at: Date.now() };
+      }
+      return null;
+    }
+
+    /**
      * Ai đang nằm dưới con trỏ NGAY LÚC NÀY.
      *
      * Phím N hỏi hàm này chứ không đọc một biến "người đang hover" nhớ sẵn:
@@ -447,11 +477,14 @@
       // thẻ cũ trong trang và chỉ giấu đi, nên "mới nhất" hay trỏ vào người
       // đã hover từ trước.
       const live = recentCards.filter((c) => c.el && c.el.isConnected && isReallyVisible(c.el));
-      const src = live[0] || (lastPerson && !lastPerson.fromPointer ? lastPerson : null);
+      // Không có cái nào trong sổ đang hiện thì QUÉT LẠI màn hình: thẻ đang
+      // hiện có thể là thẻ GMGN dựng sẵn rồi bỏ giấu, chưa từng vào sổ.
+      const found = live[0] || scanVisibleCard();
+      const src = found || (lastPerson && !lastPerson.fromPointer ? lastPerson : null);
       if (!src) return say("chưa đọc được tooltip nào");
       const tuoi = Date.now() - src.at;
 
-      if (live[0]) {
+      if (found) {
         const r = src.el.getBoundingClientRect();
         // Đọc lại nội dung: tooltip có khi được dùng đi dùng lại cho người khác.
         const use = matchHandleIn(src.el, true) || src.hit;
@@ -561,6 +594,7 @@
         recentCards = recentCards.filter((c) => c.el !== card);
         recentCards.unshift({ hit: hit, el: card, at: Date.now() });
         recentCards = recentCards.slice(0, 6);
+        if (card.parentElement) poolRoot = card.parentElement;
         if (shown) continue;
 
         if (!pointerFresh()) { why("chưa biết con trỏ ở đâu"); continue; }
