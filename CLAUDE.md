@@ -151,3 +151,11 @@
   con trỏ rời avatar đó, để nó rơi xuống nhánh tooltip là trả lời người cũ cho avatar mới.
 - **`hitAtPointer` tự khai lý do ở MỌI đường ra** (`diagnose().lastHit`). Hàm này đã vá bốn lần, mỗi
   lần hỏng lại là một vòng đoán mò. Sửa nó thì giữ nguyên thói quen đó.
+- **Đừng bám vào NODE vừa đổi — leo lên tìm KHUNG thẻ** (`cardContainer`, tối đa 5 tầng, phải có ảnh
+  người và kích thước hợp lý). Node vừa đổi có thể chỉ là một mẩu chữ bên trong; bám vào nó thì GMGN
+  vẽ lại một nhịp là mất dấu, và `lastPerson.el.isConnected` thành false giữa lúc hover và lúc bấm N
+  (đo được trên chart thật: `lastHit.lyDo = "không có thẻ tooltip nào còn sống"`).
+- **Phần tử bị xoá thì NGƯỜI vẫn còn.** GMGN chỉ hiện một tooltip tại một thời điểm, nên người đọc
+  được vài giây trước vẫn là người dưới con trỏ — rê sang ai khác thì đã có thẻ mới. Cửa sổ tin cậy
+  cho trường hợp này (`ORPHAN_TTL_MS` 6s) CỐ TÌNH ngắn hơn `PERSON_TTL_MS` (20s): không đọc lại được
+  nữa thì càng để lâu càng dễ ghi chú vào nhầm hồ sơ. Và chỉ áp dụng khi con trỏ đang ở TRÊN CHART.
