@@ -299,6 +299,18 @@
       }, delay == null ? 120 : delay);
     }
 
+    /**
+     * Đặt vị trí chuột từ BÊN NGOÀI.
+     *
+     * Chuột đi vào iframe là frame cha ngừng nhận pointermove hoàn toàn — nó
+     * vẫn giữ toạ độ cũ và tưởng là mới. Chart GMGN nằm trong iframe, nên mọi
+     * phép "cái này có ở cạnh con trỏ không" ở frame cha đều đo từ một điểm
+     * sai. Frame chart phải tự báo ra.
+     */
+    function setPointer(x, y) {
+      pointer = { x: x, y: y, t: Date.now() };
+    }
+
     function onPointerMove(ev) {
       pointer = { x: ev.clientX, y: ev.clientY, t: Date.now() };
       // Tooltip của GMGN tự biến mất không báo; thẻ của mình thì phải tự biết
@@ -521,6 +533,7 @@
       host,
       diagnose,
       hitAtPointer,
+      setPointer,
       isRunning: () => running,
       start() {
         if (running) return;

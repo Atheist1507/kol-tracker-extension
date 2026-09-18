@@ -116,3 +116,17 @@
   invalidated", và tab không trả lời `chrome.tabs.sendMessage` nữa. Phải **F5 lại trang** mới nạp bản
   mới. Thông báo lỗi PHẢI nói ra điều đó — gộp nó chung với "tab này chưa chạy content script" là đẩy
   người dùng đi tìm sai hướng (đã mất một vòng vì đúng chuyện này).
+- **Avatar TRÊN CHART là NÉT VẼ TRÊN CANVAS, không phải thẻ `<img>`.** Chẩn đoán 18/09/2026 khép lại
+  chuyện này: iframe chart có `canvases: 8, images: 0`, còn cả trang chỉ có **12** ảnh cỡ avatar thật
+  (`avatarBuckets: twitterPath 8, externalRes 4, giaoDien 59`) — tức là bảng X Tracker bên phải, không
+  phải chart. Hệ quả, KHÔNG có cách nào lách:
+  - viền quanh avatar trên chart là **bất khả thi** (không có phần tử nào để bám vào);
+  - `identifyByAvatar` không bao giờ nhận ra người trên chart;
+  - phím N trên chart CHỈ chạy được qua đường đọc chữ trong tooltip. Đường đó là tính năng chính, không
+    còn là "dự phòng" — đừng ai xoá nó đi cho gọn.
+- **Chuột vào iframe là frame cha NGỪNG nhận `pointermove`.** Nó giữ nguyên toạ độ cũ và không biết
+  mình đang cầm số liệu chết, nên mọi phép "cái này có ở cạnh con trỏ không" ở frame cha đều đo từ một
+  điểm sai — đó là lý do thật sự làm N chết trên chart. Frame chart tự báo toạ độ ra (`KT.MSG.POINTER`,
+  hãm 80ms), frame cha cộng offset của thẻ `<iframe>` để quy về hệ toạ độ của mình.
+  ⚠ Phím N bấm trong frame chart cũng gửi `NOTE_FOR` KHÔNG kèm định danh — frame con không tự nhận ra
+  ai được (canvas), nên để frame trên cùng tự quyết bằng tooltip + toạ độ vừa nhận.
