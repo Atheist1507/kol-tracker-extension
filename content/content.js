@@ -76,7 +76,20 @@
     },
 
     openNote: (hit, rect) => {
-      if (!noteBox || !hit) return;
+      if (!hit) return;
+      // Hộp ghi chú chỉ dựng ở frame TRÊN CÙNG (một trang một hộp). Bấm N khi
+      // đang hover avatar trên chart là bấm trong iframe của TradingView —
+      // nhờ frame trên cùng mở hộ, và gửi ĐỊNH DANH chứ không gửi cả object:
+      // frame trên cùng có dữ liệu Sheet mới hơn, để nó tự tra lại.
+      if (!noteBox) {
+        chrome.runtime
+          .sendMessage({
+            type: KT.MSG.NOTE_FOR,
+            ref: { wallet: hit.person && hit.person.wallet, username: hit.person && hit.person.username },
+          })
+          .catch(() => {});
+        return;
+      }
       noteBox.open({
         caller: hit.caller,
         person: hit.person,
@@ -151,6 +164,7 @@
         }
         if (panel) panel.update();
         if (overlay) overlay.reset();
+        shareCallers();
       } else if (msg.kind === "token") {
         const list = (msg.payload && msg.payload.data) || [];
         const first = Array.isArray(list) ? list[0] : list;
@@ -166,6 +180,21 @@
     } catch (e) {
       /* dữ liệu GMGN đổi hình dạng — im lặng, đừng làm hỏng trang */
     }
+  }
+
+  /**
+   * main-world.js chỉ chạy ở frame trên cùng (all_frames: false — nó vá fetch
+   * của GMGN, vá ở mọi frame là vá nhầm chỗ). Nên chỉ frame đó thấy danh sách
+   * người trên chart; iframe của TradingView thì mù tịt, và avatar nằm trong
+   * đó thì hover không ra ai, bấm N không ra gì.
+   *
+   * Đẩy qua service worker để mọi frame trong tab cùng thấy.
+   */
+  function shareCallers() {
+    if (!isTop) return;
+    chrome.runtime
+      .sendMessage({ type: KT.MSG.CALLERS, callers: state.callers, token: state.token })
+      .catch(() => {});
   }
 
   /* ---------- phím tắt ---------- */
@@ -252,6 +281,19 @@
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || !msg.type) return;
+    if (msg.type === KT.MSG.CALLERS) {
+      if (isTop) return; // chính mình vừa gửi đi
+      state.callers = msg.callers || [];
+      state.token = msg.token || state.token;
+      if (overlay) overlay.reset();
+      return;
+    }
+    if (msg.type === KT.MSG.NOTE_FOR) {
+      if (!isTop) return;
+      const hit = identify(msg.ref);
+      if (hit) api.openNote(hit, null);
+      return;
+    }
     if (msg.type === KT.MSG.TOGGLE_PANEL) {
       togglePanel(msg.query);
       sendResponse({ ok: true });
@@ -290,6 +332,19 @@
 
     window.addEventListener("keydown", onHotkey, true);
     refreshIfStale();
+    shareCallers();
+
+    // Khai báo mình tồn tại. Không có cái này thì "chart nằm trong iframe mà
+    // content script không vào được" trông y hệt "vào được nhưng không khớp
+    // được avatar nào" — hai bệnh, hai cách chữa.
+    chrome.runtime
+      .sendMessage({
+        type: KT.MSG.FRAME_HELLO,
+        url: location.href.slice(0, 120),
+        isTop,
+        images: document.querySelectorAll("img[src]").length,
+      })
+      .catch(() => {});
 
     globalThis.__KT = {
       state,

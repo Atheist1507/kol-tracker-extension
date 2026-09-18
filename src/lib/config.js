@@ -36,6 +36,12 @@
     TEST_URL: "kt:testUrl", // Options thử một link CSV trước khi lưu
     SHEET_PING: "kt:sheetPing", // Options thử kết nối Apps Script
     SAVE_NOTE: "kt:saveNote", // hộp ghi chú → Apps Script → Sheet
+    // Chart của GMGN là TradingView nằm trong iframe blob: RIÊNG. Ba tin dưới
+    // đây nối frame trên cùng với frame đó — xem content.js.
+    CALLERS: "kt:callers", // frame trên cùng → SW → mọi frame: ai đang trên chart
+    NOTE_FOR: "kt:noteFor", // frame con → SW → frame trên cùng: mở hộp ghi chú giúp
+    FRAME_HELLO: "kt:frameHello", // mỗi frame tự khai báo, để Chẩn đoán thấy được
+    FRAMES: "kt:frames", // popup hỏi SW: content script đã vào được những frame nào
   };
 
   /**

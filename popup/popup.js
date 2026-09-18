@@ -159,8 +159,18 @@
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.id) return;
     try {
-      const res = await chrome.tabs.sendMessage(tab.id, { type: KT.MSG.DIAGNOSE });
-      const text = JSON.stringify(res, null, 2);
+      const res = await chrome.tabs.sendMessage(tab.id, { type: KT.MSG.DIAGNOSE }, { frameId: 0 });
+      // Chart của GMGN nằm trong iframe riêng. Không liệt kê được frame nào có
+      // content script thì "iframe không vào được" trông y hệt "vào được nhưng
+      // không khớp avatar nào".
+      let frames = [];
+      try {
+        const r = await chrome.runtime.sendMessage({ type: KT.MSG.FRAMES, tabId: tab.id });
+        frames = (r && r.frames) || [];
+      } catch (e) {
+        /* SW vừa ngủ dậy, chưa có sổ */
+      }
+      const text = JSON.stringify(Object.assign({}, res, { framesWithScript: frames }), null, 2);
       await navigator.clipboard.writeText(text);
       el.content.innerHTML = `<div class="kt-sec-title">Chẩn đoán (đã copy vào clipboard)</div>
         <div class="kt-hint" style="white-space:pre-wrap;font-family:ui-monospace,monospace">${KT.esc(text)}</div>`;

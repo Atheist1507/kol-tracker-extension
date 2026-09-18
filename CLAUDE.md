@@ -85,3 +85,17 @@
   ai biết mấy giờ.
   ⚠ Đánh đổi đã biết: `dd/MM/yyyy` không sort đúng khi sort cột đó như CHỮ trong Sheet (ISO thì có).
   Extension tự sắp theo mốc đã parse nên không ảnh hưởng.
+- **Chart của GMGN là TradingView trong một iframe `blob:` RIÊNG; avatar trên chart nằm trong đó.**
+  Cái panel bên phải trang ("X Tracker") mới ở frame trên cùng — nên trước đây mọi thứ extension bắt
+  được đều là của panel đó, còn hover avatar trên chart rồi bấm N thì không có gì xảy ra. Hai lý do
+  chồng lên nhau, phải chữa cả hai:
+  1. `main-world.js` khai `all_frames: false` (nó vá `fetch` của GMGN, vá ở mọi frame là vá nhầm chỗ)
+     → chỉ frame trên cùng thấy danh sách người. Frame chart mù tịt. Giờ frame trên cùng đẩy
+     `KT.MSG.CALLERS` qua service worker, SW phát lại cho MỌI frame của tab.
+  2. Hộp ghi chú chỉ dựng ở frame trên cùng (một trang một hộp). Bấm N trong frame chart giờ gửi
+     `KT.MSG.NOTE_FOR` → SW → `frameId: 0`. Gửi ĐỊNH DANH (ví + username) chứ không gửi cả object:
+     frame trên cùng có dữ liệu Sheet mới hơn, để nó tự tra lại.
+  ⚠ SW gọi `chrome.tabs.sendMessage` thì PHẢI có host permission cho gmgn — `content_scripts.matches`
+  KHÔNG cấp quyền đó, và `activeTab` chỉ có hiệu lực cho popup sau cú bấm của người dùng.
+  ⚠ Mỗi frame tự khai `KT.MSG.FRAME_HELLO`, nút Chẩn đoán in ra `framesWithScript`. Không có nó thì
+  "iframe không vào được" trông y hệt "vào được nhưng không khớp avatar nào" — hai bệnh, hai cách chữa.
