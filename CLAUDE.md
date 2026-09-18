@@ -180,3 +180,12 @@
   trước) chứ không phải cả trang.
   ⚠ Đây là bài học thứ ba cùng một kiểu: MutationObserver chỉ kể được chuyện nó CHỨNG KIẾN. Thứ gì
   phải đúng tại THỜI ĐIỂM BẤM PHÍM thì hỏi lại DOM tại thời điểm đó, đừng tin sổ sách.
+- **⚠⚠ Bảng "X Tracker" bên phải trang GMGN có hàng người TRÔNG HỆT thẻ tooltip của chart**: avatar,
+  `@handle`, `x mấy`, `mấy ngày`, nội dung post, chữ "Callback". Không lọc theo VỊ TRÍ thì phép đọc
+  tooltip trúng ngay một hàng trong bảng đó và trả lời một người chẳng liên quan gì tới chart — đó là
+  cái đã xảy ra suốt nhiều bản: chưa lần nào bắt được thẻ trên chart cả, toàn bắt nhầm sang bảng bên
+  cạnh, mà `lastTooltip` nhìn vẫn "hợp lý" nên không ai nghi.
+  Luật: con trỏ đang trên chart thì ứng viên PHẢI nằm trong vùng khung chart (`chartRect()` = iframe
+  to nhất, đệm 40px). Áp ở CẢ hai chỗ: lúc thẻ mọc ra, và lúc quét lại khi bấm N.
+- ⚠ `scanVisibleCard` duyệt theo **ẢNH** (vài chục) chứ không theo `div` (vài nghìn) — nhưng leo từ
+  ảnh lên phải đi tiếp tới tầng CÓ `@handle`, dừng ở tầng đầu tiên chứa ảnh là dừng ở cụm avatar+tên.

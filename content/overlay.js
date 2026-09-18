@@ -405,19 +405,41 @@
      * Chỉ chạy lúc bấm N nên quét được, và quét trong đúng cái khung chứa đám
      * thẻ đó chứ không phải cả trang.
      */
-    function scanVisibleCard() {
-      const root = poolRoot && poolRoot.isConnected ? poolRoot : document.body;
-      if (!root) return null;
-      let seen = 0;
-      for (const el of root.querySelectorAll("div")) {
-        if (++seen > 600) break;
-        const r = el.getBoundingClientRect();
-        if (!r.width || !r.height) continue;
-        if (r.width > MAX_TOOLTIP_W || r.height > MAX_TOOLTIP_H) continue;
-        if (!el.querySelector("img")) continue;
-        if (!isReallyVisible(el)) continue;
-        const hit = matchHandleIn(el, true);
-        if (hit) return { hit: hit, el: el, at: Date.now() };
+    /**
+     * Quét tìm thẻ giới thiệu người ĐANG HIỆN trên màn hình.
+     *
+     * ⚠ Sổ `recentCards` chỉ chứa thẻ mình BẮT ĐƯỢC LÚC NÓ MỌC RA. GMGN dựng
+     * sẵn thẻ cho từng mốc rồi chỉ bỏ giấu khi hover — không thêm node, không
+     * đổi chữ — nên MutationObserver không thấy gì và thẻ đó không vào sổ.
+     *
+     * ⚠⚠ `nearChart` là bắt buộc khi con trỏ đang trên chart. Bảng "X Tracker"
+     * bên phải trang có hàng người TRÔNG HỆT thẻ tooltip: avatar, @handle, x
+     * mấy, mấy ngày, nội dung post. Không lọc theo vị trí thì quét trúng ngay
+     * một hàng trong đó và trả lời một người chẳng liên quan gì tới chart —
+     * đúng cái đã xảy ra suốt: chưa lần nào bắt được thẻ trên chart cả.
+     *
+     * Duyệt theo ẢNH (vài chục) chứ không theo div (vài nghìn): thẻ giới thiệu
+     * người nào cũng có ảnh, mà đo kích thước từng div thì chậm.
+     */
+    function scanVisibleCard(nearChart) {
+      const chart = nearChart ? chartRect() : null;
+      if (nearChart && !chart) return null;
+      for (const img of document.querySelectorAll("img")) {
+        const ir = img.getBoundingClientRect();
+        if (ir.width < MIN_AVATAR_PX || ir.width > 96) continue;
+
+        // Leo từ ảnh lên cho tới khi gặp khung CÓ @handle. Dừng ở tầng đầu
+        // tiên chứa ảnh là dừng ở cụm avatar+tên, chưa với tới chỗ có handle.
+        let node = img.parentElement;
+        for (let i = 0; i < 6 && node && node.nodeType === 1; i++, node = node.parentElement) {
+          const r = node.getBoundingClientRect();
+          if (!r.width || !r.height) continue;
+          if (r.width > MAX_TOOLTIP_W || r.height > MAX_TOOLTIP_H) break;
+          if (chart && !overlaps(r, chart, 40)) continue;
+          if (!isReallyVisible(node)) continue;
+          const hit = matchHandleIn(node, true);
+          if (hit) return { hit: hit, el: node, at: Date.now() };
+        }
       }
       return null;
     }
@@ -476,10 +498,18 @@
       // Chọn thẻ ĐANG HIỆN, không phải thẻ mới nhất mình thấy: GMGN giữ lại
       // thẻ cũ trong trang và chỉ giấu đi, nên "mới nhất" hay trỏ vào người
       // đã hover từ trước.
-      const live = recentCards.filter((c) => c.el && c.el.isConnected && isReallyVisible(c.el));
+      const onChart = overIframe();
+      const chart = onChart ? chartRect() : null;
+      const live = recentCards.filter(
+        (c) =>
+          c.el &&
+          c.el.isConnected &&
+          isReallyVisible(c.el) &&
+          (!chart || overlaps(c.el.getBoundingClientRect(), chart, 40))
+      );
       // Không có cái nào trong sổ đang hiện thì QUÉT LẠI màn hình: thẻ đang
       // hiện có thể là thẻ GMGN dựng sẵn rồi bỏ giấu, chưa từng vào sổ.
-      const found = live[0] || scanVisibleCard();
+      const found = live[0] || scanVisibleCard(onChart);
       const src = found || (lastPerson && !lastPerson.fromPointer ? lastPerson : null);
       if (!src) return say("chưa đọc được tooltip nào");
       const tuoi = Date.now() - src.at;
@@ -488,7 +518,7 @@
         const r = src.el.getBoundingClientRect();
         // Đọc lại nội dung: tooltip có khi được dùng đi dùng lại cho người khác.
         const use = matchHandleIn(src.el, true) || src.hit;
-        if (overIframe()) return say("thẻ đang hiện (con trỏ trên chart)", Object.assign({}, use, { rect: r }));
+        if (onChart) return say("thẻ đang hiện trên chart", Object.assign({}, use, { rect: r }));
         if (nearPointer(r)) return say("thẻ đang hiện (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
         return say("thẻ đang hiện nhưng cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
       }
@@ -498,7 +528,7 @@
       // người đang nằm dưới con trỏ — rê sang ai khác thì đã có thẻ mới rồi.
       // Cửa sổ này CỐ TÌNH ngắn hơn PERSON_TTL_MS: không đọc lại được nữa thì
       // càng để lâu càng dễ ghi chú vào nhầm hồ sơ.
-      if (!overIframe()) return say("thẻ đã bị xoá, mà con trỏ không ở trên chart");
+      if (!onChart) return say("thẻ đã bị xoá, mà con trỏ không ở trên chart");
       if (tuoi > ORPHAN_TTL_MS) return say("thẻ đã bị xoá " + Math.round(tuoi / 1000) + "s trước");
       return say("thẻ đã bị xoá, dùng người đọc gần nhất", Object.assign({}, src.hit, { rect: null }));
     }
@@ -521,6 +551,21 @@
      * ở đây là vô nghĩa: GMGN thả tooltip theo chỗ trống của nó, không theo
      * con trỏ.
      */
+    /** Khung của chart: iframe to nhất trên trang. */
+    function chartRect() {
+      let best = null;
+      for (const f of document.querySelectorAll("iframe")) {
+        const r = f.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        if (!best || r.width * r.height > best.width * best.height) best = r;
+      }
+      return best;
+    }
+
+    function overlaps(a, b, pad) {
+      return !(a.right < b.left - pad || a.left > b.right + pad || a.bottom < b.top - pad || a.top > b.bottom + pad);
+    }
+
     function overIframe() {
       for (const el of elementsUnderPointer()) {
         if (el && el.tagName === "IFRAME") return true;
@@ -611,8 +656,17 @@
         // Trên chart thì đo khoảng cách là vô nghĩa: GMGN thả tooltip theo chỗ
         // trống của nó, mà avatar dưới con trỏ lại là nét vẽ trên canvas.
         if (overIframe()) {
+          // Bảng X Tracker cũng đầy hàng trông hệt thẻ tooltip. Con trỏ đang
+          // trên chart thì thẻ phải nằm ở vùng chart, không thì đó là hàng
+          // trong bảng bên cạnh.
+          const chart = chartRect();
+          const cr = card.getBoundingClientRect();
+          if (chart && !overlaps(cr, chart, 40)) {
+            why("thẻ nằm ngoài vùng chart (bảng X Tracker?)");
+            continue;
+          }
           why("con trỏ đang trên chart");
-          showCard(hit, card.getBoundingClientRect(), card, false);
+          showCard(hit, cr, card, false);
           shown = true;
           continue;
         }
