@@ -174,6 +174,32 @@
      * Thẻ của GMGN luôn kèm ảnh của chính người đó — đó là dấu hiệu phân biệt
      * nó với một cục SPA vừa vẽ lại có nhắc tên ai đó.
      */
+    /**
+     * Thẻ này có đang THẬT SỰ hiện trên màn hình không?
+     *
+     * GMGN không xoá thẻ cũ đi — nó giữ lại trong trang và giấu đi. Thẻ cũ vẫn
+     * `isConnected`, vẫn có kích thước, `getBoundingClientRect()` vẫn trả số
+     * đẹp. Đọc lại nó thì ra đúng cái tên nó đang giữ, chỉ có điều đó là người
+     * đã hover từ trước. Đây là lý do hộp ghi chú mở ra tên người khác trong
+     * khi tooltip trên màn hình là người đang hover.
+     */
+    function isReallyVisible(el) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return false;
+      if (r.bottom <= 0 || r.right <= 0 || r.top >= window.innerHeight || r.left >= window.innerWidth) return false;
+
+      for (let n = el, i = 0; n && n.nodeType === 1 && i < 12; n = n.parentElement, i++) {
+        const st = getComputedStyle(n);
+        if (st.display === "none" || st.visibility === "hidden" || Number(st.opacity) === 0) return false;
+      }
+
+      // Bị thứ khác phủ lên (thẻ mới đè lên thẻ cũ) cũng là không hiện.
+      const cx = Math.min(Math.max(r.left + r.width / 2, 1), window.innerWidth - 1);
+      const cy = Math.min(Math.max(r.top + r.height / 2, 1), window.innerHeight - 1);
+      const top = document.elementFromPoint(cx, cy);
+      return !!top && (top === el || el.contains(top) || top.contains(el));
+    }
+
     function cardContainer(el) {
       let node = el;
       for (let i = 0; i < 5 && node && node.nodeType === 1; i++) {
@@ -197,7 +223,7 @@
       };
     }
 
-    function matchHandleIn(node) {
+    function matchHandleIn(node, quiet) {
       const chunks = textChunks(node);
       if (!chunks.length || chunks.length > MAX_CARD_CHUNKS) return null;
 
@@ -208,11 +234,11 @@
         if (KT.handleKey(name).length < 2) continue;
         const hit = api.identify({ username: name });
         if (hit) {
-          rememberTooltip(el, chunks, name, true);
+          if (!quiet) rememberTooltip(el, chunks, name, true);
           return hit;
         }
       }
-      if (standalone.length) rememberTooltip(el, chunks, standalone[0], false);
+      if (standalone.length && !quiet) rememberTooltip(el, chunks, standalone[0], false);
       return null;
     }
 
@@ -260,6 +286,7 @@
     let cardHit = null;
     let cardFromPointer = false; // thẻ mọc từ chính avatar dưới con trỏ, hay từ tooltip cạnh nó
     let lastPerson = null; // { hit, el, at } — sống qua cả lúc thẻ bị ẩn
+    let recentCards = []; // vài thẻ tooltip gần đây, để chọn cái ĐANG HIỆN
     let lastHit = null; // vì sao lần hỏi gần nhất ra (hoặc không ra) ai
     let cardWatch = null;
 
@@ -298,6 +325,14 @@
       cardFromPointer = !!fromPointer;
       if (anchorNode) {
         lastPerson = { hit: hit, el: anchorNode, at: Date.now(), fromPointer: !!fromPointer };
+        // Sổ vài thẻ gần nhất: GMGN giữ lại thẻ cũ trong trang nên "thẻ gần
+        // nhất mình thấy" chưa chắc là "thẻ đang hiện". Lúc bấm N thì chọn
+        // theo cái ĐANG HIỆN, không theo cái mới nhất.
+        if (!fromPointer) {
+          recentCards = recentCards.filter((c) => c.el !== anchorNode);
+          recentCards.unshift({ hit: hit, el: anchorNode, at: Date.now() });
+          recentCards = recentCards.slice(0, 6);
+        }
       }
       if (!cfg || !cfg.overlayHover) {
         cardAnchor = anchorNode || null;
@@ -408,22 +443,21 @@
       // bước 2 loại rồi — con trỏ không còn ở trên avatar đó nữa, mà nó thì
       // vẫn nằm trong bán kính của avatar bên cạnh, nên rơi xuống đây là trả
       // lời người cũ cho avatar mới.
-      const src = lastPerson && !lastPerson.fromPointer ? lastPerson : null;
+      // Chọn thẻ ĐANG HIỆN, không phải thẻ mới nhất mình thấy: GMGN giữ lại
+      // thẻ cũ trong trang và chỉ giấu đi, nên "mới nhất" hay trỏ vào người
+      // đã hover từ trước.
+      const live = recentCards.filter((c) => c.el && c.el.isConnected && isReallyVisible(c.el));
+      const src = live[0] || (lastPerson && !lastPerson.fromPointer ? lastPerson : null);
       if (!src) return say("chưa đọc được tooltip nào");
       const tuoi = Date.now() - src.at;
 
-      // Phần tử còn trên trang thì ĐỌC LẠI nó: tooltip của GMGN có khi được
-      // dùng đi dùng lại, rê sang người khác là đổi nội dung chứ không dựng
-      // lại, nên cái mình nhớ có thể đã nói về người khác.
-      if (src.el && src.el.isConnected) {
+      if (live[0]) {
         const r = src.el.getBoundingClientRect();
-        if (r.width && r.height) {
-          if (tuoi > PERSON_TTL_MS) return say("thẻ cũ quá (" + Math.round(tuoi / 1000) + "s)");
-          const use = matchHandleIn(src.el) || src.hit;
-          if (overIframe()) return say("đọc lại tooltip (con trỏ trên chart)", Object.assign({}, use, { rect: r }));
-          if (nearPointer(r)) return say("đọc lại tooltip (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
-          return say("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
-        }
+        // Đọc lại nội dung: tooltip có khi được dùng đi dùng lại cho người khác.
+        const use = matchHandleIn(src.el, true) || src.hit;
+        if (overIframe()) return say("thẻ đang hiện (con trỏ trên chart)", Object.assign({}, use, { rect: r }));
+        if (nearPointer(r)) return say("thẻ đang hiện (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
+        return say("thẻ đang hiện nhưng cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
       }
 
       // Phần tử đã bị GMGN vứt đi. NGƯỜI thì vẫn còn: GMGN chỉ hiện một
@@ -505,6 +539,7 @@
       const nodes = Array.from(pendingNodes).slice(0, 30);
       pendingNodes.clear();
 
+      let shown = false;
       for (const node of nodes) {
         if (!node.isConnected) continue;
         const hit = matchHandleIn(node);
@@ -512,50 +547,51 @@
 
         const el = node.nodeType === 1 ? node : node.parentElement;
         if (!el) { why("không có phần tử"); continue; }
-        const rect = el.getBoundingClientRect();
-        if (!rect.width || !rect.height) { why("thẻ không có kích thước"); continue; }
-        if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) {
-          why("thẻ quá to: " + Math.round(rect.width) + "x" + Math.round(rect.height));
-          continue;
-        }
 
-        // Tooltip vừa mọc ra là NÓI VỀ thứ con trỏ đang chỉ vào. Nếu dưới con
-        // trỏ có một avatar thì neo thẳng vào avatar đó — kể cả tooltip mọc ở
-        // tận đâu. Đo khoảng cách tới tooltip là sai: tooltip của chart GMGN
-        // mọc xa hẳn avatar, nên luật bán kính làm phím N chết hẳn trên chart
-        // đúng lúc nó vừa được sửa cho hết mở nhầm người.
-        // Nhưng phải chắc CÁI VỪA MỌC RA đúng là thẻ giới thiệu một người, chứ
-        // không phải một cục SPA vừa vẽ lại có nhắc tên ai đó. Dấu hiệu: thẻ
-        // của GMGN luôn kèm ẢNH của chính người đó. Thiếu bước này thì đang
-        // hover một avatar lạ mà ở góc màn hình có chữ "@ai-đó" là N mở nhầm
-        // sang người kia — đúng con bug vừa sửa xong.
         // Node vừa đổi có thể chỉ là một mẩu chữ bên trong thẻ. Leo lên tìm
-        // KHUNG thẻ thật (có ảnh người, kích thước còn hợp lý) — bám vào mẩu
-        // chữ thì GMGN vẽ lại một nhịp là mất dấu.
+        // KHUNG thẻ thật — có ảnh người (thẻ giới thiệu người của GMGN luôn
+        // kèm ảnh, một cục SPA vừa vẽ lại thì không), kích thước còn hợp lý.
+        // Bám vào mẩu chữ thì GMGN vẽ lại một nhịp là mất dấu.
         const card = cardContainer(el);
         if (!card) { why("không tìm ra khung thẻ có ảnh người"); continue; }
+
+        // GHI SỔ TRƯỚC, quyết định hiện thẻ sau. Hai tooltip có thể mọc trong
+        // cùng một nhịp; dừng ở cái đầu tiên là cái thứ hai không bao giờ vào
+        // sổ, và lúc bấm N thì "chọn thẻ đang hiện" không có gì để chọn.
+        recentCards = recentCards.filter((c) => c.el !== card);
+        recentCards.unshift({ hit: hit, el: card, at: Date.now() });
+        recentCards = recentCards.slice(0, 6);
+        if (shown) continue;
+
         if (!pointerFresh()) { why("chưa biết con trỏ ở đâu"); continue; }
 
+        // Tooltip vừa mọc ra là NÓI VỀ thứ con trỏ đang chỉ vào. Dưới con trỏ
+        // có avatar thì neo thẳng vào avatar đó, kể cả tooltip mọc ở tận đâu.
         const anchorImg = imgUnderPointer();
         if (anchorImg) {
           why("neo vào avatar dưới con trỏ");
           showCard(hit, anchorImg.getBoundingClientRect(), anchorImg, true);
-          return;
+          shown = true;
+          continue;
         }
+        // Trên chart thì đo khoảng cách là vô nghĩa: GMGN thả tooltip theo chỗ
+        // trống của nó, mà avatar dưới con trỏ lại là nét vẽ trên canvas.
         if (overIframe()) {
           why("con trỏ đang trên chart");
           showCard(hit, card.getBoundingClientRect(), card, false);
-          return;
+          shown = true;
+          continue;
         }
-        // Không hover avatar nào (rê trên một cái tên trong danh sách chẳng
-        // hạn) thì mới quay về luật cũ: tooltip phải ở cạnh con trỏ.
+        // Không hover avatar nào, cũng không ở trên chart (rê trên một cái tên
+        // trong danh sách chẳng hạn) thì mới quay về luật cũ: phải ở cạnh.
+        const rect = card.getBoundingClientRect();
         if (!nearPointer(rect)) {
           why("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, rect)) + "px");
           continue;
         }
         why("tooltip ở cạnh con trỏ");
-        showCard(hit, card.getBoundingClientRect(), card, false);
-        return;
+        showCard(hit, rect, card, false);
+        shown = true;
       }
     }
 
