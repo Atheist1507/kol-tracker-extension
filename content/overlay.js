@@ -37,6 +37,10 @@
   const PERSON_TTL_MS = 20000;
   // Khi phần tử đã bị xoá thì không đọc lại được nữa — cửa sổ tin cậy ngắn hơn.
   const ORPHAN_TTL_MS = 6000;
+  // Biên quanh khung chart. Thẻ tooltip mọc TRÀN ra ngoài mép chart (đo trên
+  // ảnh thật: chart hết ở x=1515, thẻ bắt đầu ở x=1550) nên biên hẹp là vứt
+  // nhầm. 120px vẫn còn cách bảng X Tracker rất xa (cách hơn 240px).
+  const CHART_PAD_PX = 120;
 
   function createOverlay(api) {
     // Frame con ở đây LÀ chart (TradingView). Trong đó không có bảng X Tracker
@@ -232,6 +236,14 @@
      * nới lỏng điều kiện đều vô ích — mình chưa bao giờ nhìn thấy nó.
      * Shadow root ĐÓNG thì chịu, không có đường vào.
      */
+    /** Phần tử này có phải của extension mình không? */
+    function isOurs(el) {
+      for (let n = el, i = 0; n && i < 4; n = n.parentElement, i++) {
+        if (n.id && String(n.id).indexOf("kol-tracker") === 0) return true;
+      }
+      return false;
+    }
+
     function scanRoots() {
       const roots = [document];
       const queue = [document];
@@ -241,7 +253,11 @@
         for (const el of root.querySelectorAll("*")) {
           if (++seen > 4000) break;
           if (!el.shadowRoot) continue;
-          if (el === host || shadow.contains(el)) continue; // shadow của chính mình
+          // ⚠ Bỏ qua shadow root của CHÍNH MÌNH. Panel KOL Tracker cũng là một
+          // thẻ có avatar và @handle, và nó nằm đè lên chart — quét vào đó là
+          // đọc ra dòng đầu trong danh sách của chính mình rồi tưởng đó là
+          // người đang hover. Đã xảy ra thật: hover Shea1121, hộp mở Roxx_Sol.
+          if (isOurs(el)) continue;
           roots.push(el.shadowRoot);
           queue.push(el.shadowRoot);
         }
@@ -496,7 +512,8 @@
             const r = el.getBoundingClientRect();
             if (r.width < 120 || r.width > MAX_TOOLTIP_W) continue;
             if (!r.height || r.height > MAX_TOOLTIP_H) continue;
-            if (!overlaps(r, chart, 40)) continue;
+            if (!overlaps(r, chart, CHART_PAD_PX)) continue;
+            if (isOurs(el) || isOurs(el.getRootNode().host || el)) continue;
             if (!isReallyVisible(el)) continue;
             const hit = matchHandleIn(el, true);
             // Ghi lại vài ứng viên NẰM ĐÚNG VÙNG CHART mà không khớp được ai:
@@ -523,7 +540,7 @@
           const r = node.getBoundingClientRect();
           if (!r.width || !r.height) continue;
           if (r.width > MAX_TOOLTIP_W || r.height > MAX_TOOLTIP_H) break;
-          if (chart && !overlaps(r, chart, 40)) continue;
+          if (chart && !overlaps(r, chart, CHART_PAD_PX)) continue;
           if (!isReallyVisible(node)) continue;
           const hit = matchHandleIn(node, true);
           if (hit) return { hit: hit, el: node, at: Date.now() };
@@ -593,7 +610,7 @@
           c.el &&
           c.el.isConnected &&
           isReallyVisible(c.el) &&
-          (!chart || overlaps(c.el.getBoundingClientRect(), chart, 40))
+          (!chart || overlaps(c.el.getBoundingClientRect(), chart, CHART_PAD_PX))
       );
       // Không có cái nào trong sổ đang hiện thì QUÉT LẠI màn hình: thẻ đang
       // hiện có thể là thẻ GMGN dựng sẵn rồi bỏ giấu, chưa từng vào sổ.
@@ -757,7 +774,7 @@
           // trong bảng bên cạnh.
           const chart = chartRect();
           const cr = card.getBoundingClientRect();
-          if (chart && !overlaps(cr, chart, 40)) {
+          if (chart && !overlaps(cr, chart, CHART_PAD_PX)) {
             why("thẻ nằm ngoài vùng chart (bảng X Tracker?)");
             continue;
           }
