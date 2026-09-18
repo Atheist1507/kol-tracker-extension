@@ -190,6 +190,30 @@
    *
    * Đẩy qua service worker để mọi frame trong tab cùng thấy.
    */
+  /**
+   * Khai báo mình tồn tại. Không có cái này thì "chart nằm trong iframe mà
+   * content script không vào được" trông y hệt "vào được nhưng không khớp được
+   * avatar nào" — hai bệnh, hai cách chữa.
+   *
+   * Gọi lại mỗi khi có dữ liệu mới: lúc frame vừa dựng thì trang chưa vẽ ảnh
+   * nào, `images: 0` ở đó không nói lên điều gì.
+   */
+  function sayHello() {
+    const diag = overlay ? overlay.diagnose() : {};
+    chrome.runtime
+      .sendMessage({
+        type: KT.MSG.FRAME_HELLO,
+        url: location.href.slice(0, 120),
+        isTop,
+        images: document.querySelectorAll("img[src]").length,
+        avatarLike: diag.avatarLike,
+        avatarMatched: diag.avatarMatched,
+        ringsActive: diag.ringsActive,
+        callers: state.callers.length,
+      })
+      .catch(() => {});
+  }
+
   function shareCallers() {
     if (!isTop) return;
     chrome.runtime
@@ -286,6 +310,7 @@
       state.callers = msg.callers || [];
       state.token = msg.token || state.token;
       if (overlay) overlay.reset();
+      setTimeout(sayHello, 1200); // chờ quét xong rồi hãy khai lại số liệu
       return;
     }
     if (msg.type === KT.MSG.NOTE_FOR) {
@@ -334,17 +359,7 @@
     refreshIfStale();
     shareCallers();
 
-    // Khai báo mình tồn tại. Không có cái này thì "chart nằm trong iframe mà
-    // content script không vào được" trông y hệt "vào được nhưng không khớp
-    // được avatar nào" — hai bệnh, hai cách chữa.
-    chrome.runtime
-      .sendMessage({
-        type: KT.MSG.FRAME_HELLO,
-        url: location.href.slice(0, 120),
-        isTop,
-        images: document.querySelectorAll("img[src]").length,
-      })
-      .catch(() => {});
+    sayHello();
 
     globalThis.__KT = {
       state,
