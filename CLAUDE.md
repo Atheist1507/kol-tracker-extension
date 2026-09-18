@@ -189,3 +189,11 @@
   to nhất, đệm 40px). Áp ở CẢ hai chỗ: lúc thẻ mọc ra, và lúc quét lại khi bấm N.
 - ⚠ `scanVisibleCard` duyệt theo **ẢNH** (vài chục) chứ không theo `div` (vài nghìn) — nhưng leo từ
   ảnh lên phải đi tiếp tới tầng CÓ `@handle`, dừng ở tầng đầu tiên chứa ảnh là dừng ở cụm avatar+tên.
+- **Chẩn đoán chỉ đọc được frame TRÊN CÙNG** (`chrome.tabs.sendMessage(..., {frameId: 0})`). Frame
+  chart nghĩ gì thì không ai biết — bảy vòng mò mẫm phần lớn vì thiếu đúng chỗ này. Giờ frame con tự
+  khai `lastTooltip` + `lastHit` của NÓ mỗi 3 giây (chỉ khi tab đang hiện), nằm trong
+  `framesWithScript`.
+- **Trong khung chart (`inChartFrame`) thì bỏ luật khoảng cách.** Frame đó LÀ chart, không có bảng
+  X Tracker hay danh sách nào khác để lẫn, nên thẻ nào mọc ra cũng là nói về mốc đang hover — y như
+  luật đã áp cho `overIframe()` ở frame cha. Luật lọc theo `chartRect()` thì ngược lại CHỈ dùng ở
+  frame cha (trong iframe không có iframe nào để đo).

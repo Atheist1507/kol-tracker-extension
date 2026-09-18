@@ -461,6 +461,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       avatarMatched: msg.avatarMatched,
       ringsActive: msg.ringsActive,
       callers: msg.callers,
+      lastTooltip: msg.lastTooltip,
+      lastHit: msg.lastHit,
       frameId: sender && sender.frameId,
     });
     return;
