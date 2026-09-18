@@ -131,7 +131,14 @@
       const { data, db } = api.getState();
       if (!data) return;
       if (data.error) {
-        el.foot.innerHTML = `<span class="kt-err">${KT.esc(data.error)}</span>`;
+        // Lỗi nằm lại trong storage cho tới lần tải THÀNH CÔNG kế tiếp, nên
+        // một sự cố thoáng qua từ nửa tiếng trước trông y hệt sự cố đang xảy
+        // ra. Nói ra nó cũ bao lâu, và có bao nhiêu dữ liệu vẫn đang dùng được.
+        const ago = data.errorAt ? " · " + KT.timeAgo(data.errorAt) : "";
+        const still = db && db.counts.people ? ` · vẫn đang dùng ${db.counts.people} người tải trước đó` : "";
+        el.foot.innerHTML = `<span class="kt-err">${KT.esc(data.error)}</span><span class="kt-sub">${KT.esc(
+          ago + still
+        )}</span>`;
         el.dot.className = "kt-dot err";
         return;
       }

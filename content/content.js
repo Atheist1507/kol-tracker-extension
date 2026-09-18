@@ -335,7 +335,13 @@
     const stale = (state.cfg.staleMinutes || 10) * 60000;
     const syncedAt = (state.data && state.data.syncedAt) || 0;
     if (!state.cfg.sheetApiUrl && !state.cfg.kolsCsvUrl) return;
-    if (Date.now() - syncedAt > stale) api.refresh();
+    if (Date.now() - syncedAt > stale) return void api.refresh();
+
+    // Đang mang một lỗi cũ thì thử lại, kể cả khi dữ liệu còn tươi: bằng không
+    // một sự cố thoáng qua nằm lại trên panel tới hàng chục phút và trông như
+    // đang hỏng thật.
+    const errorAt = (state.data && state.data.errorAt) || 0;
+    if (state.data && state.data.error && Date.now() - errorAt > 60000) api.refresh();
   }
 
   /* ---------- sự kiện ---------- */
