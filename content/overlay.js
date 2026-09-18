@@ -350,6 +350,13 @@
       const r = cardAnchor.getBoundingClientRect();
       if (!r.width || !r.height) return null;
 
+      // ⚠ Tooltip của GMGN là MỘT phần tử dùng đi dùng lại: rê sang người khác
+      // thì nó đổi NỘI DUNG chứ không bị xoá đi dựng lại. Nên thứ mình nhớ lúc
+      // nó mọc ra có thể đã nói về người khác rồi — đọc lại ngay lúc bấm.
+      // Đây đúng là cái làm hộp ghi chú mở ra tên một người đã hover từ trước.
+      const fresh = cardFromPointer ? null : matchHandleIn(cardAnchor);
+      const use = fresh || cardHit;
+
       // Thẻ mọc từ chính một avatar: chỉ còn đúng khi con trỏ VẪN ở trên đúng
       // avatar đó. Rê sang avatar bên cạnh mà vẫn trả lời người cũ là ghi chú
       // vào nhầm hồ sơ — hỏng im lặng, kiểu tệ nhất.
@@ -362,8 +369,8 @@
       // khớp được URL, nên chỉ đòi nó ở trong tầm với. Trừ khi con trỏ đang ở
       // trên chart: ở đó GMGN thả tooltip theo chỗ trống của nó, đo khoảng
       // cách là vứt nhầm đúng thứ mình cần.
-      if (overIframe()) return Object.assign({}, cardHit, { rect: r });
-      return nearPointer(r) ? Object.assign({}, cardHit, { rect: r }) : null;
+      if (overIframe()) return Object.assign({}, use, { rect: r });
+      return nearPointer(r) ? Object.assign({}, use, { rect: r }) : null;
     }
 
     function elementsUnderPointer() {
@@ -441,11 +448,12 @@
         if (!hit) continue;
 
         const el = node.nodeType === 1 ? node : node.parentElement;
-        if (!el) return why("không có phần tử");
+        if (!el) { why("không có phần tử"); continue; }
         const rect = el.getBoundingClientRect();
-        if (!rect.width || !rect.height) return why("thẻ không có kích thước");
+        if (!rect.width || !rect.height) { why("thẻ không có kích thước"); continue; }
         if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) {
-          return why("thẻ quá to: " + Math.round(rect.width) + "x" + Math.round(rect.height));
+          why("thẻ quá to: " + Math.round(rect.width) + "x" + Math.round(rect.height));
+          continue;
         }
 
         // Tooltip vừa mọc ra là NÓI VỀ thứ con trỏ đang chỉ vào. Nếu dưới con
@@ -459,8 +467,8 @@
         // hover một avatar lạ mà ở góc màn hình có chữ "@ai-đó" là N mở nhầm
         // sang người kia — đúng con bug vừa sửa xong.
         const looksLikeCard = !!(el.querySelector && el.querySelector("img"));
-        if (!looksLikeCard) return why("thẻ không kèm ảnh người");
-        if (!pointerFresh()) return why("chưa biết con trỏ ở đâu");
+        if (!looksLikeCard) { why("thẻ không kèm ảnh người"); continue; }
+        if (!pointerFresh()) { why("chưa biết con trỏ ở đâu"); continue; }
 
         const anchorImg = imgUnderPointer();
         if (anchorImg) {
@@ -476,7 +484,8 @@
         // Không hover avatar nào (rê trên một cái tên trong danh sách chẳng
         // hạn) thì mới quay về luật cũ: tooltip phải ở cạnh con trỏ.
         if (!nearPointer(rect)) {
-          return why("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, rect)) + "px");
+          why("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, rect)) + "px");
+          continue;
         }
         why("tooltip ở cạnh con trỏ");
         showCard(hit, rect, el, false);
