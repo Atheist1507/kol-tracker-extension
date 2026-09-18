@@ -210,7 +210,9 @@
           token_address: ctx.tokenAddress || "",
           post_id: caller.postId || "",
           post_text: caller.postText || "",
-          posted_at: caller.postedAt || "",
+          // Ghi kiểu người đọc được, không phải ISO của API — cột này nằm cạnh
+          // noted_at trong Sheet, hai kiểu ngày khác nhau trông như lỗi.
+          posted_at: KT.fmtDateTime(caller.postedTs || caller.postedAt),
           multiplier_at_note: caller.multiple == null ? "" : caller.multiple,
           holding_state: caller.holdingLabel || "",
           pnl_usd_at_note: caller.pnlUsd == null ? "" : caller.pnlUsd,

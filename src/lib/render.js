@@ -142,6 +142,7 @@
     if (caller.postCount > 1) bits.push("hô " + caller.postCount + " lần");
     if (caller.followers != null) bits.push(caller.followers + " follower");
     if (caller.postedTs) bits.push(timeAgo(caller.postedTs));
+    const postedFull = KT.fmtDateTime(caller.postedTs || caller.postedAt);
 
     const flag = person && person.redFlags ? ' <span style="color:#F85149" title="có cờ đỏ">⚑</span>' : "";
     const tier = known
@@ -153,9 +154,9 @@
       <span class="kt-grow kt-trunc">
         <span class="kt-name">${esc(caller.username || shortWallet(caller.wallet))}</span>${flag}
         <span class="kt-sub kt-trunc" style="display:block">${esc(caller.postText || "—")}</span>
-        <span class="kt-sub" style="display:block">${holdingHtml(caller.holding, caller.holdingLabel)} ${esc(
-          bits.join(" · ")
-        )}</span>
+        <span class="kt-sub" style="display:block" title="${esc(
+          postedFull ? "post " + postedFull : ""
+        )}">${holdingHtml(caller.holding, caller.holdingLabel)} ${esc(bits.join(" · "))}</span>
       </span>
       ${tier}
     </div>`;
@@ -167,7 +168,10 @@
     const rows = notes
       .slice(0, limit || 8)
       .map((n) => {
-        const when = n.notedTs ? timeAgo(n.notedTs) : n.notedAt || "";
+        // Ngày ĐẦY ĐỦ, không phải "1 tháng trước": đây là cột mốc của một ghi
+        // chú, thứ để đối chiếu với cây nến. "Bao lâu rồi" đẩy vào title.
+        const when = KT.fmtDateTime(n.notedTs || n.notedAt);
+        const ago = n.notedTs ? timeAgo(n.notedTs) : "";
         const meta = [n.token, fmtMultiple(n.multiple), n.positionRaw, n.result]
           .filter(Boolean)
           .join(" · ");
@@ -176,7 +180,9 @@
             <span class="kt-tok">${esc(n.token || "—")}</span>
             ${holdingHtml(n.holding)}
             <span class="kt-spacer"></span>
-            <span class="kt-sub">${esc(when)}${n.addedBy ? " · " + esc(n.addedBy) : ""}</span>
+            <span class="kt-sub" title="${esc(ago)}">${esc(when)}${
+              n.addedBy ? " · " + esc(n.addedBy) : ""
+            }</span>
           </div>
           <div class="kt-note-body">${esc(n.note || "—")}</div>
           ${n.postText ? `<div class="kt-note-post">“${esc(n.postText)}”</div>` : ""}
@@ -197,7 +203,8 @@
     const meta = [];
     if (person.wallet) meta.push(shortWallet(person.wallet));
     if (person.followers != null) meta.push(person.followers + " follower");
-    if (person.firstSeen) meta.push("thấy lần đầu " + person.firstSeen);
+    if (person.firstSeen) meta.push("thấy lần đầu " + KT.fmtDateTime(person.firstSeen));
+    if (person.lastNoted) meta.push("ghi chú gần nhất " + KT.fmtDateTime(person.lastNoted));
 
     return `<div class="kt-detail">
       <div class="kt-detail-head">
@@ -235,7 +242,7 @@
     const bits = [];
     if (caller.multiple != null) bits.push("hiện " + fmtMultiple(caller.multiple));
     if (caller.pnlUsd != null) bits.push("PnL $" + Math.round(caller.pnlUsd));
-    if (caller.postedTs) bits.push("post " + timeAgo(caller.postedTs));
+    if (caller.postedTs) bits.push("post " + KT.fmtDateTime(caller.postedTs));
     return `<div class="kt-snap">
       ${holdingHtml(caller.holding, caller.holdingLabel)}
       <span class="kt-sub">${esc(bits.join(" · "))}</span>

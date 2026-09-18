@@ -75,3 +75,13 @@
   mới nhất**: giữ hay xả là chuyện của cả tài khoản, không của riêng một bài.
 - **Viền trên chart chỉ khoanh người ĐÃ có hồ sơ.** Khoanh cả người lạ thì ai cũng có viền và cái viền
   không còn nói gì — trên GMGN avatar vốn đã có viền vàng/cam sẵn, thêm một viền xám nữa là vô hình.
+- **Mốc thời gian: ISO để MÁY đọc, `dd/MM/yyyy lúc HH:mm` để NGƯỜI đọc.** Cả UI lẫn Sheet từng bày
+  nguyên chuỗi ISO (`2026-09-17T16:05:22.669Z`) — không ai đọc được, mà còn lệch mấy tiếng so với lúc
+  thật sự bấm lưu. Hiển thị đi qua `KT.fmtDateTime` (stats.js, cạnh `parseDateLoose` vì đọc và ghi
+  phải khớp nhau); Apps Script ghi bằng `nowStamp_()` theo múi giờ của chính file Sheet.
+  ⚠ `parseDateLoose` PHẢI đọc được cả phần giờ của chuỗi đó, nếu không hai ghi chú cùng một ngày đều
+  về 00:00 và thứ tự giữa chúng là ngẫu nhiên.
+  ⚠ Ô CHỈ có ngày thì KHÔNG bịa ra "lúc 00:00" — trông như một mốc chính xác trong khi thật ra không
+  ai biết mấy giờ.
+  ⚠ Đánh đổi đã biết: `dd/MM/yyyy` không sort đúng khi sort cột đó như CHỮ trong Sheet (ISO thì có).
+  Extension tự sắp theo mốc đã parse nên không ảnh hưởng.
