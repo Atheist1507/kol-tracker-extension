@@ -32,6 +32,9 @@
   // Con trỏ đứng yên quá lâu thì thôi coi như không còn hover gì: chuột rời
   // khỏi cửa sổ không phải lúc nào cũng bắn pointerout mình nghe được.
   const POINTER_TTL_MS = 15000;
+  // Người đọc được từ tooltip sống lâu hơn cái THẺ vẽ ra: ẩn thẻ là chuyện
+  // hiển thị, không phải chuyện quên mất đang nói về ai.
+  const PERSON_TTL_MS = 20000;
 
   function createOverlay(api) {
     const host = document.createElement("div");
@@ -236,6 +239,8 @@
     let cardAnchor = null;
     let cardHit = null;
     let cardFromPointer = false; // thẻ mọc từ chính avatar dưới con trỏ, hay từ tooltip cạnh nó
+    let lastPerson = null; // { hit, el, at } — sống qua cả lúc thẻ bị ẩn
+    let lastHit = null; // vì sao lần hỏi gần nhất ra (hoặc không ra) ai
     let cardWatch = null;
 
     function pointerFresh() {
@@ -271,6 +276,9 @@
       // N mở mãi một người bất kể chuột ở đâu.
       cardHit = hit;
       cardFromPointer = !!fromPointer;
+      if (anchorNode) {
+        lastPerson = { hit: hit, el: anchorNode, at: Date.now(), fromPointer: !!fromPointer };
+      }
       if (!cfg || !cfg.overlayHover) {
         cardAnchor = anchorNode || null;
         watchAnchor();
@@ -336,41 +344,67 @@
      * biến nhớ sẵn thì ai ghi vào cũng được, mà trên một SPA thì "ai" là bất
      * kỳ mutation nào.
      */
+    /**
+     * Ai đang nằm dưới con trỏ NGAY LÚC NÀY.
+     *
+     * Phím N hỏi hàm này chứ không đọc một biến "người đang hover" nhớ sẵn:
+     * biến nhớ sẵn thì ai ghi vào cũng được, mà trên một SPA thì "ai" là bất
+     * kỳ mutation nào.
+     *
+     * Ghi lý do vào `lastHit` ở MỌI đường ra. Hàm này đã vá bốn lần và mỗi lần
+     * hỏng lại là một vòng đoán mò — giờ nó tự khai.
+     */
     function hitAtPointer() {
-      if (!pointerFresh()) return null;
+      const say = (reason, value) => {
+        lastHit = { luc: new Date().toISOString(), lyDo: reason, ra: value ? value.person.username || value.person.wallet : null };
+        return value || null;
+      };
 
+      if (!pointerFresh()) return say("chưa biết con trỏ ở đâu");
       const els = elementsUnderPointer();
+
+      // 1. Ảnh dưới con trỏ khớp thẳng được một người.
       for (const el of els) {
         if (!el || el.tagName !== "IMG") continue;
         const hit = api.identifyByAvatar(el.currentSrc || el.src);
-        if (hit) return Object.assign({}, hit, { rect: el.getBoundingClientRect() });
+        if (hit) return say("khớp avatar dưới con trỏ", Object.assign({}, hit, { rect: el.getBoundingClientRect() }));
       }
 
-      if (!cardHit || !cardAnchor || !cardAnchor.isConnected) return null;
-      const r = cardAnchor.getBoundingClientRect();
-      if (!r.width || !r.height) return null;
+      // 2. Thẻ mọc từ chính một avatar: chỉ còn đúng khi con trỏ VẪN ở trên
+      // đúng avatar đó. Rê sang avatar bên cạnh mà vẫn trả lời người cũ là ghi
+      // chú vào nhầm hồ sơ — hỏng im lặng, kiểu tệ nhất.
+      if (cardHit && cardFromPointer && cardAnchor && cardAnchor.isConnected) {
+        const r = cardAnchor.getBoundingClientRect();
+        if (els.indexOf(cardAnchor) >= 0 && r.width && r.height) {
+          return say("thẻ neo vào avatar dưới con trỏ", Object.assign({}, cardHit, { rect: r }));
+        }
+      }
+
+      // 3. Thẻ đọc từ tooltip GMGN. Dùng `lastPerson` chứ không dùng cardHit:
+      // thẻ có thể đã bị ẩn đi (GMGN dựng lại tooltip, watchAnchor dọn mất)
+      // trong khi phần tử tooltip vẫn còn nguyên trên trang và vẫn đang nói về
+      // người mình cần. Ẩn thẻ là chuyện HIỂN THỊ, không phải chuyện quên người.
+      // CHỈ thẻ đọc từ tooltip mới đi đường này. Thẻ neo vào một avatar đã bị
+      // bước 2 loại rồi — con trỏ không còn ở trên avatar đó nữa, mà nó thì
+      // vẫn nằm trong bán kính của avatar bên cạnh, nên rơi xuống đây là trả
+      // lời người cũ cho avatar mới.
+      const src =
+        lastPerson && !lastPerson.fromPointer && lastPerson.el && lastPerson.el.isConnected ? lastPerson : null;
+      if (!src) return say("không có thẻ tooltip nào còn sống");
+      if (Date.now() - src.at > PERSON_TTL_MS) return say("thẻ cũ quá");
+
+      const r = src.el.getBoundingClientRect();
+      if (!r.width || !r.height) return say("thẻ không còn kích thước");
 
       // ⚠ Tooltip của GMGN là MỘT phần tử dùng đi dùng lại: rê sang người khác
-      // thì nó đổi NỘI DUNG chứ không bị xoá đi dựng lại. Nên thứ mình nhớ lúc
-      // nó mọc ra có thể đã nói về người khác rồi — đọc lại ngay lúc bấm.
-      // Đây đúng là cái làm hộp ghi chú mở ra tên một người đã hover từ trước.
-      const fresh = cardFromPointer ? null : matchHandleIn(cardAnchor);
-      const use = fresh || cardHit;
+      // thì nó đổi NỘI DUNG chứ không bị xoá đi dựng lại. Đọc lại ngay lúc bấm.
+      const use = matchHandleIn(src.el) || src.hit;
 
-      // Thẻ mọc từ chính một avatar: chỉ còn đúng khi con trỏ VẪN ở trên đúng
-      // avatar đó. Rê sang avatar bên cạnh mà vẫn trả lời người cũ là ghi chú
-      // vào nhầm hồ sơ — hỏng im lặng, kiểu tệ nhất.
-      if (cardFromPointer) {
-        return els.indexOf(cardAnchor) >= 0 ? Object.assign({}, cardHit, { rect: r }) : null;
-      }
-
-      // Thẻ mọc từ tooltip GMGN (đọc bằng chữ) thì nó nằm CẠNH avatar chứ
-      // không dưới con trỏ — đây là đường duy nhất cho avatar mình không so
-      // khớp được URL, nên chỉ đòi nó ở trong tầm với. Trừ khi con trỏ đang ở
-      // trên chart: ở đó GMGN thả tooltip theo chỗ trống của nó, đo khoảng
-      // cách là vứt nhầm đúng thứ mình cần.
-      if (overIframe()) return Object.assign({}, use, { rect: r });
-      return nearPointer(r) ? Object.assign({}, use, { rect: r }) : null;
+      // GMGN thả tooltip theo chỗ trống của nó, không bám con trỏ. Trên chart
+      // thì đo khoảng cách là vứt nhầm đúng thứ mình cần.
+      if (overIframe()) return say("đọc lại tooltip (con trỏ trên chart)", Object.assign({}, use, { rect: r }));
+      if (nearPointer(r)) return say("đọc lại tooltip (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
+      return say("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
     }
 
     function elementsUnderPointer() {
@@ -571,6 +605,7 @@
           (f.src || "(same-origin)").slice(0, 80)
         ),
         lastTooltip,
+        lastHit,
       };
     }
 

@@ -144,3 +144,10 @@
   cái đã nhớ.
 - ⚠ Trong `processTooltipQueue`, một node bị loại phải `continue` chứ KHÔNG `return`: hàng đợi có thể
   chứa cả mẩu text lẻ lẫn cả thẻ tooltip thật, bỏ cuộc ở mẩu đầu là không bao giờ tới được thẻ thật.
+- **Ẩn THẺ ≠ quên NGƯỜI.** `hideCard()` xoá `cardHit`, nhưng phần tử tooltip của GMGN vẫn còn nguyên
+  trên trang và vẫn đang nói về đúng người đó — GMGN dựng lại tooltip một nhịp là `watchAnchor()` dọn
+  mất thẻ, và bấm N lúc đó ra rỗng. Giữ riêng `lastPerson` (sống 20s, qua cả lúc thẻ bị ẩn).
+  ⚠ `lastPerson` phải nhớ nó đến từ đâu (`fromPointer`): thẻ neo vào một AVATAR đã bị bước 2 loại khi
+  con trỏ rời avatar đó, để nó rơi xuống nhánh tooltip là trả lời người cũ cho avatar mới.
+- **`hitAtPointer` tự khai lý do ở MỌI đường ra** (`diagnose().lastHit`). Hàm này đã vá bốn lần, mỗi
+  lần hỏng lại là một vòng đoán mò. Sửa nó thì giữ nguyên thói quen đó.
