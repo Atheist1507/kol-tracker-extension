@@ -434,9 +434,28 @@
         const r = i.getBoundingClientRect();
         return r.width >= MIN_AVATAR_PX && r.width <= 72 && Math.abs(r.width - r.height) <= 6;
       });
+      // Ảnh cỡ avatar nào khớp được với một người trên chart, ảnh nào không.
+      // Đây là câu hỏi quyết định: GMGN phục vụ avatar qua proxy nội bộ
+      // (/external-res/<hash>_v2.webp) — hash nội dung, không gỡ ngược ra URL
+      // gốc được. Nếu API trả URL pbs.twimg.com còn thẻ <img> dùng URL proxy
+      // thì hai bên KHÔNG BAO GIỜ khớp, và không có triệu chứng nào khác ngoài
+      // "hover không ra gì".
+      const unmatched = [];
+      let matched = 0;
+      for (const img of small) {
+        const src = img.currentSrc || img.src;
+        if (api.identifyByAvatar(src)) matched++;
+        else if (unmatched.length < 6) unmatched.push(src.slice(0, 120));
+      }
+      const state = api.getState();
+      const callerAvatars = (state.callers || []).slice(0, 4).map((c) => String(c.avatar || "").slice(0, 120));
+
       return {
         url: location.href,
         canvases: canvases.length,
+        avatarMatched: matched,
+        avatarUnmatchedSamples: unmatched,
+        callerAvatarSamples: callerAvatars,
         canvasDetail: canvases.slice(0, 4),
         images: imgs.length,
         avatarLike: small.length,

@@ -452,6 +452,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       url: msg.url,
       isTop: !!msg.isTop,
       images: msg.images,
+      avatarLike: msg.avatarLike,
+      avatarMatched: msg.avatarMatched,
+      ringsActive: msg.ringsActive,
+      callers: msg.callers,
       frameId: sender && sender.frameId,
     });
     return;
