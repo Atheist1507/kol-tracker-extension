@@ -197,3 +197,11 @@
   X Tracker hay danh sách nào khác để lẫn, nên thẻ nào mọc ra cũng là nói về mốc đang hover — y như
   luật đã áp cho `overIframe()` ở frame cha. Luật lọc theo `chartRect()` thì ngược lại CHỈ dùng ở
   frame cha (trong iframe không có iframe nào để đo).
+- **Tooltip của chart KHÔNG nằm trong iframe chart** — frame đó khai `lastTooltip: null`, `images: 0`,
+  chỉ có 8 canvas. Nó nằm ở frame CHA, chồng lên vùng chart.
+- **Đừng đòi thẻ phải có `<img>` khi đã biết chắc vị trí.** Điều kiện "có ảnh người" sinh ra để phân
+  biệt thẻ-giới-thiệu-người với một cục SPA vừa vẽ lại — cần ở giữa trang, nhưng trong vùng chart thì
+  VỊ TRÍ đã làm xong việc đó. Mà avatar trong thẻ chart rất có thể là `background-image` chứ không
+  phải `<img>`, nên đòi ảnh ở đó là vứt đúng cái mình đang tìm (`looseContainer`).
+  ⚠ Hệ quả: ở vùng chart, `scanVisibleCard` duyệt theo `div` (cap 8000) chứ không theo ảnh — đi từ
+  ảnh thì không bao giờ tới được thẻ không có ảnh.
