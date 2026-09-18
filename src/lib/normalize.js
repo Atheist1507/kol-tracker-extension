@@ -113,7 +113,17 @@
       /_(normal|bigger|mini|reasonably_small|small|medium|large|big|thumb|thumbnail|orig|original|square|\d+x\d+|x\d+)(\.[a-z]{3,4})$/i,
       "$2"
     );
-    return s.toLowerCase();
+    s = s.toLowerCase();
+
+    // GMGN phục vụ CÙNG một avatar qua hai đường khác nhau:
+    //   API trả   /defi/images/twitter/<md5>.jpg
+    //   trang dùng /external-res/<md5>_v2.webp
+    // Cùng một ảnh, hai URL, không đường nào gỡ ngược ra URL gốc trên X được.
+    // Rút về phần hash là hai bên gặp nhau. Trùng hash = trùng ảnh, nên không
+    // đẻ ra khớp nhầm — trừ khi hai người dùng CHUNG một ảnh, mà lúc đó thì
+    // URL đầy đủ cũng trùng y như vậy.
+    const hash = s.match(/(?:^|\/)([0-9a-f]{32})(?:_[a-z0-9]+)?\.[a-z]{3,4}$/);
+    return hash ? hash[1] : s;
   }
 
   /** Tách ô "aliases" nhiều giá trị: phẩy, chấm phẩy, gạch đứng, xuống dòng. */

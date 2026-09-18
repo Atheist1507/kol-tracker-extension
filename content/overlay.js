@@ -347,6 +347,25 @@
       return nearPointer(r) ? Object.assign({}, cardHit, { rect: r }) : null;
     }
 
+    /** Ảnh cỡ avatar đang nằm ngay dưới con trỏ (khớp được hay không, kệ). */
+    function imgUnderPointer() {
+      if (!pointerFresh()) return null;
+      let els = [];
+      try {
+        els = document.elementsFromPoint(pointer.x, pointer.y) || [];
+      } catch (e) {
+        return null;
+      }
+      for (const el of els) {
+        if (!el || el.tagName !== "IMG") continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < MIN_AVATAR_PX || r.width > 96) continue;
+        if (Math.abs(r.width - r.height) > 8) continue; // avatar thì vuông
+        return el;
+      }
+      return null;
+    }
+
     function onPointerOver(ev) {
       const target = ev.target;
       if (!target || target.nodeType !== 1) return;
@@ -389,11 +408,28 @@
         const rect = el.getBoundingClientRect();
         if (!rect.width || !rect.height) continue;
         if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) continue;
-        // Không ở cạnh con trỏ thì đó không phải tooltip người ta gọi ra —
-        // chỉ là SPA vừa vẽ lại một chỗ nào đó có tên người quen.
+
+        // Tooltip vừa mọc ra là NÓI VỀ thứ con trỏ đang chỉ vào. Nếu dưới con
+        // trỏ có một avatar thì neo thẳng vào avatar đó — kể cả tooltip mọc ở
+        // tận đâu. Đo khoảng cách tới tooltip là sai: tooltip của chart GMGN
+        // mọc xa hẳn avatar, nên luật bán kính làm phím N chết hẳn trên chart
+        // đúng lúc nó vừa được sửa cho hết mở nhầm người.
+        // Nhưng phải chắc CÁI VỪA MỌC RA đúng là thẻ giới thiệu một người, chứ
+        // không phải một cục SPA vừa vẽ lại có nhắc tên ai đó. Dấu hiệu: thẻ
+        // của GMGN luôn kèm ẢNH của chính người đó. Thiếu bước này thì đang
+        // hover một avatar lạ mà ở góc màn hình có chữ "@ai-đó" là N mở nhầm
+        // sang người kia — đúng con bug vừa sửa xong.
+        const looksLikeCard = !!(el.querySelector && el.querySelector("img"));
+        const anchorImg = looksLikeCard ? imgUnderPointer() : null;
+        if (anchorImg) {
+          showCard(hit, anchorImg.getBoundingClientRect(), anchorImg, true);
+          return;
+        }
+        // Không hover avatar nào (rê trên một cái tên trong danh sách chẳng
+        // hạn) thì mới quay về luật cũ: tooltip phải ở cạnh con trỏ.
         if (!nearPointer(rect)) continue;
 
-        showCard(hit, rect, el);
+        showCard(hit, rect, el, false);
         return;
       }
     }

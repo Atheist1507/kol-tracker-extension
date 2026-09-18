@@ -99,3 +99,15 @@
   KHÔNG cấp quyền đó, và `activeTab` chỉ có hiệu lực cho popup sau cú bấm của người dùng.
   ⚠ Mỗi frame tự khai `KT.MSG.FRAME_HELLO`, nút Chẩn đoán in ra `framesWithScript`. Không có nó thì
   "iframe không vào được" trông y hệt "vào được nhưng không khớp avatar nào" — hai bệnh, hai cách chữa.
+- **Avatar trên trang GMGN nằm ở frame TRÊN CÙNG, không phải trong iframe chart.** Chẩn đoán
+  18/09/2026: frame chart có content script và nhận được `callers: 33`, nhưng `images: 0` — nó chỉ
+  chứa canvas của TradingView. Frame trên cùng mới có 71 ảnh cỡ avatar.
+- **GMGN phục vụ CÙNG một avatar qua hai đường**: API trả `/defi/images/twitter/<md5>.jpg`, thẻ `<img>`
+  trên trang dùng `/external-res/<md5>_v2.webp`. So nguyên URL thì chỉ 7/71 avatar khớp được.
+  `avatarKey` rút về phần hash — trùng hash là trùng ảnh nên không đẻ ra khớp nhầm.
+- **Tooltip của chart mọc XA avatar**, nên luật "tooltip phải ở trong bán kính quanh con trỏ" (thêm
+  vào để chặn N mở nhầm người) lại giết luôn phím N trên chart. Giờ neo theo AVATAR DƯỚI CON TRỎ thay
+  vì đo khoảng cách tới tooltip.
+  ⚠ Nhưng phải kiểm `el.querySelector("img")` trước: thẻ giới thiệu người của GMGN luôn kèm ảnh của
+  chính người đó, còn một cục SPA vừa vẽ lại có nhắc `@tên` thì không. Bỏ bước đó là bug cũ sống lại —
+  đang hover một avatar lạ mà ở góc màn hình có tên ai đó là N mở nhầm sang người kia (có test).
