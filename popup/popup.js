@@ -176,7 +176,18 @@
         <div class="kt-hint" style="white-space:pre-wrap;font-family:ui-monospace,monospace">${KT.esc(text)}</div>`;
       state.detailRef = null;
     } catch (e) {
-      renderFoot("Tab này chưa chạy content script.");
+      // Ba nguyên nhân khác hẳn nhau, trước đây gộp chung một câu nên người
+      // dùng không biết phải làm gì. Cái hay gặp nhất là cái đầu: bấm ⟳ ở
+      // chrome://extensions thì bản cũ trong tab đang mở bị cắt khỏi extension
+      // và không trả lời ai nữa — tab phải F5 mới nạp bản mới.
+      const why = String((e && e.message) || e);
+      if (/context invalidated|Receiving end does not exist|Could not establish/i.test(why)) {
+        renderFoot("Extension vừa cập nhật — bấm F5 lại trang GMGN rồi thử lại.");
+      } else if (!/^https:\/\/(www\.)?gmgn\.(ai|cc)\//i.test(tab.url || "")) {
+        renderFoot("Tab này không phải trang GMGN.");
+      } else {
+        renderFoot("Không hỏi được trang: " + why.slice(0, 80));
+      }
     }
   });
 

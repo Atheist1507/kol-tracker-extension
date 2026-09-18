@@ -111,3 +111,8 @@
   ⚠ Nhưng phải kiểm `el.querySelector("img")` trước: thẻ giới thiệu người của GMGN luôn kèm ảnh của
   chính người đó, còn một cục SPA vừa vẽ lại có nhắc `@tên` thì không. Bỏ bước đó là bug cũ sống lại —
   đang hover một avatar lạ mà ở góc màn hình có tên ai đó là N mở nhầm sang người kia (có test).
+- **Bấm ⟳ ở `chrome://extensions` KHÔNG cập nhật tab đang mở.** Bản content script cũ trong tab đó bị
+  CẮT khỏi extension ngay lập tức: `chrome.runtime.id` biến mất, mọi lời gọi ném "Extension context
+  invalidated", và tab không trả lời `chrome.tabs.sendMessage` nữa. Phải **F5 lại trang** mới nạp bản
+  mới. Thông báo lỗi PHẢI nói ra điều đó — gộp nó chung với "tab này chưa chạy content script" là đẩy
+  người dùng đi tìm sai hướng (đã mất một vòng vì đúng chuyện này).
