@@ -516,12 +516,21 @@
             if (isOurs(el) || isOurs(el.getRootNode().host || el)) continue;
             if (!isReallyVisible(el)) continue;
             const hit = matchHandleIn(el, true);
-            // Ghi lại vài ứng viên NẰM ĐÚNG VÙNG CHART mà không khớp được ai:
-            // không có cái nào thì nghĩa là thẻ chart không nằm trong DOM mình
-            // với tới được, và mọi cách nới điều kiện đều vô ích.
-            if (!hit && lastScan.ungVien.length < 5) {
-              const chunks = textChunks(el).slice(0, 5);
-              if (chunks.length) lastScan.ungVien.push(chunks.join(" | ").slice(0, 160));
+            // ⚠ Chỉ ghi ứng viên CÓ DẤU @ — tức là trông như thẻ nói về một
+            // người. Bản trước ghi bừa 5 cái đầu theo thứ tự DOM nên chỗ ghi
+            // bị mấy thanh công cụ của GMGN chiếm sạch ("Ví | Theo dõi |
+            // Callout"), và thẻ người thật nếu có cũng không bao giờ lọt vào.
+            if (!hit && lastScan.ungVien.length < 6) {
+              const chunks = textChunks(el);
+              const co = chunks.some((c) => c.indexOf("@") >= 0);
+              if (co && chunks.length <= MAX_CARD_CHUNKS) {
+                const ten = KT.candidateHandles(chunks);
+                lastScan.ungVien.push(
+                  (chunks.join(" | ").slice(0, 120) || "?") +
+                    "  →đọc ra: " +
+                    (ten.standalone.concat(ten.at).slice(0, 3).join(", ") || "không ra tên nào")
+                );
+              }
             }
             if (hit) return { hit: hit, el: el, at: Date.now() };
           }
@@ -775,7 +784,15 @@
           const chart = chartRect();
           const cr = card.getBoundingClientRect();
           if (chart && !overlaps(cr, chart, CHART_PAD_PX)) {
-            why("thẻ nằm ngoài vùng chart (bảng X Tracker?)");
+            // Ghi luôn TOẠ ĐỘ hai bên. Nếu thẻ này thật ra là thẻ của chart mà
+            // bị loại, thì so hai dãy số là thấy ngay khung chart đo sai chỗ.
+            why(
+              "thẻ ngoài vùng chart — thẻ [" +
+                [cr.left, cr.top, cr.right, cr.bottom].map(Math.round).join(",") +
+                "] vs chart [" +
+                [chart.left, chart.top, chart.right, chart.bottom].map(Math.round).join(",") +
+                "]"
+            );
             continue;
           }
           why("con trỏ đang trên chart");
