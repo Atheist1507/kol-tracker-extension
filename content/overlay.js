@@ -154,6 +154,15 @@
       return out;
     }
 
+    /** Ghi lại vì sao thẻ vừa nhận ra người lại (không) được hiện. */
+    function why(reason) {
+      if (lastTooltip) {
+        lastTooltip.ketQua = reason;
+        lastTooltip.conTro = pointer ? Math.round(pointer.x) + "," + Math.round(pointer.y) : "chưa biết";
+        lastTooltip.conTroTuoi = pointer ? Date.now() - pointer.t + "ms" : "-";
+      }
+    }
+
     function rememberTooltip(el, chunks, matchedAs, found) {
       lastTooltip = {
         tag: el && el.tagName ? el.tagName.toLowerCase() : "?",
@@ -330,12 +339,7 @@
     function hitAtPointer() {
       if (!pointerFresh()) return null;
 
-      let els = [];
-      try {
-        els = document.elementsFromPoint(pointer.x, pointer.y) || [];
-      } catch (e) {
-        els = [];
-      }
+      const els = elementsUnderPointer();
       for (const el of els) {
         if (!el || el.tagName !== "IMG") continue;
         const hit = api.identifyByAvatar(el.currentSrc || el.src);
@@ -355,20 +359,41 @@
 
       // Thẻ mọc từ tooltip GMGN (đọc bằng chữ) thì nó nằm CẠNH avatar chứ
       // không dưới con trỏ — đây là đường duy nhất cho avatar mình không so
-      // khớp được URL, nên chỉ đòi nó ở trong tầm với.
+      // khớp được URL, nên chỉ đòi nó ở trong tầm với. Trừ khi con trỏ đang ở
+      // trên chart: ở đó GMGN thả tooltip theo chỗ trống của nó, đo khoảng
+      // cách là vứt nhầm đúng thứ mình cần.
+      if (overIframe()) return Object.assign({}, cardHit, { rect: r });
       return nearPointer(r) ? Object.assign({}, cardHit, { rect: r }) : null;
+    }
+
+    function elementsUnderPointer() {
+      if (!pointerFresh()) return [];
+      try {
+        return document.elementsFromPoint(pointer.x, pointer.y) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    /**
+     * Con trỏ đang nằm trên một iframe — tức là trên CHART.
+     *
+     * Ở đó không có phần tử nào để bám: avatar là nét vẽ trên canvas. Nên thẻ
+     * giới thiệu người nào vừa mọc ra trong lúc con trỏ ở trên chart thì chắc
+     * chắn nói về cái đang nằm dưới con trỏ, mọc ở đâu cũng kệ. Đo khoảng cách
+     * ở đây là vô nghĩa: GMGN thả tooltip theo chỗ trống của nó, không theo
+     * con trỏ.
+     */
+    function overIframe() {
+      for (const el of elementsUnderPointer()) {
+        if (el && el.tagName === "IFRAME") return true;
+      }
+      return false;
     }
 
     /** Ảnh cỡ avatar đang nằm ngay dưới con trỏ (khớp được hay không, kệ). */
     function imgUnderPointer() {
-      if (!pointerFresh()) return null;
-      let els = [];
-      try {
-        els = document.elementsFromPoint(pointer.x, pointer.y) || [];
-      } catch (e) {
-        return null;
-      }
-      for (const el of els) {
+      for (const el of elementsUnderPointer()) {
         if (!el || el.tagName !== "IMG") continue;
         const r = el.getBoundingClientRect();
         if (r.width < MIN_AVATAR_PX || r.width > 96) continue;
@@ -416,10 +441,12 @@
         if (!hit) continue;
 
         const el = node.nodeType === 1 ? node : node.parentElement;
-        if (!el) continue;
+        if (!el) return why("không có phần tử");
         const rect = el.getBoundingClientRect();
-        if (!rect.width || !rect.height) continue;
-        if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) continue;
+        if (!rect.width || !rect.height) return why("thẻ không có kích thước");
+        if (rect.width > MAX_TOOLTIP_W || rect.height > MAX_TOOLTIP_H) {
+          return why("thẻ quá to: " + Math.round(rect.width) + "x" + Math.round(rect.height));
+        }
 
         // Tooltip vừa mọc ra là NÓI VỀ thứ con trỏ đang chỉ vào. Nếu dưới con
         // trỏ có một avatar thì neo thẳng vào avatar đó — kể cả tooltip mọc ở
@@ -432,15 +459,26 @@
         // hover một avatar lạ mà ở góc màn hình có chữ "@ai-đó" là N mở nhầm
         // sang người kia — đúng con bug vừa sửa xong.
         const looksLikeCard = !!(el.querySelector && el.querySelector("img"));
-        const anchorImg = looksLikeCard ? imgUnderPointer() : null;
+        if (!looksLikeCard) return why("thẻ không kèm ảnh người");
+        if (!pointerFresh()) return why("chưa biết con trỏ ở đâu");
+
+        const anchorImg = imgUnderPointer();
         if (anchorImg) {
+          why("neo vào avatar dưới con trỏ");
           showCard(hit, anchorImg.getBoundingClientRect(), anchorImg, true);
+          return;
+        }
+        if (overIframe()) {
+          why("con trỏ đang trên chart");
+          showCard(hit, rect, el, false);
           return;
         }
         // Không hover avatar nào (rê trên một cái tên trong danh sách chẳng
         // hạn) thì mới quay về luật cũ: tooltip phải ở cạnh con trỏ.
-        if (!nearPointer(rect)) continue;
-
+        if (!nearPointer(rect)) {
+          return why("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, rect)) + "px");
+        }
+        why("tooltip ở cạnh con trỏ");
         showCard(hit, rect, el, false);
         return;
       }

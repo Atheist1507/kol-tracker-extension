@@ -130,3 +130,10 @@
   hãm 80ms), frame cha cộng offset của thẻ `<iframe>` để quy về hệ toạ độ của mình.
   ⚠ Phím N bấm trong frame chart cũng gửi `NOTE_FOR` KHÔNG kèm định danh — frame con không tự nhận ra
   ai được (canvas), nên để frame trên cùng tự quyết bằng tooltip + toạ độ vừa nhận.
+- **Con trỏ ở TRÊN CHART thì không đo khoảng cách tới tooltip nữa.** GMGN thả tooltip vào chỗ trống
+  của nó, không bám con trỏ — mà avatar dưới con trỏ lại là nét vẽ trên canvas, không có gì để neo.
+  Nên `overIframe()` (con trỏ đang trên một `<iframe>`) là đủ điều kiện nhận thẻ. Luật bán kính chỉ
+  còn dùng cho phần DOM thường của trang.
+- **`lastTooltip.ketQua` nói vì sao thẻ (không) hiện ra.** Trước đây `found: true` bị đọc nhầm thành
+  "đã hiện thẻ" — nó chỉ có nghĩa là ĐỌC RA được cái tên; thẻ vẫn có thể bị vứt ở bước sau mà không
+  để lại dấu vết nào. Mỗi nhánh loại bỏ giờ tự khai lý do, kèm toạ độ con trỏ và tuổi của nó.
