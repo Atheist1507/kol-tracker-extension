@@ -14,6 +14,7 @@
 
   // Panel chỉ ở frame trên cùng; overlay thì frame nào cũng chạy.
   const isTop = window.top === window;
+  const STALE_MSG = "Extension vừa cập nhật — bấm F5 lại trang này.";
 
   if (globalThis.__KOL_TRACKER__) return;
   globalThis.__KOL_TRACKER__ = true;
@@ -64,9 +65,28 @@
     return person ? { caller: null, person, known: true, renamedFrom: "" } : null;
   }
 
+  /**
+   * Bản content script đang chạy còn nối được với extension không?
+   *
+   * Bấm ⟳ ở chrome://extensions là bản cũ trong mọi tab đang mở bị CẮT khỏi
+   * extension ngay lập tức: `chrome.runtime.id` biến mất, mọi lời gọi ném lỗi
+   * "Extension context invalidated", và tab đó không trả lời ai nữa cho tới
+   * khi F5. Không nói ra thì nó trông y hệt "extension hỏng".
+   */
+  function alive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
   const api = {
     getState: () => state,
-    refresh: () => chrome.runtime.sendMessage({ type: KT.MSG.REFRESH }).catch((e) => ({ error: String(e) })),
+    refresh: () =>
+      alive()
+        ? chrome.runtime.sendMessage({ type: KT.MSG.REFRESH }).catch(() => ({ error: STALE_MSG }))
+        : Promise.resolve({ error: STALE_MSG }),
     openOptions: () => chrome.runtime.sendMessage({ type: "kt:openOptions" }).catch(() => {}),
     identify,
     identifyByAvatar,
