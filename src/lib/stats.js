@@ -78,16 +78,29 @@
     if (!s) return null;
 
     let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    if (m) {
+      // Có phần giờ (chuỗi ISO từ API GMGN, từ ô Sheet cũ) thì để Date.parse
+      // lo — nó hiểu cả hậu tố Z lẫn offset múi giờ. Nhánh UTC bên dưới chỉ
+      // dành cho ô CHỈ có ngày, ở đó bịa ra giờ là sai.
+      if (/^\d{4}-\d{1,2}-\d{1,2}[T ]\d/.test(s)) {
+        const t = Date.parse(s);
+        if (!Number.isNaN(t)) return t;
+      }
+      return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    }
 
     m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
     if (m) {
       let [, d, mo, y] = m;
       let year = +y;
       if (year < 100) year += 2000;
-      // Ô nào rõ ràng là mm/dd (ngày > 12) thì đảo lại
-      if (+d > 12 && +mo <= 12) return Date.UTC(year, +mo - 1, +d);
-      return Date.UTC(year, +mo - 1, +d);
+      // Giờ phút nếu có: "18/09/2026 lúc 14:37" — chính là thứ Code.gs ghi vào
+      // Sheet. Thiếu bước này thì hai ghi chú cùng một ngày đều về 00:00 và
+      // thứ tự giữa chúng là ngẫu nhiên.
+      const clock = s.slice(m[0].length).match(/(\d{1,2})\s*(?::|g|h|giờ|gio)\s*(\d{1,2})?/i);
+      const hh = clock ? +clock[1] : 0;
+      const mi = clock && clock[2] ? +clock[2] : 0;
+      return Date.UTC(year, +mo - 1, +d, hh <= 23 ? hh : 0, mi <= 59 ? mi : 0);
     }
 
     const t = Date.parse(s);
@@ -151,7 +164,41 @@
     return out;
   }
 
+  /**
+   * Mốc thời gian đọc bằng mắt người Việt: "18/09/2026 lúc 14:37".
+   *
+   * Sinh ra vì UI lẫn Sheet đang bày nguyên chuỗi ISO ("2026-09-17T16:05:22.669Z")
+   * — đúng cho máy, nhưng không ai đọc được, mà còn lệch múi giờ so với lúc
+   * mình thật sự bấm lưu.
+   *
+   * Giữ cả PHÚT chứ không chỉ giờ tròn: hai ghi chú về cùng một người trong
+   * cùng một buổi chiều mà đều ghi "lúc 14 giờ" thì không phân biệt được
+   * cái nào trước.
+   */
+  function pad2(n) {
+    return (n < 10 ? "0" : "") + n;
+  }
+
+  function fmtDate(value) {
+    const ts = typeof value === "number" ? value : parseDateLoose(value);
+    if (ts == null) return "";
+    const d = new Date(ts);
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+
+  function fmtDateTime(value) {
+    const ts = typeof value === "number" ? value : parseDateLoose(value);
+    if (ts == null) return "";
+    const d = new Date(ts);
+    // Nửa đêm đúng 00:00 gần như luôn là "chỉ biết ngày" (ô Sheet gõ tay,
+    // hoặc chuỗi không có phần giờ) — bịa ra "lúc 00:00" là nói điêu.
+    if (!d.getHours() && !d.getMinutes()) return fmtDate(ts);
+    return fmtDate(ts) + " lúc " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+
   KT.parseMultiple = parseMultiple;
+  KT.fmtDate = fmtDate;
+  KT.fmtDateTime = fmtDateTime;
   KT.parseResult = parseResult;
   KT.parsePosition = parsePosition;
   KT.POSITION_LABELS = POSITION_LABELS;
@@ -166,6 +213,8 @@
       parsePosition,
       POSITION_LABELS,
       parseDateLoose,
+      fmtDate,
+      fmtDateTime,
       calcStats,
       MIN_SAMPLE,
     };

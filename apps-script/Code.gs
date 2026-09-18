@@ -197,7 +197,13 @@ function saveNote_(body) {
   const detailSheet = ss.getSheetByName(DETAIL);
   if (!overview || !detailSheet) return { ok: false, error: "chưa chạy setup()" };
 
-  const nowIso = new Date().toISOString();
+  // Mốc thời gian ghi vào Sheet là để NGƯỜI đọc, nên viết kiểu Việt và theo
+  // múi giờ của chính file Sheet. Chuỗi ISO đúng cho máy nhưng không ai đọc
+  // được, mà còn lệch mấy tiếng so với lúc thật sự bấm lưu.
+  // ⚠ Đánh đổi: dd/MM/yyyy KHÔNG sắp xếp đúng khi sort cột đó như chữ (ISO thì
+  // có). Extension tự sắp theo mốc đã parse nên không ảnh hưởng; cần sort
+  // trong Sheet thì sort theo cột khác.
+  const nowIso = nowStamp_();
 
   // --- Detail: luôn thêm dòng mới, mỗi lần note là một dòng ---
   detail.wallet = wallet;
@@ -234,6 +240,12 @@ function saveNote_(body) {
  * Đếm sẵn rồi ghi số thì không phụ thuộc locale, và cũng không có gì để hỏng
  * khi ai đó kéo-thả hay sắp xếp lại các dòng.
  */
+/** "18/09/2026 lúc 14:37" theo múi giờ của file Sheet. */
+function nowStamp_() {
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || "Asia/Ho_Chi_Minh";
+  return Utilities.formatDate(new Date(), tz, "dd/MM/yyyy 'lúc' HH:mm");
+}
+
 function countNotesFor_(detailSheet, wallet) {
   const last = detailSheet.getLastRow();
   if (last < 2) return 0;
