@@ -172,3 +172,11 @@
 - ⚠ `processTooltipQueue` GHI SỔ mọi thẻ khớp được rồi mới quyết định hiện cái nào. Hai tooltip có
   thể mọc trong cùng một nhịp; dừng ở cái đầu tiên là cái thứ hai không bao giờ vào sổ, và lúc bấm N
   thì "chọn thẻ đang hiện" không có gì để chọn.
+- **GMGN DỰNG SẴN thẻ tooltip cho từng mốc rồi chỉ BỎ GIẤU khi hover.** Không thêm node, không đổi
+  chữ — nên MutationObserver KHÔNG thấy gì và thẻ đó không bao giờ vào sổ. Triệu chứng: hover người
+  thứ hai thì N im, chẩn đoán báo "thẻ đã bị xoá N giây trước" trong khi tooltip đang hiện rành rành.
+  Nên `hitAtPointer` phải QUÉT LẠI màn hình (`scanVisibleCard`) khi trong sổ không có thẻ nào đang
+  hiện. Quét chỉ chạy lúc bấm N, và quét trong `poolRoot` (khung chứa đám thẻ, nhớ từ lần khớp
+  trước) chứ không phải cả trang.
+  ⚠ Đây là bài học thứ ba cùng một kiểu: MutationObserver chỉ kể được chuyện nó CHỨNG KIẾN. Thứ gì
+  phải đúng tại THỜI ĐIỂM BẤM PHÍM thì hỏi lại DOM tại thời điểm đó, đừng tin sổ sách.
