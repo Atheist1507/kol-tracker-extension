@@ -39,6 +39,10 @@
   const ORPHAN_TTL_MS = 6000;
 
   function createOverlay(api) {
+    // Frame con ở đây LÀ chart (TradingView). Trong đó không có bảng X Tracker
+    // hay danh sách nào khác để lẫn, nên thẻ nào mọc ra cũng là nói về mốc
+    // đang hover — khỏi đo khoảng cách, y như luật dành cho chart ở frame cha.
+    const inChartFrame = window.top !== window;
     const host = document.createElement("div");
     host.id = "kol-tracker-overlay";
     host.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:2147482999;";
@@ -498,8 +502,8 @@
       // Chọn thẻ ĐANG HIỆN, không phải thẻ mới nhất mình thấy: GMGN giữ lại
       // thẻ cũ trong trang và chỉ giấu đi, nên "mới nhất" hay trỏ vào người
       // đã hover từ trước.
-      const onChart = overIframe();
-      const chart = onChart ? chartRect() : null;
+      const onChart = inChartFrame || overIframe();
+      const chart = onChart && !inChartFrame ? chartRect() : null;
       const live = recentCards.filter(
         (c) =>
           c.el &&
@@ -509,7 +513,7 @@
       );
       // Không có cái nào trong sổ đang hiện thì QUÉT LẠI màn hình: thẻ đang
       // hiện có thể là thẻ GMGN dựng sẵn rồi bỏ giấu, chưa từng vào sổ.
-      const found = live[0] || scanVisibleCard(onChart);
+      const found = live[0] || scanVisibleCard(onChart && !inChartFrame);
       const src = found || (lastPerson && !lastPerson.fromPointer ? lastPerson : null);
       if (!src) return say("chưa đọc được tooltip nào");
       const tuoi = Date.now() - src.at;
@@ -655,6 +659,12 @@
         }
         // Trên chart thì đo khoảng cách là vô nghĩa: GMGN thả tooltip theo chỗ
         // trống của nó, mà avatar dưới con trỏ lại là nét vẽ trên canvas.
+        if (inChartFrame) {
+          why("trong khung chart");
+          showCard(hit, card.getBoundingClientRect(), card, false);
+          shown = true;
+          continue;
+        }
         if (overIframe()) {
           // Bảng X Tracker cũng đầy hàng trông hệt thẻ tooltip. Con trỏ đang
           // trên chart thì thẻ phải nằm ở vùng chart, không thì đó là hàng
@@ -760,6 +770,7 @@
         iframes: Array.from(document.querySelectorAll("iframe")).map((f) =>
           (f.src || "(same-origin)").slice(0, 80)
         ),
+        inChartFrame,
         lastTooltip,
         lastHit,
       };

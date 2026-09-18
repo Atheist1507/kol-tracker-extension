@@ -231,6 +231,8 @@
         avatarMatched: diag.avatarMatched,
         ringsActive: diag.ringsActive,
         callers: state.callers.length,
+        lastTooltip: diag.lastTooltip,
+        lastHit: diag.lastHit,
       })
       .catch(() => {});
   }
@@ -423,6 +425,12 @@
 
     if (!isTop) {
       document.addEventListener("pointermove", reportPointer, { capture: true, passive: true });
+      // Khai lại đều đặn: chẩn đoán chỉ đọc được frame TRÊN CÙNG, nên không có
+      // cái này thì frame chart nghĩ gì mình không bao giờ biết. Bảy vòng vừa
+      // rồi mò mẫm chính vì thiếu đúng chỗ này.
+      setInterval(() => {
+        if (document.visibilityState === "visible") sayHello();
+      }, 3000);
     }
 
     window.addEventListener("keydown", onHotkey, true);
