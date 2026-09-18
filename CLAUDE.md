@@ -215,3 +215,10 @@
 - **`lastScan` trong chẩn đoán** kể lần quét vùng chart gần nhất: bao nhiêu gốc, xét bao nhiêu node,
   và vài ứng viên NẰM ĐÚNG VÙNG CHART mà không khớp được ai. `ungVien` rỗng = thẻ chart không nằm
   trong DOM mình với tới được; có chữ = đọc được nhưng khớp tên hỏng. Hai bệnh, hai cách chữa.
+- **⚠⚠ Quét shadow root thì phải BỎ QUA shadow root của CHÍNH MÌNH.** Panel KOL Tracker cũng là một
+  thẻ có avatar và `@handle`, và nó nằm đè lên chart — quét vào đó là đọc ra dòng đầu trong danh sách
+  của chính mình rồi tưởng đó là người đang hover. Đã xảy ra thật: hover `Shea1121`, hộp mở
+  `Roxx_Sol` (dòng đầu panel). `isOurs()` bắt theo id `kol-tracker-*`, leo 4 tầng cha.
+- **Biên quanh khung chart là `CHART_PAD_PX` 120, không phải 40.** Thẻ tooltip mọc TRÀN ra ngoài mép
+  chart — đo trên ảnh thật: chart hết ở x=1515, thẻ bắt đầu ở x=1550. Biên hẹp là vứt nhầm đúng cái
+  mình tìm. 120px vẫn cách bảng X Tracker hơn 240px nên không kéo nó vào.
