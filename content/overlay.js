@@ -35,6 +35,8 @@
   // Người đọc được từ tooltip sống lâu hơn cái THẺ vẽ ra: ẩn thẻ là chuyện
   // hiển thị, không phải chuyện quên mất đang nói về ai.
   const PERSON_TTL_MS = 20000;
+  // Khi phần tử đã bị xoá thì không đọc lại được nữa — cửa sổ tin cậy ngắn hơn.
+  const ORPHAN_TTL_MS = 6000;
 
   function createOverlay(api) {
     const host = document.createElement("div");
@@ -164,6 +166,24 @@
         lastTooltip.conTro = pointer ? Math.round(pointer.x) + "," + Math.round(pointer.y) : "chưa biết";
         lastTooltip.conTroTuoi = pointer ? Date.now() - pointer.t + "ms" : "-";
       }
+    }
+
+    /**
+     * Từ một node vừa đổi, leo lên tìm khung thẻ giới thiệu người.
+     *
+     * Thẻ của GMGN luôn kèm ảnh của chính người đó — đó là dấu hiệu phân biệt
+     * nó với một cục SPA vừa vẽ lại có nhắc tên ai đó.
+     */
+    function cardContainer(el) {
+      let node = el;
+      for (let i = 0; i < 5 && node && node.nodeType === 1; i++) {
+        if (node.querySelector && node.querySelector("img")) {
+          const r = node.getBoundingClientRect();
+          if (r.width && r.height && r.width <= MAX_TOOLTIP_W && r.height <= MAX_TOOLTIP_H) return node;
+        }
+        node = node.parentElement;
+      }
+      return null;
     }
 
     function rememberTooltip(el, chunks, matchedAs, found) {
@@ -388,23 +408,32 @@
       // bước 2 loại rồi — con trỏ không còn ở trên avatar đó nữa, mà nó thì
       // vẫn nằm trong bán kính của avatar bên cạnh, nên rơi xuống đây là trả
       // lời người cũ cho avatar mới.
-      const src =
-        lastPerson && !lastPerson.fromPointer && lastPerson.el && lastPerson.el.isConnected ? lastPerson : null;
-      if (!src) return say("không có thẻ tooltip nào còn sống");
-      if (Date.now() - src.at > PERSON_TTL_MS) return say("thẻ cũ quá");
+      const src = lastPerson && !lastPerson.fromPointer ? lastPerson : null;
+      if (!src) return say("chưa đọc được tooltip nào");
+      const tuoi = Date.now() - src.at;
 
-      const r = src.el.getBoundingClientRect();
-      if (!r.width || !r.height) return say("thẻ không còn kích thước");
+      // Phần tử còn trên trang thì ĐỌC LẠI nó: tooltip của GMGN có khi được
+      // dùng đi dùng lại, rê sang người khác là đổi nội dung chứ không dựng
+      // lại, nên cái mình nhớ có thể đã nói về người khác.
+      if (src.el && src.el.isConnected) {
+        const r = src.el.getBoundingClientRect();
+        if (r.width && r.height) {
+          if (tuoi > PERSON_TTL_MS) return say("thẻ cũ quá (" + Math.round(tuoi / 1000) + "s)");
+          const use = matchHandleIn(src.el) || src.hit;
+          if (overIframe()) return say("đọc lại tooltip (con trỏ trên chart)", Object.assign({}, use, { rect: r }));
+          if (nearPointer(r)) return say("đọc lại tooltip (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
+          return say("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
+        }
+      }
 
-      // ⚠ Tooltip của GMGN là MỘT phần tử dùng đi dùng lại: rê sang người khác
-      // thì nó đổi NỘI DUNG chứ không bị xoá đi dựng lại. Đọc lại ngay lúc bấm.
-      const use = matchHandleIn(src.el) || src.hit;
-
-      // GMGN thả tooltip theo chỗ trống của nó, không bám con trỏ. Trên chart
-      // thì đo khoảng cách là vứt nhầm đúng thứ mình cần.
-      if (overIframe()) return say("đọc lại tooltip (con trỏ trên chart)", Object.assign({}, use, { rect: r }));
-      if (nearPointer(r)) return say("đọc lại tooltip (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
-      return say("tooltip cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
+      // Phần tử đã bị GMGN vứt đi. NGƯỜI thì vẫn còn: GMGN chỉ hiện một
+      // tooltip tại một thời điểm, nên người đọc được vài giây trước vẫn là
+      // người đang nằm dưới con trỏ — rê sang ai khác thì đã có thẻ mới rồi.
+      // Cửa sổ này CỐ TÌNH ngắn hơn PERSON_TTL_MS: không đọc lại được nữa thì
+      // càng để lâu càng dễ ghi chú vào nhầm hồ sơ.
+      if (!overIframe()) return say("thẻ đã bị xoá, mà con trỏ không ở trên chart");
+      if (tuoi > ORPHAN_TTL_MS) return say("thẻ đã bị xoá " + Math.round(tuoi / 1000) + "s trước");
+      return say("thẻ đã bị xoá, dùng người đọc gần nhất", Object.assign({}, src.hit, { rect: null }));
     }
 
     function elementsUnderPointer() {
@@ -500,8 +529,11 @@
         // của GMGN luôn kèm ẢNH của chính người đó. Thiếu bước này thì đang
         // hover một avatar lạ mà ở góc màn hình có chữ "@ai-đó" là N mở nhầm
         // sang người kia — đúng con bug vừa sửa xong.
-        const looksLikeCard = !!(el.querySelector && el.querySelector("img"));
-        if (!looksLikeCard) { why("thẻ không kèm ảnh người"); continue; }
+        // Node vừa đổi có thể chỉ là một mẩu chữ bên trong thẻ. Leo lên tìm
+        // KHUNG thẻ thật (có ảnh người, kích thước còn hợp lý) — bám vào mẩu
+        // chữ thì GMGN vẽ lại một nhịp là mất dấu.
+        const card = cardContainer(el);
+        if (!card) { why("không tìm ra khung thẻ có ảnh người"); continue; }
         if (!pointerFresh()) { why("chưa biết con trỏ ở đâu"); continue; }
 
         const anchorImg = imgUnderPointer();
@@ -512,7 +544,7 @@
         }
         if (overIframe()) {
           why("con trỏ đang trên chart");
-          showCard(hit, rect, el, false);
+          showCard(hit, card.getBoundingClientRect(), card, false);
           return;
         }
         // Không hover avatar nào (rê trên một cái tên trong danh sách chẳng
@@ -522,7 +554,7 @@
           continue;
         }
         why("tooltip ở cạnh con trỏ");
-        showCard(hit, rect, el, false);
+        showCard(hit, card.getBoundingClientRect(), card, false);
         return;
       }
     }
