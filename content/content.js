@@ -206,6 +206,7 @@
         url: location.href.slice(0, 120),
         isTop,
         images: document.querySelectorAll("img[src]").length,
+        canvases: document.querySelectorAll("canvas").length,
         avatarLike: diag.avatarLike,
         avatarMatched: diag.avatarMatched,
         ringsActive: diag.ringsActive,
