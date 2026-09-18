@@ -159,3 +159,7 @@
   được vài giây trước vẫn là người dưới con trỏ — rê sang ai khác thì đã có thẻ mới. Cửa sổ tin cậy
   cho trường hợp này (`ORPHAN_TTL_MS` 6s) CỐ TÌNH ngắn hơn `PERSON_TTL_MS` (20s): không đọc lại được
   nữa thì càng để lâu càng dễ ghi chú vào nhầm hồ sơ. Và chỉ áp dụng khi con trỏ đang ở TRÊN CHART.
+- **Lỗi kết nối Sheet nằm lại trong storage cho tới lần tải THÀNH CÔNG kế tiếp** (cố ý: giữ dữ liệu
+  cũ để panel còn dùng được khi mất mạng). Hệ quả phải bù lại: dải đỏ PHẢI nói nó cũ bao lâu
+  (`data.errorAt`), và `refreshIfStale` phải tự thử lại khi đang mang một lỗi cũ hơn 60s — bằng không
+  một sự cố thoáng qua trông y hệt một sự cố đang xảy ra, và người dùng đi sửa nhầm chỗ.
