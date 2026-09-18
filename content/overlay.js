@@ -201,7 +201,17 @@
       const cx = Math.min(Math.max(r.left + r.width / 2, 1), window.innerWidth - 1);
       const cy = Math.min(Math.max(r.top + r.height / 2, 1), window.innerHeight - 1);
       const top = document.elementFromPoint(cx, cy);
-      return !!top && (top === el || el.contains(top) || top.contains(el));
+      if (!top) return false;
+      if (top === el || el.contains(top) || top.contains(el)) return true;
+
+      // ⚠ `contains` KHÔNG đi xuyên ranh giới shadow DOM. Phần tử nằm trong
+      // shadow root thì elementFromPoint trả về THẺ CHỦ của shadow đó, và so
+      // thẳng hai cái là luôn ra "không hiện" — tức là mọi thẻ trong shadow
+      // root đều bị loại oan.
+      const root = el.getRootNode && el.getRootNode();
+      const shadowHost = root && root.host ? root.host : null;
+      if (!shadowHost) return false;
+      return top === shadowHost || shadowHost.contains(top) || top.contains(shadowHost);
     }
 
     /**
@@ -213,6 +223,32 @@
      * có thể là background-image chứ không phải <img>, nên đòi ảnh ở đây là
      * vứt đúng cái mình đang tìm.
      */
+    /**
+     * Mọi "gốc" quét được: document, cộng các shadow root MỞ trên trang.
+     *
+     * ⚠ Nội dung trong shadow root thì `document.querySelectorAll` KHÔNG trả về,
+     * và MutationObserver gắn ở documentElement cũng KHÔNG thấy gì bên trong.
+     * Nếu GMGN dựng thẻ tooltip của chart trong một shadow root thì mọi cách
+     * nới lỏng điều kiện đều vô ích — mình chưa bao giờ nhìn thấy nó.
+     * Shadow root ĐÓNG thì chịu, không có đường vào.
+     */
+    function scanRoots() {
+      const roots = [document];
+      const queue = [document];
+      let seen = 0;
+      while (queue.length && roots.length < 40 && seen < 4000) {
+        const root = queue.shift();
+        for (const el of root.querySelectorAll("*")) {
+          if (++seen > 4000) break;
+          if (!el.shadowRoot) continue;
+          if (el === host || shadow.contains(el)) continue; // shadow của chính mình
+          roots.push(el.shadowRoot);
+          queue.push(el.shadowRoot);
+        }
+      }
+      return roots;
+    }
+
     function looseContainer(el) {
       let node = el;
       for (let i = 0; i < 5 && node && node.nodeType === 1; i++, node = node.parentElement) {
@@ -311,6 +347,7 @@
     let recentCards = []; // vài thẻ tooltip gần đây, để chọn cái ĐANG HIỆN
     let poolRoot = null; // chỗ GMGN chứa đám thẻ tooltip — để quét lại lúc bấm N
     let lastHit = null; // vì sao lần hỏi gần nhất ra (hoặc không ra) ai
+    let lastScan = null; // lần quét vùng chart gần nhất: bao nhiêu gốc, thấy gì
     let cardWatch = null;
 
     function pointerFresh() {
@@ -451,16 +488,26 @@
       // nào (avatar là background-image), nên đi từ ảnh là không bao giờ tới.
       // Vị trí đã lọc gắt rồi nên không sợ vơ nhầm.
       if (chart) {
-        let seen = 0;
-        for (const el of document.querySelectorAll("div")) {
-          if (++seen > 8000) break;
-          const r = el.getBoundingClientRect();
-          if (r.width < 120 || r.width > MAX_TOOLTIP_W) continue;
-          if (!r.height || r.height > MAX_TOOLTIP_H) continue;
-          if (!overlaps(r, chart, 40)) continue;
-          if (!isReallyVisible(el)) continue;
-          const hit = matchHandleIn(el, true);
-          if (hit) return { hit: hit, el: el, at: Date.now() };
+        const roots = scanRoots();
+        lastScan = { goc: roots.length, xet: 0, ungVien: [] };
+        for (const root of roots) {
+          for (const el of root.querySelectorAll("div")) {
+            if (++lastScan.xet > 8000) break;
+            const r = el.getBoundingClientRect();
+            if (r.width < 120 || r.width > MAX_TOOLTIP_W) continue;
+            if (!r.height || r.height > MAX_TOOLTIP_H) continue;
+            if (!overlaps(r, chart, 40)) continue;
+            if (!isReallyVisible(el)) continue;
+            const hit = matchHandleIn(el, true);
+            // Ghi lại vài ứng viên NẰM ĐÚNG VÙNG CHART mà không khớp được ai:
+            // không có cái nào thì nghĩa là thẻ chart không nằm trong DOM mình
+            // với tới được, và mọi cách nới điều kiện đều vô ích.
+            if (!hit && lastScan.ungVien.length < 5) {
+              const chunks = textChunks(el).slice(0, 5);
+              if (chunks.length) lastScan.ungVien.push(chunks.join(" | ").slice(0, 160));
+            }
+            if (hit) return { hit: hit, el: el, at: Date.now() };
+          }
         }
         return null;
       }
@@ -812,6 +859,11 @@
         inChartFrame,
         lastTooltip,
         lastHit,
+        lastScan,
+        chartArea: (function () {
+          const r = chartRect();
+          return r ? [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] : null;
+        })(),
       };
     }
 

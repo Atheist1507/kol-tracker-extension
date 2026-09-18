@@ -205,3 +205,13 @@
   phải `<img>`, nên đòi ảnh ở đó là vứt đúng cái mình đang tìm (`looseContainer`).
   ⚠ Hệ quả: ở vùng chart, `scanVisibleCard` duyệt theo `div` (cap 8000) chứ không theo ảnh — đi từ
   ảnh thì không bao giờ tới được thẻ không có ảnh.
+- **Shadow DOM là điểm mù của MỌI cách đọc trang.** `document.querySelectorAll` không trả về nội dung
+  trong shadow root, MutationObserver gắn ở `documentElement` không thấy gì bên trong, và `contains`
+  không đi xuyên ranh giới đó. Nếu GMGN dựng thẻ tooltip của chart trong shadow root thì mọi cách nới
+  điều kiện đều vô ích — mình chưa bao giờ nhìn thấy nó. `scanRoots()` gom document + các shadow root
+  MỞ (đóng thì chịu).
+  ⚠ `isReallyVisible` phải biết chuyện đó: `elementFromPoint` trả về THẺ CHỦ của shadow root, so
+  thẳng với phần tử bên trong là luôn ra "không hiện" — tức là loại oan sạch mọi thẻ trong shadow root.
+- **`lastScan` trong chẩn đoán** kể lần quét vùng chart gần nhất: bao nhiêu gốc, xét bao nhiêu node,
+  và vài ứng viên NẰM ĐÚNG VÙNG CHART mà không khớp được ai. `ungVien` rỗng = thẻ chart không nằm
+  trong DOM mình với tới được; có chữ = đọc được nhưng khớp tên hỏng. Hai bệnh, hai cách chữa.
