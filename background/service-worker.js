@@ -387,6 +387,35 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (before.kolsCsvUrl !== after.kolsCsvUrl || before.callsCsvUrl !== after.callsCsvUrl) refresh();
 });
 
+/**
+ * Sổ ghi "content script đã vào được những frame nào của tab nào".
+ *
+ * Service worker MV3 ngủ bất cứ lúc nào nên đây là trí nhớ tạm, mất là mất —
+ * chấp nhận được: nó chỉ phục vụ nút Chẩn đoán, và mỗi lần tải lại trang là
+ * các frame tự khai báo lại.
+ */
+const frameLog = new Map(); // tabId → [{ url, isTop, images, at }]
+
+function noteFrame(tabId, info) {
+  if (tabId == null) return;
+  const list = (frameLog.get(tabId) || []).filter((f) => f.url !== info.url);
+  list.push(Object.assign({ at: Date.now() }, info));
+  frameLog.set(tabId, list.slice(-12));
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => frameLog.delete(tabId));
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.status === "loading") frameLog.delete(tabId);
+});
+
+/** Chuyển tiếp một tin sang frame khác của CÙNG tab. */
+function relay(sender, message, frameId) {
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (tabId == null) return;
+  const opts = frameId == null ? undefined : { frameId: frameId };
+  chrome.tabs.sendMessage(tabId, message, opts).catch(() => {});
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
 
@@ -408,6 +437,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === KT.MSG.TEST_URL) {
     testUrl(msg.url).then(sendResponse);
+    return true;
+  }
+  if (msg.type === KT.MSG.CALLERS) {
+    relay(sender, msg); // không nêu frameId = mọi frame trong tab
+    return;
+  }
+  if (msg.type === KT.MSG.NOTE_FOR) {
+    relay(sender, msg, 0); // frame 0 = trên cùng, nơi có hộp ghi chú
+    return;
+  }
+  if (msg.type === KT.MSG.FRAME_HELLO) {
+    noteFrame(sender && sender.tab && sender.tab.id, {
+      url: msg.url,
+      isTop: !!msg.isTop,
+      images: msg.images,
+      frameId: sender && sender.frameId,
+    });
+    return;
+  }
+  if (msg.type === KT.MSG.FRAMES) {
+    sendResponse({ frames: frameLog.get(msg.tabId) || [] });
     return true;
   }
   if (msg.type === "kt:openOptions") {
