@@ -204,6 +204,24 @@
       return !!top && (top === el || el.contains(top) || top.contains(el));
     }
 
+    /**
+     * Khung thẻ khi ĐÃ biết chắc vị trí (đang ở vùng chart).
+     *
+     * ⚠ Không đòi phải có thẻ <img>. Đòi ảnh là cách phân biệt thẻ-giới-thiệu-
+     * người với một cục SPA vừa vẽ lại — cần thiết ở giữa trang, nhưng ở vùng
+     * chart thì VỊ TRÍ đã làm xong việc đó rồi. Mà avatar trong thẻ chart rất
+     * có thể là background-image chứ không phải <img>, nên đòi ảnh ở đây là
+     * vứt đúng cái mình đang tìm.
+     */
+    function looseContainer(el) {
+      let node = el;
+      for (let i = 0; i < 5 && node && node.nodeType === 1; i++, node = node.parentElement) {
+        const r = node.getBoundingClientRect();
+        if (r.width >= 120 && r.width <= MAX_TOOLTIP_W && r.height && r.height <= MAX_TOOLTIP_H) return node;
+      }
+      return null;
+    }
+
     function cardContainer(el) {
       let node = el;
       for (let i = 0; i < 5 && node && node.nodeType === 1; i++) {
@@ -428,6 +446,25 @@
     function scanVisibleCard(nearChart) {
       const chart = nearChart ? chartRect() : null;
       if (nearChart && !chart) return null;
+
+      // Ở vùng chart thì duyệt theo DIV: thẻ chart có thể không chứa thẻ <img>
+      // nào (avatar là background-image), nên đi từ ảnh là không bao giờ tới.
+      // Vị trí đã lọc gắt rồi nên không sợ vơ nhầm.
+      if (chart) {
+        let seen = 0;
+        for (const el of document.querySelectorAll("div")) {
+          if (++seen > 8000) break;
+          const r = el.getBoundingClientRect();
+          if (r.width < 120 || r.width > MAX_TOOLTIP_W) continue;
+          if (!r.height || r.height > MAX_TOOLTIP_H) continue;
+          if (!overlaps(r, chart, 40)) continue;
+          if (!isReallyVisible(el)) continue;
+          const hit = matchHandleIn(el, true);
+          if (hit) return { hit: hit, el: el, at: Date.now() };
+        }
+        return null;
+      }
+
       for (const img of document.querySelectorAll("img")) {
         const ir = img.getBoundingClientRect();
         if (ir.width < MIN_AVATAR_PX || ir.width > 96) continue;
@@ -634,7 +671,9 @@
         // KHUNG thẻ thật — có ảnh người (thẻ giới thiệu người của GMGN luôn
         // kèm ảnh, một cục SPA vừa vẽ lại thì không), kích thước còn hợp lý.
         // Bám vào mẩu chữ thì GMGN vẽ lại một nhịp là mất dấu.
-        const card = cardContainer(el);
+        const onChartNow = inChartFrame || overIframe();
+        let card = cardContainer(el);
+        if (!card && onChartNow) card = looseContainer(el);
         if (!card) { why("không tìm ra khung thẻ có ảnh người"); continue; }
 
         // GHI SỔ TRƯỚC, quyết định hiện thẻ sau. Hai tooltip có thể mọc trong
