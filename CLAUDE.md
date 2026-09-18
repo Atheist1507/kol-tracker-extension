@@ -163,3 +163,12 @@
   cũ để panel còn dùng được khi mất mạng). Hệ quả phải bù lại: dải đỏ PHẢI nói nó cũ bao lâu
   (`data.errorAt`), và `refreshIfStale` phải tự thử lại khi đang mang một lỗi cũ hơn 60s — bằng không
   một sự cố thoáng qua trông y hệt một sự cố đang xảy ra, và người dùng đi sửa nhầm chỗ.
+- **GMGN KHÔNG xoá thẻ tooltip cũ — nó giữ lại trong trang và GIẤU đi.** Thẻ cũ vẫn `isConnected`,
+  vẫn có kích thước, `getBoundingClientRect()` vẫn trả số đẹp. Đọc lại nó ra đúng cái tên nó đang giữ
+  — của người đã hover từ TRƯỚC. Đây là lý do hộp ghi chú mở ra tên người khác trong khi tooltip trên
+  màn hình là người đang hover (`lastHit.ra = "sfdn__"` trong khi màn hình là `Shea1121`).
+  Nên phải chọn thẻ **ĐANG HIỆN** (`isReallyVisible`: rect + display/visibility/opacity của cả chuỗi
+  cha + `elementFromPoint` để bắt trường hợp bị thẻ mới đè lên), không phải thẻ mới nhất.
+- ⚠ `processTooltipQueue` GHI SỔ mọi thẻ khớp được rồi mới quyết định hiện cái nào. Hai tooltip có
+  thể mọc trong cùng một nhịp; dừng ở cái đầu tiên là cái thứ hai không bao giờ vào sổ, và lúc bấm N
+  thì "chọn thẻ đang hiện" không có gì để chọn.
