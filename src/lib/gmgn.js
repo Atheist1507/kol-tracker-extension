@@ -201,6 +201,98 @@
     return order;
   }
 
+
+  /**
+   * URL API → đường dẫn gọn để NHẬN MẶT một endpoint.
+   *
+   * Bỏ query, bỏ chain và địa chỉ token, vì cùng một endpoint gọi cho hai
+   * token là hai URL khác nhau — không gom lại thì bảng chẩn đoán đầy những
+   * dòng trông như nhau mà chẳng dòng nào lặp lại.
+   */
+  function apiPath(url) {
+    let path = String(url || "");
+    try {
+      path = new URL(path, "https://gmgn.ai").pathname;
+    } catch (e) {
+      path = path.split("?")[0];
+    }
+    return path
+      .replace(/\/(sol|eth|base|bsc|tron|blast|arb|op)(?=\/|$)/gi, "/{chain}")
+      .replace(/\/0x[0-9a-f]{40}(?=\/|$)/gi, "/{dc}")
+      .replace(/\/[1-9A-HJ-NP-Za-km-z]{32,44}(?=\/|$)/g, "/{dc}");
+  }
+
+  /* Khoá hay gặp trong JSON của GMGN cho từng phần của một con người. */
+  const HANDLE_KEYS = ["username", "screen_name", "twitter_username", "twitter_screen_name", "user_name", "handle"];
+  const NAME_KEYS = ["display_name", "twitter_name", "nickname", "name"];
+  const AVATAR_KEYS = ["profile_image_url", "avatar_url", "twitter_avatar", "avatar", "icon"];
+  const WALLET_KEYS = ["wallet_address", "maker", "address", "wallet"];
+
+  function pick(obj, keys) {
+    for (const k of keys) {
+      const v = obj[k];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+  }
+
+  /** "@shea1121" / "Shea1121" → có phải một tay cầm Twitter không? */
+  function looksLikeHandle(s) {
+    return /^@?[A-Za-z0-9_]{1,20}$/.test(s);
+  }
+
+  /**
+   * Lùng NGƯỜI trong một JSON bất kỳ của GMGN.
+   *
+   * Vì sao cần: `community/messages` (bảng X Tracker dưới chart) KHÔNG phải
+   * nguồn của mấy avatar mọc trên cây nến — người dùng đã khẳng định hai đám
+   * đó khác nhau. Mà mốc trên chart thì vẽ bằng canvas, không để lại DOM nào
+   * để hover. Nên đường duy nhất còn lại là nghe TẤT CẢ API của trang rồi tự
+   * nhận ra chỗ nào đang nói về người.
+   *
+   * Cố ý KHÔNG đoán trước hình dạng: đi khắp cây JSON, thấy object nào có một
+   * tay cầm Twitter đọc được thì nhặt. Thà nhặt dư rồi lọc còn hơn bỏ sót
+   * đúng cái endpoint mình chưa biết tên.
+   *
+   * Chặn nhầm token: token cũng có `name`/`address`/`logo`, nhưng không có
+   * tay cầm — nên khoá bắt buộc là HANDLE_KEYS, và giá trị phải đúng dạng.
+   */
+  function scanPeople(payload, limit) {
+    const max = limit || 300;
+    const out = [];
+    const seen = Object.create(null);
+    let budget = 20000;
+
+    function visit(node, depth) {
+      if (budget <= 0 || out.length >= max || depth > 8 || !node || typeof node !== "object") return;
+      budget--;
+      if (Array.isArray(node)) {
+        for (const item of node) visit(item, depth + 1);
+        return;
+      }
+      const handle = pick(node, HANDLE_KEYS).replace(/^@/, "");
+      if (handle && looksLikeHandle(handle)) {
+        const key = KT.handleKey(handle);
+        if (key && !seen[key]) {
+          seen[key] = true;
+          out.push({
+            username: handle,
+            displayName: pick(node, NAME_KEYS),
+            avatar: pick(node, AVATAR_KEYS),
+            wallet: KT.walletKey(pick(node, WALLET_KEYS)) || "",
+          });
+        }
+      }
+      for (const k in node) {
+        const v = node[k];
+        if (v && typeof v === "object") visit(v, depth + 1);
+      }
+    }
+
+    visit(payload && payload.data !== undefined ? payload.data : payload, 0);
+    return out;
+  }
+
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
   function parseEndpoint(url) {
     const m = String(url || "").match(/\/api\/v1\/token\/([^/]+)\/([^/]+)\/community\/messages/);
@@ -214,6 +306,8 @@
     parseMessages,
     groupCallers,
     parseEndpoint,
+    apiPath,
+    scanPeople,
     HOLDING_LABELS,
     HOLDING_RED_FLAGS,
   };

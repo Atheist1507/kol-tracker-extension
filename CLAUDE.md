@@ -222,3 +222,31 @@
 - **Biên quanh khung chart là `CHART_PAD_PX` 120, không phải 40.** Thẻ tooltip mọc TRÀN ra ngoài mép
   chart — đo trên ảnh thật: chart hết ở x=1515, thẻ bắt đầu ở x=1550. Biên hẹp là vứt nhầm đúng cái
   mình tìm. 120px vẫn cách bảng X Tracker hơn 240px nên không kéo nó vào.
+
+## Đám trên chart KHÔNG phải đám trong bảng X Tracker (19/09/2026)
+
+Chủ máy khẳng định sau mười một vòng mò: mấy avatar mọc trên cây nến là một
+đám KHÁC với danh sách dưới bảng X Tracker. Không có cái danh sách nào dưới
+trang để tóm đám đó cả. Hai hệ quả:
+
+- `community/messages` (nguồn của `state.callers`) **không bao giờ** chứa người
+  trên chart. Mọi vòng trước đều giả định ngược lại, nên `identify()` trả null
+  và hover không ra gì — không phải lỗi đo toạ độ.
+- Mốc trên chart vẽ bằng **canvas**, không để lại DOM để hover. Nên đường duy
+  nhất còn lại là **nghe tất cả API của GMGN** rồi tự nhận ra chỗ nào nói về
+  người: `main-world.js` bắt mọi URL có `/api/`, `KT.gmgn.scanPeople()` đi khắp
+  cây JSON nhặt object nào có tay cầm Twitter đọc được.
+  - `scanPeople` **phải** đòi HANDLE_KEYS: token cũng có `name`/`address`/`logo`,
+    thiếu chốt đó là mỗi chart đẻ ra một "người" tên CashCat (có test khoá lại).
+  - Sổ `apiLog` trong Chẩn đoán ghi **cả** endpoint không có ai — "có endpoint
+    này mà rỗng" là một câu trả lời, không biết nó tồn tại thì không.
+- `main-world.js` giờ chạy ở **mọi frame** (`all_frames: true` +
+  `match_origin_as_fallback`), vì nếu iframe chart tự gọi API thì frame trên
+  cùng mù tịt. Frame nào nhặt được người thì phát `MSG.API` cho cả tab; bên
+  NHẬN chỉ gộp, **không chia lại** (vòng lặp).
+
+### Ghi chú cho người chỉ có tay cầm, không có ví
+`Code.gs` từ chối dòng thiếu ví (`saveNote_` → "thiếu wallet"), mà người nhặt
+từ API lạ thường không kèm ví. `note-box.js` lấy `x:<handle>` làm khoá thay thế
+— viết rõ tiền tố để không ai nhìn nhầm là địa chỉ ví thật. Cái giá: gặp lại
+đúng người đó kèm ví thật thì Sheet có hai dòng, gộp tay.
