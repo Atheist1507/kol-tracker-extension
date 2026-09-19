@@ -19,6 +19,20 @@
   const TAG = "kol-tracker";
   const MESSAGES_RE = /\/api\/v1\/token\/([^/?#]+)\/([^/?#]+)\/community\/messages/;
   const TOKEN_INFO_RE = /\/api\/v1\/mutil_window_token_info/;
+  /**
+   * MỌI API của GMGN, không chỉ hai cái trên.
+   *
+   * Vì sao nghe hết: đám avatar mọc trên cây nến KHÔNG phải đám trong bảng
+   * X Tracker (community/messages) — chủ máy đã khẳng định. Mốc trên chart vẽ
+   * bằng canvas nên không có DOM để hover; muốn biết chúng là ai thì phải tìm
+   * cho ra endpoint nuôi chúng, mà tên endpoint đó mình chưa biết.
+   *
+   * Nghe hết thì tốn, nên có hai cái phanh: bỏ qua response quá to, và chỉ
+   * gửi nguyên văn JSON khi trong đó thật sự có mùi người.
+   */
+  const ANY_API_RE = /\/api\//;
+  const MAX_BYTES = 800000;
+  const PERSON_HINT_RE = /"(username|screen_name|twitter_username|twitter_screen_name|handle)"/;
 
   if (window.__KT_MAIN_WORLD__) return;
   window.__KT_MAIN_WORLD__ = true;
@@ -31,16 +45,41 @@
     }
   }
 
+  function watched(url) {
+    const u = String(url || "");
+    return MESSAGES_RE.test(u) || TOKEN_INFO_RE.test(u) || ANY_API_RE.test(u);
+  }
+
   function inspect(url, text) {
     const u = String(url || "");
-    if (!MESSAGES_RE.test(u) && !TOKEN_INFO_RE.test(u)) return;
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch (e) {
+    if (!watched(u)) return;
+
+    if (MESSAGES_RE.test(u) || TOKEN_INFO_RE.test(u)) {
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        return;
+      }
+      send(MESSAGES_RE.test(u) ? "messages" : "token", u, json);
       return;
     }
-    send(MESSAGES_RE.test(u) ? "messages" : "token", u, json);
+
+    // Endpoint lạ: báo tên nó ra dù không đọc được gì. Biết "có endpoint này
+    // mà rỗng người" khác hẳn với không biết endpoint đó tồn tại.
+    const body = String(text || "");
+    if (body.length > MAX_BYTES || !PERSON_HINT_RE.test(body)) {
+      send("api", u, null);
+      return;
+    }
+    let json;
+    try {
+      json = JSON.parse(body);
+    } catch (e) {
+      send("api", u, null);
+      return;
+    }
+    send("api", u, json);
   }
 
   /* ---- fetch ---- */
@@ -50,7 +89,7 @@
       const promise = origFetch.apply(this, args);
       try {
         const url = (args[0] && args[0].url) || args[0];
-        if (MESSAGES_RE.test(String(url)) || TOKEN_INFO_RE.test(String(url))) {
+        if (watched(url)) {
           promise
             .then((res) => {
               // clone() để KHÔNG đụng vào body mà trang sắp đọc
@@ -82,7 +121,7 @@
   XMLHttpRequest.prototype.send = function () {
     try {
       const url = this.__ktUrl;
-      if (url && (MESSAGES_RE.test(String(url)) || TOKEN_INFO_RE.test(String(url)))) {
+      if (url && watched(url)) {
         this.addEventListener("load", () => {
           try {
             inspect(url, this.responseText || "");

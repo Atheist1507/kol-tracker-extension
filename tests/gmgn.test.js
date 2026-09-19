@@ -228,3 +228,36 @@ test("không có ví lẫn username thì không bị gộp nhầm vào nhau", ()
   ]);
   assert.strictEqual(out.length, 2);
 });
+
+/* ---------- lùng người trong API lạ (apiPath / scanPeople) ---------- */
+
+test("apiPath gom mọi token về cùng một đường dẫn", () => {
+  const a = KT.gmgn.apiPath("https://gmgn.ai/api/v1/token/sol/9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin/community/messages?limit=50");
+  const b = KT.gmgn.apiPath("https://gmgn.ai/api/v1/token/eth/0x" + "a".repeat(40) + "/community/messages");
+  assert.strictEqual(a, "/api/v1/token/{chain}/{dc}/community/messages");
+  assert.strictEqual(a, b);
+});
+
+test("scanPeople nhặt người dù nằm sâu trong hình dạng lạ", () => {
+  const people = KT.gmgn.scanPeople({
+    data: { groups: [{ rows: [{ user: { twitter_username: "Shea1121", display_name: "Shea" } }] }] },
+  });
+  assert.deepStrictEqual(people.map((p) => p.username), ["Shea1121"]);
+});
+
+test("scanPeople KHÔNG nhặt nhầm token làm người", () => {
+  // token cũng có name/address/logo — thiếu chốt chặn này là mỗi chart đẻ ra
+  // một "người" tên CashCat
+  const people = KT.gmgn.scanPeople({ data: [{ symbol: "CASH", name: "CashCat", address: "0x" + "a".repeat(40), logo: "l.png" }] });
+  assert.deepStrictEqual(people, []);
+});
+
+test("scanPeople bỏ tay cầm không đúng dạng Twitter", () => {
+  const people = KT.gmgn.scanPeople({ data: [{ username: "tên có dấu cách" }, { username: "ok_1" }] });
+  assert.deepStrictEqual(people.map((p) => p.username), ["ok_1"]);
+});
+
+test("scanPeople gộp trùng theo tay cầm, không phân biệt hoa thường", () => {
+  const people = KT.gmgn.scanPeople({ data: [{ username: "Shea1121" }, { username: "@shea1121", display_name: "x" }] });
+  assert.strictEqual(people.length, 1);
+});

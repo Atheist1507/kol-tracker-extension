@@ -177,14 +177,33 @@
       close();
     }
 
+    /**
+     * Khoá của một người trong Sheet là VÍ (Code.gs từ chối dòng thiếu ví).
+     *
+     * Nhưng người nhặt được từ API khác của GMGN có khi chỉ có tay cầm Twitter,
+     * không kèm ví — và "không lưu được" thì cả cái hộp này thành vô nghĩa.
+     * Lấy chính tay cầm làm khoá, viết rõ tiền tố `x:` để không ai nhìn nhầm
+     * là địa chỉ ví thật.
+     *
+     * ⚠ Cái giá: nếu sau này gặp lại đúng người đó KÈM ví thật thì Sheet có
+     * HAI dòng. Thà hai dòng gộp tay được còn hơn mất hẳn lần ghi chú.
+     */
+    function keyOf(person, caller) {
+      const wallet = person.wallet || caller.wallet || "";
+      if (wallet) return wallet;
+      const handle = KT.handleKey(caller.username || person.username || "");
+      return handle ? "x:" + handle : "";
+    }
+
     /** Gói đúng tên cột của Sheet — xem apps-script/Code.gs. */
     function buildPayload(note) {
       const person = ctx.person;
       const caller = ctx.caller || {};
       const me = api.getState().cfg.addedBy || "";
+      const key = keyOf(person, caller);
 
       const personPatch = {
-        wallet: person.wallet || caller.wallet || "",
+        wallet: key,
         username: caller.username || person.username || "",
         display_name: caller.displayName || person.displayName || "",
         twitter_url: caller.twitterUrl || person.twitterUrl || "",
@@ -203,7 +222,7 @@
         action: "note",
         person: personPatch,
         detail: {
-          wallet: person.wallet || caller.wallet || "",
+          wallet: key,
           username: caller.username || person.username || "",
           chain: ctx.chain || "",
           token: ctx.token || "",

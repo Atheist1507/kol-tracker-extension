@@ -24,6 +24,11 @@
     data: null,
     db: null,
     callers: [], // người đang hiện trên chart (từ API GMGN)
+    // Người nhặt được từ các API KHÁC của GMGN (xem noteApi). Bảng X Tracker
+    // và đám avatar trên cây nến là HAI đám khác nhau — cái sau không có danh
+    // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
+    extra: new Map(), // handleKey → { username, displayName, avatar, wallet, tuDau }
+    apiLog: [], // { path, lan, nguoi, ten[] } — để Chẩn đoán chỉ ra endpoint nào có người
     token: null, // { symbol, address, chain }
     // KHÔNG giữ "người đang hover" ở đây nữa: state toàn cục thì mutation nào
     // của GMGN cũng ghi vào được, và phím N mở mãi một người. Overlay hỏi
@@ -43,6 +48,7 @@
     const wallet = KT.walletKey(ref.wallet);
     const caller =
       state.callers.find((c) => (wallet && c.wallet === wallet) || (key && KT.handleKey(c.username) === key)) ||
+      findExtra(key, wallet) ||
       null;
     const merged = caller || ref;
     const person = KT.findPerson(state.db, merged);
@@ -58,11 +64,68 @@
   function identifyByAvatar(url) {
     const key = KT.avatarKey(url);
     if (!key) return null;
-    const caller = state.callers.find((c) => KT.avatarKey(c.avatar) === key);
+    const caller =
+      state.callers.find((c) => KT.avatarKey(c.avatar) === key) ||
+      (function () {
+        for (const p of state.extra.values()) if (p.avatar && KT.avatarKey(p.avatar) === key) return p;
+        return null;
+      })();
     if (caller) return identify(caller);
     // Ảnh lưu trong Sheet (người nhập tay, không có trên chart lúc này)
     const person = state.db && state.db.people.find((p) => p.avatar && KT.avatarKey(p.avatar) === key);
     return person ? { caller: null, person, known: true, renamedFrom: "" } : null;
+  }
+
+  /* ---------- người nhặt từ API lạ ---------- */
+
+  const MAX_EXTRA = 400;
+
+  function findExtra(key, wallet) {
+    if (key && state.extra.has(key)) return state.extra.get(key);
+    if (!wallet) return null;
+    for (const p of state.extra.values()) if (p.wallet === wallet) return p;
+    return null;
+  }
+
+  /**
+   * Một response API bất kỳ của GMGN → ghi tên endpoint vào sổ, và nhặt người.
+   *
+   * Sổ endpoint ghi CẢ những cái không có ai: "có endpoint này mà rỗng" là một
+   * câu trả lời, còn không biết endpoint đó tồn tại thì không.
+   */
+  function noteApi(url, payload) {
+    const path = KT.gmgn.apiPath(url);
+    let row = null;
+    for (const r of state.apiLog) if (r.path === path) row = r;
+    if (!row) {
+      if (state.apiLog.length >= 40) return;
+      row = { path, lan: 0, nguoi: 0, ten: [] };
+      state.apiLog.push(row);
+    }
+    row.lan++;
+    if (!payload) return;
+
+    const people = KT.gmgn.scanPeople(payload);
+    if (!people.length) return;
+    row.nguoi = Math.max(row.nguoi, people.length);
+    for (const p of people) {
+      if (row.ten.length < 4 && row.ten.indexOf(p.username) < 0) row.ten.push(p.username);
+    }
+    if (addExtra(people, path) && alive()) shareExtra(people, path);
+  }
+
+  /** Gộp vào hồ chung. Trả về true nếu có ai đó MỚI. */
+  function addExtra(people, path) {
+    let added = false;
+    for (const p of people) {
+      const key = KT.handleKey(p.username);
+      if (!key || state.extra.has(key)) continue;
+      if (state.extra.size >= MAX_EXTRA) break;
+      state.extra.set(key, Object.assign({}, p, { tuDau: path }));
+      added = true;
+    }
+    if (added && panel) panel.update();
+    return added;
   }
 
   /**
@@ -185,6 +248,8 @@
         if (panel) panel.update();
         if (overlay) overlay.reset();
         shareCallers();
+      } else if (msg.kind === "api") {
+        noteApi(msg.url, msg.payload);
       } else if (msg.kind === "token") {
         const list = (msg.payload && msg.payload.data) || [];
         const first = Array.isArray(list) ? list[0] : list;
@@ -235,6 +300,14 @@
         lastHit: diag.lastHit,
       })
       .catch(() => {});
+  }
+
+  /**
+   * main-world chạy ở mọi frame, nhưng hộp ghi chú và Chẩn đoán chỉ ở frame
+   * trên cùng. Frame nào nghe được người thì chia cho cả tab.
+   */
+  function shareExtra(people, path) {
+    chrome.runtime.sendMessage({ type: KT.MSG.API, people, path }).catch(() => {});
   }
 
   function shareCallers() {
@@ -372,6 +445,13 @@
       setTimeout(sayHello, 1200); // chờ quét xong rồi hãy khai lại số liệu
       return;
     }
+    if (msg.type === KT.MSG.API) {
+      // Chỉ GỘP, không chia lại: tin này đã đi tới mọi frame rồi, chia tiếp là
+      // vòng lặp. (addExtra trả false khi không có ai mới, nhưng đừng dựa vào
+      // đó để chặn vòng — dựa vào chỗ này.)
+      addExtra(msg.people || [], msg.path || "");
+      return;
+    }
     if (msg.type === KT.MSG.POINTER) {
       if (!isTop || !overlay) return;
       const box = frameOffset(msg.url);
@@ -402,6 +482,22 @@
           callers: state.callers.length,
           token: state.token,
           sheetPeople: state.db ? state.db.counts.people : 0,
+          // Endpoint nào của GMGN có người trong đó. Đây là câu hỏi mở còn lại:
+          // đám trên chart không nằm trong community/messages, nên phải tìm cho
+          // ra endpoint nuôi chúng.
+          apiLog: state.apiLog.slice(0, 40),
+          nguoiNgoaiBang: state.extra.size,
+          // Người có trong API mà KHÔNG có trong bảng X Tracker — nếu đám trên
+          // chart là một đám khác thật thì chúng phải hiện ra ở đây.
+          tenNgoaiBang: (function () {
+            const inBang = new Set(state.callers.map((c) => KT.handleKey(c.username)));
+            const out = [];
+            for (const [key, p] of state.extra) {
+              if (inBang.has(key) || out.length >= 12) continue;
+              out.push(p.username + " ←" + p.tuDau);
+            }
+            return out;
+          })(),
         })
       );
       return;
