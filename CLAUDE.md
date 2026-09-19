@@ -250,3 +250,35 @@ trang để tóm đám đó cả. Hai hệ quả:
 từ API lạ thường không kèm ví. `note-box.js` lấy `x:<handle>` làm khoá thay thế
 — viết rõ tiền tố để không ai nhìn nhầm là địa chỉ ví thật. Cái giá: gặp lại
 đúng người đó kèm ví thật thì Sheet có hai dòng, gộp tay.
+
+## Thẻ trên chart CÓ trong DOM — chết ở hai chỗ khác (19/09/2026)
+
+Chẩn đoán v0.5.0 lật ngược kết luận của mười một vòng trước: thẻ nói về người
+trên chart **có** trong DOM, **có** lọt qua bộ lọc vùng chart, và mình **có**
+đọc được chữ trong đó:
+
+```
+"Triggered | Thesis | 13h | @ | Triggeredtrad3s | CATE JUST HIT 100M…"
+"Manifesto |  | Best Callout | Yeon | @ | yeon__ | 75d | …"
+```
+
+Hỏng ở hai chỗ, cả hai đều nằm SAU khâu đọc:
+
+1. **GMGN tách dấu `@` ra một text node RIÊNG.** `"@"` trơ trọi không khớp
+   `STANDALONE_HANDLE_RE`, còn `"Triggeredtrad3s"` không có `@` nên rơi xuống
+   `plain` — lẫn với "Thesis", "13h", "Best Callout" và cả câu post.
+   `candidateHandles` giờ ghép `"@"` với mẩu kế bên (có test).
+2. **`identify()` trả null cho người chưa có hồ sơ**, và `matchHandleIn` coi
+   null là "không đọc được gì". Nhưng đám trên chart KHÔNG nằm trong bảng
+   X Tracker (xem mục trên) nên chúng luôn luôn null — tức là người đáng ghi
+   chú nhất thì bị vứt đi. Giờ có `allowUnknown`: đọc ra handle ở ô handle thật
+   (`standalone`, KHÔNG nhận `plain`) mà tra không thấy ai thì dựng hồ sơ trắng.
+   ⚠ Cờ này CHỈ bật cho đường phím N và CHỈ khi con trỏ ở trên chart. Viền màu
+   và thẻ tóm tắt vẫn chỉ dành cho người quen mặt — bật cho cả người lạ là cả
+   trang GMGN mọc viền.
+
+⚠ Và phải chọn thẻ **GẦN CON TRỎ NHẤT**, không phải thẻ đầu tiên theo thứ tự
+DOM: vùng chart có thẻ nằm lì (kiểu "Best Callout") luôn đứng trước trong cây.
+Lấy cái đầu tiên là tái sinh đúng con bug "bấm N ai cũng ra một người" của mấy
+bản đầu, chỉ đổi chỗ chứ chưa chết. Hoà khoảng cách thì lấy khung NHỎ hơn —
+mấy khung cha chỉ bọc quanh.

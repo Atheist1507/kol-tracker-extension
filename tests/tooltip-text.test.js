@@ -48,3 +48,17 @@ test("@ đứng một mình hoặc handle quá ngắn không tính", () => {
   assert.deepStrictEqual(standalone, []);
   assert.deepStrictEqual(at, []);
 });
+
+test("thẻ trên chart tách dấu @ ra mẩu riêng — vẫn phải ra đúng handle", () => {
+  // Đo trên trang thật 19/09/2026: GMGN dựng "@" thành một text node, tên
+  // thành text node kế bên. Không ghép lại thì tên rơi xuống `plain`, lẫn với
+  // "Thesis" và "13h" — và đó là lý do DUY NHẤT thẻ trên chart không dùng được.
+  const out = KT.candidateHandles(["Triggered", "Thesis", "13h", "@", "Triggeredtrad3s", "CATE JUST HIT 100M"]);
+  assert.deepStrictEqual(out.standalone, ["Triggeredtrad3s"]);
+  assert.ok(out.plain.indexOf("Triggeredtrad3s") < 0, "tên đã dùng rồi thì đừng để rơi xuống plain nữa");
+});
+
+test("dấu @ trơ trọi mà mẩu sau không phải tên thì không ghép bừa", () => {
+  const out = KT.candidateHandles(["@", "câu văn dài có dấu cách"]);
+  assert.deepStrictEqual(out.standalone, []);
+});

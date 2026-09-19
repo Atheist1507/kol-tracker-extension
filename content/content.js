@@ -114,6 +114,17 @@
     if (addExtra(people, path) && alive()) shareExtra(people, path);
   }
 
+  /** Hồ sơ trắng cho người mình chưa biết gì ngoài cái tên. */
+  function ghostHit(ref) {
+    if (!ref || !ref.username) return null;
+    return {
+      caller: null,
+      person: KT.personFromCaller({ username: ref.username, wallet: ref.wallet || "" }),
+      known: false,
+      renamedFrom: "",
+    };
+  }
+
   /** Gộp vào hồ chung. Trả về true nếu có ai đó MỚI. */
   function addExtra(people, path) {
     let added = false;
@@ -463,7 +474,11 @@
       // Không kèm định danh = frame con không tự nhận ra ai (avatar trên chart
       // là nét vẽ trên canvas, không phải thẻ <img>). Frame trên cùng tự quyết:
       // nó có thẻ tooltip của GMGN và giờ có cả toạ độ chuột đúng.
-      const hit = msg.ref && (msg.ref.wallet || msg.ref.username) ? identify(msg.ref) : overlay && overlay.hitAtPointer();
+      const ref = msg.ref && (msg.ref.wallet || msg.ref.username) ? msg.ref : null;
+      // ⚠ identify() trả null khi người đó chưa có trong Sheet lẫn trong bảng
+      // X Tracker — đúng cảnh của đám trên chart. Frame con đã đọc được tên
+      // rồi thì đừng vứt đi: dựng hồ sơ trắng cho người lạ, hộp ghi chú vẫn mở.
+      const hit = ref ? identify(ref) || ghostHit(ref) : overlay && overlay.hitAtPointer();
       if (hit) api.openNote(hit, null);
       return;
     }

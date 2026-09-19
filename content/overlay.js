@@ -297,7 +297,13 @@
       };
     }
 
-    function matchHandleIn(node, quiet) {
+    /**
+     * @param allowUnknown Cho phép trả về NGƯỜI LẠ (chưa có trong Sheet, cũng
+     *   không có trong bảng X Tracker). Chỉ đường phím N mới bật cờ này —
+     *   viền màu và thẻ tóm tắt vẫn CHỈ dành cho người quen mặt, bật cho cả
+     *   người lạ là cả trang GMGN mọc viền.
+     */
+    function matchHandleIn(node, quiet, allowUnknown) {
       const chunks = textChunks(node);
       if (!chunks.length || chunks.length > MAX_CARD_CHUNKS) return null;
 
@@ -310,6 +316,26 @@
         if (hit) {
           if (!quiet) rememberTooltip(el, chunks, name, true);
           return hit;
+        }
+      }
+      // Đọc ra tên mà tra không thấy ai. Trước đây tới đây là bỏ cuộc — và đó
+      // chính là chỗ chết của đám avatar trên chart: chúng KHÔNG nằm trong
+      // bảng X Tracker, nên identify() không bao giờ trả về gì. Nhưng tên thì
+      // đã đọc được rồi, mà "người mình chưa có hồ sơ" lại đúng là người đáng
+      // ghi chú nhất.
+      //
+      // Chỉ nhận mẩu `standalone` (ô handle thật sự của thẻ), KHÔNG nhận
+      // `plain` — "Thesis", "13h", "Best Callout" cũng nằm trong đó.
+      if (allowUnknown && standalone.length) {
+        const name = standalone[0];
+        if (KT.handleKey(name).length >= 2) {
+          if (!quiet) rememberTooltip(el, chunks, name, true);
+          return {
+            caller: null,
+            person: KT.personFromCaller({ username: name }),
+            known: false,
+            renamedFrom: "",
+          };
         }
       }
       if (standalone.length && !quiet) rememberTooltip(el, chunks, standalone[0], false);
@@ -496,7 +522,7 @@
      * Duyệt theo ẢNH (vài chục) chứ không theo div (vài nghìn): thẻ giới thiệu
      * người nào cũng có ảnh, mà đo kích thước từng div thì chậm.
      */
-    function scanVisibleCard(nearChart) {
+    function scanVisibleCard(nearChart, allowUnknown) {
       const chart = nearChart ? chartRect() : null;
       if (nearChart && !chart) return null;
 
@@ -506,6 +532,7 @@
       if (chart) {
         const roots = scanRoots();
         lastScan = { goc: roots.length, xet: 0, ungVien: [] };
+        let best = null;
         for (const root of roots) {
           for (const el of root.querySelectorAll("div")) {
             if (++lastScan.xet > 8000) break;
@@ -515,7 +542,7 @@
             if (!overlaps(r, chart, CHART_PAD_PX)) continue;
             if (isOurs(el) || isOurs(el.getRootNode().host || el)) continue;
             if (!isReallyVisible(el)) continue;
-            const hit = matchHandleIn(el, true);
+            const hit = matchHandleIn(el, true, allowUnknown);
             // ⚠ Chỉ ghi ứng viên CÓ DẤU @ — tức là trông như thẻ nói về một
             // người. Bản trước ghi bừa 5 cái đầu theo thứ tự DOM nên chỗ ghi
             // bị mấy thanh công cụ của GMGN chiếm sạch ("Ví | Theo dõi |
@@ -532,10 +559,27 @@
                 );
               }
             }
-            if (hit) return { hit: hit, el: el, at: Date.now() };
+            if (hit) {
+              // ⚠ ĐỪNG lấy cái đầu tiên theo thứ tự DOM. Trong vùng chart còn
+              // có thẻ nằm lì (kiểu "Best Callout"), nó đứng trước trong cây
+              // nên lần nào cũng thắng — và đó đúng là con bug "bấm N ai cũng
+              // ra một người" của mấy bản đầu, chỉ đổi chỗ chứ chưa chết.
+              // Lấy thẻ GẦN CON TRỎ nhất; hoà thì lấy thẻ NHỎ hơn (khung trong
+              // cùng mới là thẻ thật, mấy khung cha chỉ bọc quanh).
+              const d = pointerFresh() ? KT.distToRect(pointer.x, pointer.y, r) : 0;
+              const area = r.width * r.height;
+              if (!best || d < best.d - 0.5 || (Math.abs(d - best.d) <= 0.5 && area < best.area)) {
+                best = { hit: hit, el: el, at: Date.now(), d: d, area: area };
+              }
+            }
           }
         }
-        return null;
+        if (best) {
+          lastScan.chon =
+            (best.hit.person.username || "?") +
+            " (cách con trỏ " + Math.round(best.d) + "px, " + (best.hit.known ? "đã có hồ sơ" : "người lạ") + ")";
+        }
+        return best;
       }
 
       for (const img of document.querySelectorAll("img")) {
@@ -551,7 +595,7 @@
           if (r.width > MAX_TOOLTIP_W || r.height > MAX_TOOLTIP_H) break;
           if (chart && !overlaps(r, chart, CHART_PAD_PX)) continue;
           if (!isReallyVisible(node)) continue;
-          const hit = matchHandleIn(node, true);
+          const hit = matchHandleIn(node, true, allowUnknown);
           if (hit) return { hit: hit, el: node, at: Date.now() };
         }
       }
@@ -623,7 +667,10 @@
       );
       // Không có cái nào trong sổ đang hiện thì QUÉT LẠI màn hình: thẻ đang
       // hiện có thể là thẻ GMGN dựng sẵn rồi bỏ giấu, chưa từng vào sổ.
-      const found = live[0] || scanVisibleCard(onChart && !inChartFrame);
+      // Người lạ chỉ được nhận khi con trỏ đang ở TRÊN CHART: dưới chart là
+      // bảng X Tracker, ở đó ai cũng đã nằm trong state.callers rồi, nhận
+      // thêm người lạ chỉ có thể là vơ nhầm.
+      const found = live[0] || scanVisibleCard(onChart && !inChartFrame, onChart);
       const src = found || (lastPerson && !lastPerson.fromPointer ? lastPerson : null);
       if (!src) return say("chưa đọc được tooltip nào");
       const tuoi = Date.now() - src.at;
@@ -631,7 +678,7 @@
       if (found) {
         const r = src.el.getBoundingClientRect();
         // Đọc lại nội dung: tooltip có khi được dùng đi dùng lại cho người khác.
-        const use = matchHandleIn(src.el, true) || src.hit;
+        const use = matchHandleIn(src.el, true, onChart) || src.hit;
         if (onChart) return say("thẻ đang hiện trên chart", Object.assign({}, use, { rect: r }));
         if (nearPointer(r)) return say("thẻ đang hiện (ở cạnh con trỏ)", Object.assign({}, use, { rect: r }));
         return say("thẻ đang hiện nhưng cách con trỏ " + Math.round(KT.distToRect(pointer.x, pointer.y, r)) + "px");
