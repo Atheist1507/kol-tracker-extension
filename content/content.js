@@ -114,6 +114,12 @@
     if (addExtra(people, path) && alive()) shareExtra(people, path);
   }
 
+  /** ID số của tài khoản X, nếu API nào đó của GMGN có nhắc tới người này. */
+  function xIdFor(username) {
+    const p = state.extra.get(KT.handleKey(username));
+    return (p && p.xId) || "";
+  }
+
   /** Hồ sơ trắng cho người mình chưa biết gì ngoài cái tên. */
   function ghostHit(ref) {
     if (!ref || !ref.username) return null;
@@ -164,6 +170,7 @@
     openOptions: () => chrome.runtime.sendMessage({ type: "kt:openOptions" }).catch(() => {}),
     identify,
     identifyByAvatar,
+    xIdFor,
     savePos: (pos) => {
       state.ui = Object.assign({}, state.ui, pos);
       chrome.storage.local.set({ [KT.STORAGE.UI]: state.ui });

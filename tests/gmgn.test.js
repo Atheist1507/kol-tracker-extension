@@ -261,3 +261,14 @@ test("scanPeople gộp trùng theo tay cầm, không phân biệt hoa thường"
   const people = KT.gmgn.scanPeople({ data: [{ username: "Shea1121" }, { username: "@shea1121", display_name: "x" }] });
   assert.strictEqual(people.length, 1);
 });
+
+test("scanPeople nhặt ID SỐ của tài khoản X khi có", () => {
+  const people = KT.gmgn.scanPeople({ data: [{ username: "Shea", twitter_id: "1234567890" }] });
+  assert.strictEqual(people[0].xId, "1234567890");
+});
+
+test("ID không phải dãy số thì bỏ, đừng lấy bừa làm khoá", () => {
+  // Khoá sai là mọi dòng trong Sheet gắn nhầm người, mà không có triệu chứng gì
+  const people = KT.gmgn.scanPeople({ data: [{ username: "Shea", user_id: "abc-def" }] });
+  assert.strictEqual(people[0].xId, "");
+});

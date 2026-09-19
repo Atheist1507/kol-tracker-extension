@@ -105,6 +105,52 @@
     };
   }
 
+  /* ---- WebSocket ---- */
+  /**
+   * Không một endpoint HTTP nào chứa đám người trên chart (đo 19/09/2026: 21
+   * endpoint, 0 người). Nghi phạm còn lại là WebSocket — GMGN đẩy giá và lệnh
+   * qua đó, rất có thể đẩy cả mấy mốc trên chart.
+   *
+   * ⚠ Tin WS bắn liên tục (mỗi tick giá một tin). Nên lọc trên CHUỖI trước,
+   * chưa JSON.parse: tin giá không có chữ "username" nên rớt ngay, không tốn gì.
+   */
+  const OrigWS = window.WebSocket;
+  if (typeof OrigWS === "function") {
+    const KTWebSocket = function (url, protocols) {
+      const ws = protocols === undefined ? new OrigWS(url) : new OrigWS(url, protocols);
+      try {
+        let binaryTold = false;
+        ws.addEventListener("message", function (ev) {
+          try {
+            if (typeof ev.data !== "string") {
+              // Nhị phân thì mình không đọc được — nhưng phải NÓI RA, kẻo
+              // "không thấy ai trong WS" trông y hệt "WS không có ai".
+              if (!binaryTold) {
+                binaryTold = true;
+                send("api", String(url) + "#nhi-phan", null);
+              }
+              return;
+            }
+            if (ev.data.length > MAX_BYTES || !PERSON_HINT_RE.test(ev.data)) return;
+            send("api", String(url), JSON.parse(ev.data));
+          } catch (e) {
+            /* im lặng — không phải việc của trang */
+          }
+        });
+      } catch (e) {
+        /* im lặng */
+      }
+      return ws;
+    };
+    KTWebSocket.prototype = OrigWS.prototype;
+    for (const k of ["CONNECTING", "OPEN", "CLOSING", "CLOSED"]) KTWebSocket[k] = OrigWS[k];
+    try {
+      window.WebSocket = KTWebSocket;
+    } catch (e) {
+      /* trang khoá thuộc tính — bỏ qua, phần fetch vẫn chạy */
+    }
+  }
+
   /* ---- XMLHttpRequest ---- */
   const origOpen = XMLHttpRequest.prototype.open;
   const origSend = XMLHttpRequest.prototype.send;
