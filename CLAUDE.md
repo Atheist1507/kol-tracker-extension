@@ -282,3 +282,26 @@ DOM: vùng chart có thẻ nằm lì (kiểu "Best Callout") luôn đứng trư�
 Lấy cái đầu tiên là tái sinh đúng con bug "bấm N ai cũng ra một người" của mấy
 bản đầu, chỉ đổi chỗ chứ chưa chết. Hoà khoảng cách thì lấy khung NHỎ hơn —
 mấy khung cha chỉ bọc quanh.
+
+## Khoá một người: ID SỐ của X, không phải username (19/09/2026)
+
+Username đổi lúc nào cũng được, và đổi xong thì mọi dòng đã ghi trong Sheet mồ
+côi — im lặng, không triệu chứng nào. Nên thứ tự khoá trong `note-box.keyOf`:
+
+1. `wallet` (người trong bảng X Tracker — API trả sẵn)
+2. `x:<id số>` nếu bắt được ID tài khoản X
+3. `x:<username>` — đường cùng, biết là sẽ chết nếu họ đổi tên
+
+Cột `twitter_url` cũng theo luật đó: có id thì ghi `x.com/i/user/<id>` (X tự
+chuyển hướng sang tên HIỆN TẠI nên link không chết), không thì `x.com/<tên>`.
+Không phải thêm cột nào vào Sheet, không phải đụng Code.gs.
+
+⚠ Tới 19/09/2026 **vẫn chưa bắt được id nào** cho người trên chart: 21 endpoint
+HTTP không có ai, thẻ trên chart chỉ có chữ hiển thị. Đang truy hai hướng:
+- `WebSocket` (main-world bọc luôn — lọc trên CHUỖI trước khi JSON.parse, vì
+  mỗi tick giá là một tin; tin nhị phân thì báo `#nhi-phan` ra chẩn đoán chứ
+  không im, kẻo "không thấy ai" lẫn với "không đọc được").
+- `lastScan.datId` — link, `data-*` và URL ảnh của chính thẻ đã chọn.
+
+Ghi nhận rồi mới dùng: **đoán sai chỗ lấy id là mọi dòng trong Sheet gắn nhầm
+người**, và đó là loại sai không có triệu chứng.

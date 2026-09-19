@@ -298,6 +298,38 @@
     }
 
     /**
+     * Thẻ này có giấu ID SỐ của tài khoản X ở đâu không?
+     *
+     * Username đổi được, id thì không — mà id không nằm trong chữ hiển thị.
+     * Nếu có thì nó nằm ở link (`x.com/i/user/<id>`), ở `data-*`, hoặc ở URL
+     * ảnh đại diện. Ghi lại nguyên văn để soi, CHƯA dùng làm khoá vội: đoán
+     * sai chỗ lấy id là mọi dòng trong Sheet gắn nhầm người.
+     */
+    function idTracesIn(el) {
+      const out = [];
+      try {
+        const nodes = [el].concat(Array.from(el.querySelectorAll("a,img,[data-id],[data-uid],[data-user-id]")));
+        for (const n of nodes.slice(0, 40)) {
+          if (out.length >= 8) break;
+          const href = n.getAttribute && n.getAttribute("href");
+          if (href) out.push("href=" + href.slice(0, 120));
+          const src = n.getAttribute && n.getAttribute("src");
+          if (src && /twitter|x\.com|external-res|profile_images/i.test(src)) out.push("src=" + src.slice(0, 120));
+          if (n.attributes) {
+            for (const a of n.attributes) {
+              if (a.name.indexOf("data-") !== 0) continue;
+              if (!/^[0-9]{5,25}$/.test(String(a.value).trim())) continue;
+              out.push(a.name + "=" + String(a.value).slice(0, 40));
+            }
+          }
+        }
+      } catch (e) {
+        /* thẻ của người khác — hỏng thì im */
+      }
+      return out.slice(0, 8);
+    }
+
+    /**
      * @param allowUnknown Cho phép trả về NGƯỜI LẠ (chưa có trong Sheet, cũng
      *   không có trong bảng X Tracker). Chỉ đường phím N mới bật cờ này —
      *   viền màu và thẻ tóm tắt vẫn CHỈ dành cho người quen mặt, bật cho cả
@@ -575,6 +607,7 @@
           }
         }
         if (best) {
+          lastScan.datId = idTracesIn(best.el);
           lastScan.chon =
             (best.hit.person.username || "?") +
             " (cách con trỏ " + Math.round(best.d) + "px, " + (best.hit.known ? "đã có hồ sơ" : "người lạ") + ")";

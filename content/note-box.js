@@ -192,7 +192,27 @@
       const wallet = person.wallet || caller.wallet || "";
       if (wallet) return wallet;
       const handle = KT.handleKey(caller.username || person.username || "");
+      // ID SỐ trước đã: username đổi lúc nào cũng được, đổi xong là dòng cũ
+      // trong Sheet mồ côi — im lặng, không triệu chứng. ID thì không đổi.
+      const xId = (api.xIdFor && api.xIdFor(handle)) || "";
+      if (xId) return "x:" + xId;
       return handle ? "x:" + handle : "";
+    }
+
+    /**
+     * Link về trang X của người đó.
+     *
+     * Có id thì dùng dạng `x.com/i/user/<id>` — X tự chuyển hướng sang tên
+     * HIỆN TẠI, nên đổi tên bao nhiêu lần link vẫn sống. Không có id thì đành
+     * dùng tên, biết là sẽ chết nếu họ đổi.
+     */
+    function twitterUrlOf(person, caller) {
+      const has = caller.twitterUrl || person.twitterUrl || "";
+      if (has) return has;
+      const handle = KT.handleKey(caller.username || person.username || "");
+      if (!handle) return "";
+      const xId = (api.xIdFor && api.xIdFor(handle)) || "";
+      return xId ? "https://x.com/i/user/" + xId : "https://x.com/" + (caller.username || person.username);
     }
 
     /** Gói đúng tên cột của Sheet — xem apps-script/Code.gs. */
@@ -206,7 +226,7 @@
         wallet: key,
         username: caller.username || person.username || "",
         display_name: caller.displayName || person.displayName || "",
-        twitter_url: caller.twitterUrl || person.twitterUrl || "",
+        twitter_url: twitterUrlOf(person, caller),
         // Chỉ URL http(s) mới đáng lưu: ảnh nhúng data: là một cục base64
         // vài KB nằm trong một ô Sheet, vô dụng mà còn phình file.
         avatar_url: KT.safeUrl(caller.avatar) || KT.safeUrl(person.avatar) || "",

@@ -227,6 +227,25 @@
   const NAME_KEYS = ["display_name", "twitter_name", "nickname", "name"];
   const AVATAR_KEYS = ["profile_image_url", "avatar_url", "twitter_avatar", "avatar", "icon"];
   const WALLET_KEYS = ["wallet_address", "maker", "address", "wallet"];
+  /**
+   * ID SỐ của tài khoản X — khoá DUY NHẤT không đổi được.
+   *
+   * Username thì đổi lúc nào cũng được, mà đổi xong là mọi dòng đã ghi trong
+   * Sheet mồ côi, im lặng, không có triệu chứng gì. Thấy được id thì lấy id
+   * làm khoá.
+   */
+  const XID_KEYS = ["twitter_id", "twitter_user_id", "x_id", "user_id", "id_str", "rest_id", "uid"];
+  const XID_RE = /^[0-9]{5,25}$/;
+
+  function pickId(obj) {
+    for (const k of XID_KEYS) {
+      const v = obj[k];
+      if (v === null || v === undefined) continue;
+      const s = String(v).trim();
+      if (XID_RE.test(s)) return s;
+    }
+    return "";
+  }
 
   function pick(obj, keys) {
     for (const k of keys) {
@@ -280,6 +299,7 @@
             displayName: pick(node, NAME_KEYS),
             avatar: pick(node, AVATAR_KEYS),
             wallet: KT.walletKey(pick(node, WALLET_KEYS)) || "",
+            xId: pickId(node),
           });
         }
       }
@@ -308,6 +328,7 @@
     parseEndpoint,
     apiPath,
     scanPeople,
+    xIdFrom: pickId,
     HOLDING_LABELS,
     HOLDING_RED_FLAGS,
   };
