@@ -185,9 +185,32 @@
       return `<div class="kt-sec-title">${KT.esc(bits.join(" · "))}</div>${rowsHtml}`;
     }
 
+    /**
+     * Dải cảnh báo người đổi tên.
+     *
+     * Đặt ở ĐẦU trang chủ của panel, không giấu trong chi tiết: đây là thứ
+     * chủ máy sẽ không bao giờ đi tìm, nên nó phải tự đập vào mắt.
+     */
+    function renamesHtml() {
+      const { renames } = api.getState();
+      if (!renames || !renames.length) return "";
+      return (
+        `<div class="kt-sec-title">Đổi tên</div>` +
+        renames
+          .slice(0, 5)
+          .map(
+            (r) =>
+              `<div class="kt-hint" style="color:#E3B341">⚠ <b>@${KT.esc(r.tenCu)}</b> mày ghi${
+                r.notedAt ? " " + KT.esc(r.notedAt) : ""
+              } giờ đang tên <b>@${KT.esc(r.tenMoi)}</b> — cùng bài call đã ghi.</div>`
+          )
+          .join("")
+      );
+    }
+
     function renderHome() {
       const { db, callers } = api.getState();
-      const callersBlock = callersHtml();
+      const callersBlock = renamesHtml() + callersHtml();
 
       if (!db || !db.people.length) {
         el.content.innerHTML =

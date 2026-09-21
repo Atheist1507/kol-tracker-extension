@@ -92,6 +92,9 @@
     const byWallet = Object.create(null);
     const byUsername = Object.create(null);
     const byToken = Object.create(null);
+    // Bài call đã ghi → người đã ghi. Đây là CÂY CẦU nhận ra người đổi tên:
+    // tên đổi được, ví đổi được, nhưng một bài call đã xảy ra thì không.
+    const byPostId = Object.create(null);
 
     function index(person) {
       if (person.wallet && !byWallet[person.wallet]) byWallet[person.wallet] = person;
@@ -120,6 +123,8 @@
         index(person);
       }
       person.notes.push(note);
+
+      if (note.postId && !byPostId[note.postId]) byPostId[note.postId] = { person, note };
 
       if (note.tokenAddress) {
         (byToken[note.tokenAddress] = byToken[note.tokenAddress] || []).push(note);
@@ -152,6 +157,7 @@
       byWallet,
       byUsername,
       byToken,
+      byPostId,
       counts: { people: people.filter((p) => !p.ghost).length, notes: noteCount },
     };
   }
@@ -165,7 +171,12 @@
     const wallet = walletKey(ref.wallet);
     if (wallet && db.byWallet[wallet]) return db.byWallet[wallet];
     const key = KT.handleKey(ref.username);
-    return (key && db.byUsername[key]) || null;
+    if (key && db.byUsername[key]) return db.byUsername[key];
+    // Đổi tên rồi thì tra bằng tên không ra. Bài call đã ghi thì vẫn ra —
+    // và phải ra, nếu không mỗi lần nó đổi tên là Sheet đẻ thêm một hồ sơ
+    // trắng, còn lịch sử cũ nằm lại ở cái tên không ai tra nữa.
+    const post = ref.postId && db.byPostId && db.byPostId[ref.postId];
+    return (post && post.person) || null;
   }
 
   /**
@@ -179,6 +190,57 @@
     if (!now || !person.usernameKey || person.usernameKey === now) return "";
     if (!person.wallet || person.wallet !== walletKey(ref.wallet)) return "";
     return person.username;
+  }
+
+  /**
+   * Ai trong đám đang hiện trên chart đã ĐỔI TÊN so với lúc mình ghi chú?
+   *
+   * Cách nhận: cùng một `post_id` — cùng đúng một bài call đã xảy ra — mà tên
+   * tác giả bây giờ khác tên đã lưu. Bài call là việc ĐÃ RỒI, nó không sửa
+   * được bằng cách đổi tên hay đổi ví, nên đây là cây cầu bền nhất mình có.
+   *
+   * ⚠ Cố ý KHÔNG neo vào `author_id`: nó là UUID v5, tức là BĂM ra từ một
+   * chuỗi gốc mà mình không biết là gì. Băm từ handle thì nó đổi theo tên,
+   * lúc đó neo vào nó là mất dấu đúng lúc cần nhất. Dùng post_id thì đúng
+   * trong cả hai trường hợp.
+   */
+  function findRenames(db, list) {
+    if (!db || !db.byPostId || !list) return [];
+    const out = [];
+    const seen = Object.create(null);
+    for (const item of list) {
+      const hit = item && item.postId && db.byPostId[item.postId];
+      if (!hit) continue;
+      const cu = KT.handleKey(hit.note.username || hit.person.username);
+      const moi = KT.handleKey(item.username);
+      if (!cu || !moi || cu === moi || seen[cu + ">" + moi]) continue;
+      seen[cu + ">" + moi] = true;
+      out.push({
+        postId: item.postId,
+        tenCu: hit.note.username || hit.person.username,
+        tenMoi: item.username,
+        person: hit.person,
+        notedAt: hit.note.notedAt,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Bản anh em của `renamedFrom` cho người KHÔNG có ví.
+   *
+   * `renamedFrom` đòi ví trùng mới dám kết luận — đúng cho người trong bảng
+   * X Tracker, nhưng người trên chart không có ví nên nó không bao giờ nói gì.
+   * Ở đây bằng chứng là bài call đã ghi.
+   */
+  function renamedFromPost(db, person, ref) {
+    if (!db || !db.byPostId || !person || !ref || !ref.postId) return "";
+    const hit = db.byPostId[ref.postId];
+    if (!hit || hit.person !== person) return "";
+    const moi = KT.handleKey(ref.username);
+    const cu = hit.note.username || person.username;
+    if (!moi || !cu || KT.handleKey(cu) === moi) return "";
+    return cu;
   }
 
   /** Tìm mờ trong danh sách người (panel + popup dùng chung). */
@@ -247,11 +309,13 @@
   KT.personFromCaller = personFromCaller;
   KT.buildDb = buildDb;
   KT.findPerson = findPerson;
+  KT.findRenames = findRenames;
+  KT.renamedFromPost = renamedFromPost;
   KT.renamedFrom = renamedFrom;
   KT.search = search;
   KT.walletKey = walletKey;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { buildDb, findPerson, renamedFrom, search, walletKey, personFromCaller };
+    module.exports = { buildDb, findPerson, findRenames, renamedFrom, renamedFromPost, search, walletKey, personFromCaller };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);
