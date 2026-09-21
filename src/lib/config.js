@@ -25,6 +25,7 @@
     CONFIG: "config", // chrome.storage.sync
     DATA: "data", // chrome.storage.local — { kols, calls, syncedAt, error }
     UI: "ui", // chrome.storage.local — vị trí panel
+    AUTHOR: "authorProbe", // chrome.storage.local — author_id có đổi giữa các lần gọi không
     ULID: "ulidProbe", // chrome.storage.local — ulid của bài post có đổi giữa các lần gọi không
   };
 
