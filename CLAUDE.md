@@ -444,3 +444,36 @@ Nhận ra người đổi tên bằng **`post_id`**, không bằng `author_id`:
 `probeAuthorId` đánh số theo `post_id`, nên lần đo sau trả lời LUÔN cả hai:
 `kiem > 0` nghĩa là `post_id` ổn định (bằng không không bao giờ khớp để mà
 đếm), còn `lech` nói `author_id` có đổi không.
+
+## Nhận ra người đổi tên: cây cầu là `post_id` (21/09/2026)
+
+Đo xong mới dựng. `authorIdOnDinh: {kiem: 40, lech: 0}` qua một lần F5 →
+**`post_id` ổn định** (bằng không thì không bao giờ khớp để mà đếm) và
+`author_id` cũng không đổi giữa các lần gọi.
+
+Nhưng vẫn neo vào **`post_id`**, KHÔNG neo vào `author_id`: `author_id` là
+UUID v5 băm từ chuỗi gốc chưa biết, nên "ổn định giữa các lần gọi" ≠ "sống qua
+phép đổi tên". `post_id` thì đúng trong cả hai khả năng.
+
+> Cùng một `post_id` đã ghi trong Sheet, mà tên tác giả bây giờ khác tên đã
+> lưu → chính nó đổi tên.
+
+Ba mảnh, đều ở tầng thuần và có test:
+- `buildDb` thêm chỉ mục **`byPostId`** (bài call đã ghi → người đã ghi).
+- `findPerson` tra thêm bằng `postId`. ⚠ Thiếu cái này thì mỗi lần nó đổi tên
+  là Sheet đẻ thêm một hồ sơ trắng, còn lịch sử cũ nằm lại ở cái tên không ai
+  tra nữa.
+- `findRenames(db, list)` → danh sách "tên cũ → tên mới", panel hiện thành dải
+  cảnh báo ở ĐẦU trang chủ (không giấu trong chi tiết: đây là thứ không ai đi
+  tìm, nên nó phải tự đập vào mắt).
+- `renamedFromPost` là bản anh em của `renamedFrom` cho người KHÔNG có ví —
+  `renamedFrom` đòi ví trùng mới dám kết luận nên với người trên chart nó im
+  lặng mãi mãi.
+
+⚠ Ghi chú cho người đã đổi tên phải rơi vào ĐÚNG dòng cũ. Nó rơi đúng vì
+`keyOf` lấy `person.wallet` (khoá đã lưu trong Sheet) trước cái tên mới — có
+test khoá lại, đừng đảo thứ tự đó.
+
+⚠ `findRenames` phải chạy lại khi **Sheet** tải xong, không chỉ khi feed về:
+người đổi tên chỉ lộ ra khi có CẢ hồ sơ cũ lẫn danh sách đang hiện, mà hai
+thứ đó không về cùng lúc.

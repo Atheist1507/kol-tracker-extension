@@ -26,6 +26,7 @@
     callers: [], // bảng X Tracker dưới chart (API community/messages)
     chartPeople: [], // người trên CHART, của token đang mở (feed fomo/thesis)
     thesisAll: [], // cả feed thesis, gồm token khác — làm sổ nhận mặt
+    renames: [], // ai đổi tên so với lúc ghi chú (tra bằng post_id)
     mauThesisTho: null, // giá trị THÔ mấy cột quyết định của feed thesis
     authorIdProbe: null, // author_id có ổn định không
     // Người nhặt được từ các API KHÁC của GMGN (xem noteApi). Bảng X Tracker
@@ -66,7 +67,7 @@
       caller,
       person: person || KT.personFromCaller(merged),
       known: !!person,
-      renamedFrom: person ? KT.renamedFrom(person, merged) : "",
+      renamedFrom: person ? KT.renamedFrom(person, merged) || KT.renamedFromPost(state.db, person, merged) : "",
     };
   }
 
@@ -269,6 +270,9 @@
     const addr = KT.walletKey((state.token && state.token.address) || "");
     const here = addr ? state.thesisAll.filter((p) => p.tokenAddress === addr) : state.thesisAll;
     state.chartPeople = here;
+    // Ai trong đám này đã đổi tên so với lúc mình ghi chú? Tra bằng bài call
+    // đã ghi, không tra bằng tên — tên chính là thứ vừa đổi.
+    state.renames = KT.findRenames(state.db, state.thesisAll);
     if (panel) panel.update();
     if (overlay) overlay.reset();
   }
@@ -396,6 +400,9 @@
   function rebuildDb() {
     const d = state.data;
     state.db = d ? KT.buildDb(d.overview, d.detail) : null;
+    // Sheet vừa tải lại thì phải soi lại: người đổi tên chỉ lộ ra khi có CẢ
+    // hồ sơ cũ lẫn danh sách đang hiện, mà hai thứ đó về không cùng lúc.
+    if (state.thesisAll.length) state.renames = KT.findRenames(state.db, state.thesisAll);
   }
 
   async function load() {
@@ -700,6 +707,11 @@
           apiLog: state.apiLog.slice(0, 40),
           nguoiNgoaiBang: state.extra.size,
           nguoiTrenChart: state.chartPeople.length,
+          doiTen: state.renames.map((r) => r.tenCu + " → " + r.tenMoi),
+          phanBoHolding: state.chartPeople.reduce((acc, p) => {
+            acc[p.holding] = (acc[p.holding] || 0) + 1;
+            return acc;
+          }, {}),
           thesisTong: state.thesisAll.length,
           mauChart: state.chartPeople
             .slice(0, 3)

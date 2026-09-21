@@ -92,3 +92,54 @@ test("db rỗng không ném lỗi", () => {
   assert.strictEqual(KT.findPerson(empty, { wallet: "0x1" }), null);
   assert.strictEqual(KT.renamedFrom(null, null), "");
 });
+
+/* ---------- nhận ra người đổi tên qua post_id ---------- */
+
+const DB_RENAME = () =>
+  KT.buildDb(
+    [{ wallet: "", username: "ten_cu", display_name: "Ai Đó", tier: "A" }],
+    [{ wallet: "", username: "ten_cu", post_id: "post-1", noted_at: "12/08/2026 lúc 09:00", note: "call sớm" }]
+  );
+
+test("cùng bài call mà tên khác = chính nó đổi tên", () => {
+  const found = KT.findRenames(DB_RENAME(), [{ postId: "post-1", username: "ten_moi" }]);
+  assert.strictEqual(found.length, 1);
+  assert.strictEqual(found[0].tenCu, "ten_cu");
+  assert.strictEqual(found[0].tenMoi, "ten_moi");
+});
+
+test("cùng tên thì không báo đổi tên", () => {
+  assert.deepStrictEqual(KT.findRenames(DB_RENAME(), [{ postId: "post-1", username: "TEN_CU" }]), []);
+});
+
+test("bài call chưa ghi bao giờ thì không kết luận gì", () => {
+  assert.deepStrictEqual(KT.findRenames(DB_RENAME(), [{ postId: "post-lạ", username: "ai_do" }]), []);
+});
+
+test("đổi tên rồi thì tra bằng post_id vẫn ra ĐÚNG hồ sơ cũ", () => {
+  // Thiếu cái này thì mỗi lần nó đổi tên là Sheet đẻ thêm một hồ sơ trắng,
+  // còn lịch sử cũ nằm lại ở cái tên không ai tra nữa
+  const person = KT.findPerson(DB_RENAME(), { username: "ten_moi", postId: "post-1" });
+  assert.ok(person, "phải tra ra người cũ");
+  assert.strictEqual(person.tierLetter, "A");
+});
+
+test("người KHÔNG có ví vẫn báo được đổi tên, bằng chứng là bài call", () => {
+  // renamedFrom đòi ví trùng mới dám kết luận — người trên chart không có ví
+  // nên nó im lặng mãi mãi
+  const db = DB_RENAME();
+  const person = KT.findPerson(db, { username: "ten_moi", postId: "post-1" });
+  assert.strictEqual(KT.renamedFrom(person, { username: "ten_moi" }), "");
+  assert.strictEqual(KT.renamedFromPost(db, person, { username: "ten_moi", postId: "post-1" }), "ten_cu");
+});
+
+test("ghi chú cho người đã đổi tên phải rơi vào ĐÚNG dòng cũ", () => {
+  // Khoá lấy từ hồ sơ tra ra được, không phải từ cái tên mới — bằng không
+  // Sheet có hai dòng cho một người và lịch sử cũ nằm lại ở tên không ai tra
+  const db = KT.buildDb(
+    [{ wallet: "x:ten_cu", username: "ten_cu" }],
+    [{ wallet: "x:ten_cu", username: "ten_cu", post_id: "post-1" }]
+  );
+  const person = KT.findPerson(db, { username: "ten_moi", postId: "post-1" });
+  assert.strictEqual(person.wallet, "x:ten_cu");
+});
