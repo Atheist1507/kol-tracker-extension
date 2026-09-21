@@ -26,6 +26,25 @@
         </div>
       </section>
 
+      <section class="card" id="quickstart">
+        <h2>Bắt đầu nhanh</h2>
+        <ol class="steps">
+          <li>Điền <b>URL Web App</b> + <b>SECRET</b> ở mục 1 bên dưới (người rủ bạn vào sẽ đưa),
+            rồi bấm <b>Thử kết nối</b> — phải ra chữ xanh.</li>
+          <li>Điền <b>tên của bạn</b> ở mục 1 để Sheet biết ghi chú nào của ai.</li>
+          <li>Mở một chart bất kỳ trên GMGN, bấm <b>Alt+K</b>. Panel hiện danh sách người đã call
+            token đó, kèm giờ call và số tiền họ bỏ vào.</li>
+          <li>Bấm một cái tên → <b>Ghi chú</b> → gõ nhận xét → <b>⌘/Ctrl+Enter</b> là vào thẳng Sheet.
+            Hoặc rê chuột vào một mốc trên chart rồi bấm <b>N</b>.</li>
+        </ol>
+        <p class="hint">
+          <b>Hai nút ⟳ khác nhau, đừng nhầm:</b> nút ⟳ trong popup/trang này chỉ <b>tải lại dữ liệu
+          từ Sheet</b> — bấm khi bạn vừa sửa hạng hay ghi chú trên Sheet. Còn muốn lấy <b>bản mới của
+          extension</b> thì phải tải code mới về, bấm ⟳ ở <code>chrome://extensions</code>, rồi
+          <b>F5 lại trang GMGN</b> (thiếu F5 là tab đang mở bị cắt khỏi extension và im luôn).
+        </p>
+      </section>
+
       <section class="card">
         <h2>1. Kết nối Sheet</h2>
         <p class="hint">
@@ -43,6 +62,11 @@
           <span class="label">SECRET (giống hệt trong Code.gs)</span>
           <input type="text" id="sheetApiSecret" placeholder="chuỗi bí mật của riêng bạn" autocomplete="off" spellcheck="false" />
           <span class="test" id="sheetApi-test"></span>
+        </label>
+        <label class="field">
+          <span class="label">Tên của bạn (ghi vào cột <code>added_by</code>)</span>
+          <input type="text" id="addedBy" placeholder="ví dụ: Tâm" autocomplete="off" />
+          <span class="hint">Hai người dùng chung Sheet thì đây là thứ duy nhất phân biệt ghi chú của ai.</span>
         </label>
         <button class="btn primary" id="sheet-ping">Thử kết nối</button>
       </section>
@@ -113,6 +137,22 @@
             <input type="number" id="staleMinutes" min="0" step="5" />
           </label>
         </div>
+      </section>
+
+      <section class="card">
+        <h2>Mời người khác dùng chung</h2>
+        <p class="hint">
+          Hai người dùng <b>chung một Sheet</b>: bạn của bạn dán <b>đúng URL Web App và SECRET này</b>,
+          <b>không</b> deploy Apps Script riêng. Mỗi người chỉ khác ô <b>Tên của bạn</b>, để Sheet ghi
+          được ai note cái gì.
+        </p>
+        <p class="hint warn">
+          ⚠ <b>SECRET là mật khẩu GHI vào Sheet.</b> Ai có nó đều ghi được. Nút dưới cố tình
+          <b>không</b> copy kèm secret — gửi nó bằng tin nhắn riêng, đừng dán vào nhóm chat hay chỗ
+          công khai.
+        </p>
+        <button class="btn primary" id="copy-invite">Copy lời mời cài đặt</button>
+        <span class="test" id="invite-test"></span>
       </section>
 
       <section class="card">
