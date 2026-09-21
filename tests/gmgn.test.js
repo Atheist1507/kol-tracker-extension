@@ -327,3 +327,21 @@ test("có mua mà không còn giữ thì là đã xả, không phải hô suông
   const one = KT.gmgn.parseThesis({ data: { items: [{ id: "x", author_handle: "a", author_id: "1", holdings_usd: 0, author_trade_usd: 500 }] } });
   assert.strictEqual(one[0].holding, "sold_all");
 });
+
+test("mốc call nhận cả epoch giây, epoch mili lẫn chuỗi ISO", () => {
+  // parseDateLoose dựng cho chuỗi ngày NGƯỜI đọc, đưa số epoch vào là ra null
+  // — mốc call biến mất mà không có lỗi nào
+  assert.strictEqual(new Date(KT.gmgn.tsFrom(1787306400)).toISOString(), "2026-08-21T10:00:00.000Z");
+  assert.strictEqual(new Date(KT.gmgn.tsFrom(1787306400000)).toISOString(), "2026-08-21T10:00:00.000Z");
+  assert.strictEqual(new Date(KT.gmgn.tsFrom("2026-08-21T10:00:00Z")).toISOString(), "2026-08-21T10:00:00.000Z");
+  assert.strictEqual(KT.gmgn.tsFrom(""), null);
+  assert.strictEqual(KT.gmgn.tsFrom("abc"), null);
+});
+
+test("author_id không phải dãy số thì KHÔNG gọi là id của X", () => {
+  // Giữ nguyên văn ở authorId, nhưng xId phải rỗng: gọi nhầm là ghi vào Sheet
+  // một link x.com/i/user/<rác>
+  const list = KT.gmgn.parseThesis({ data: { items: [{ id: "p", author_handle: "a", author_id: "abc-123" }] } });
+  assert.strictEqual(list[0].xId, "");
+  assert.strictEqual(list[0].authorId, "abc-123");
+});

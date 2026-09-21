@@ -26,6 +26,8 @@
     callers: [], // bảng X Tracker dưới chart (API community/messages)
     chartPeople: [], // người trên CHART, của token đang mở (feed fomo/thesis)
     thesisAll: [], // cả feed thesis, gồm token khác — làm sổ nhận mặt
+    mauThesisTho: null, // giá trị THÔ mấy cột quyết định của feed thesis
+    authorIdProbe: null, // author_id có ổn định không
     // Người nhặt được từ các API KHÁC của GMGN (xem noteApi). Bảng X Tracker
     // và đám avatar trên cây nến là HAI đám khác nhau — cái sau không có danh
     // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
@@ -210,10 +212,57 @@
     state.thesisAll = list;
     for (const p of list) {
       const key = KT.handleKey(p.username);
-      if (key && !state.extra.has(key)) state.extra.set(key, p);
+      if (key && !state.extra.has(key)) state.extra.set(key, Object.assign({ tuDau: "fomo/thesis" }, p));
     }
     applyThesis();
     if (isTop) chrome.runtime.sendMessage({ type: KT.MSG.THESIS, list }).catch(() => {});
+  }
+
+  /**
+   * `author_id` có ĐỔI giữa các lần gọi không?
+   *
+   * Cùng một câu hỏi đã hỏi cho `ulid`, và phải hỏi lại: `encrypted_user_id`
+   * cũng trông như một cái khoá tử tế cho tới lúc đo. Khoá bằng một thứ không
+   * ổn định là mỗi lần mở chart đẻ thêm một dòng người mới trong Sheet — âm
+   * thầm, không lỗi nào.
+   *
+   * Nhận mặt bài post bằng `id` của dòng, rồi xem author_id gắn với nó có
+   * giữ nguyên.
+   */
+  async function probeAuthorId(payload) {
+    try {
+      const data = (payload && payload.data) || payload;
+      const items = (data && data.items) || (Array.isArray(data) ? data : null);
+      if (!Array.isArray(items) || !items.length) return;
+
+      const box = (await chrome.storage.local.get(KT.STORAGE.AUTHOR))[KT.STORAGE.AUTHOR] || {
+        map: {},
+        kiem: 0,
+        lech: 0,
+        viDu: [],
+      };
+      for (const raw of items.slice(0, 40)) {
+        if (!raw || typeof raw !== "object") continue;
+        const post = String(raw.id == null ? "" : raw.id).trim();
+        const who = String(raw.author_id == null ? "" : raw.author_id).trim();
+        if (!post || !who) continue;
+        const cu = box.map[post];
+        if (cu === undefined) {
+          if (Object.keys(box.map).length < 300) box.map[post] = who;
+          continue;
+        }
+        box.kiem++;
+        if (cu !== who) {
+          box.lech++;
+          if (box.viDu.length < 3) box.viDu.push(cu + " → " + who);
+          box.map[post] = who;
+        }
+      }
+      await chrome.storage.local.set({ [KT.STORAGE.AUTHOR]: box });
+      state.authorIdProbe = { kiem: box.kiem, lech: box.lech, viDu: box.viDu, nho: Object.keys(box.map).length };
+    } catch (e) {
+      /* không phải việc sống còn */
+    }
   }
 
   function applyThesis() {
@@ -391,7 +440,9 @@
         if (overlay) overlay.reset();
         shareCallers();
       } else if (msg.kind === "thesis") {
+        state.mauThesisTho = KT.gmgn.thesisSample(msg.payload);
         takeThesis(KT.gmgn.parseThesis(msg.payload));
+        probeAuthorId(msg.payload);
       } else if (msg.kind === "api") {
         noteApi(msg.url, msg.payload);
       } else if (msg.kind === "token") {
@@ -650,7 +701,11 @@
           nguoiNgoaiBang: state.extra.size,
           nguoiTrenChart: state.chartPeople.length,
           thesisTong: state.thesisAll.length,
-          mauChart: state.chartPeople.slice(0, 3).map((p) => p.username + " id=" + (p.xId || "?") + " " + KT.fmtDateTime(p.postedTs)),
+          mauChart: state.chartPeople
+            .slice(0, 3)
+            .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " lúc " + (KT.fmtDateTime(p.postedTs) || "?")),
+          mauThesisTho: state.mauThesisTho || null,
+          authorIdOnDinh: state.authorIdProbe || null,
           mauMessage: state.mauMessage || null,
           ulidOnDinh: state.ulidProbe || null,
           // Người có trong API mà KHÔNG có trong bảng X Tracker — nếu đám trên

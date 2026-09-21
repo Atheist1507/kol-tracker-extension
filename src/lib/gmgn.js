@@ -353,6 +353,37 @@
    * ⚠ Đây là feed NHIỀU TOKEN: mỗi dòng mang `token_address` riêng. Không lọc
    * theo token đang mở là panel liệt kê người của token khác.
    */
+  /**
+   * Mốc thời gian của feed thesis có thể là chuỗi ISO, mà cũng có thể là số
+   * epoch. `parseDateLoose` không đọc được số epoch (nó dựng cho chuỗi ngày
+   * người đọc), nên đưa thẳng vào là ra null — mốc call biến mất mà không có
+   * lỗi nào.
+   */
+  function tsFrom(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const s = String(value).trim();
+    if (/^\d{9,16}$/.test(s)) {
+      const n = Number(s);
+      if (!Number.isFinite(n)) return null;
+      // Dưới 1e12 là GIÂY (1e12 mili ≈ năm 2001, không ai gửi mốc cũ hơn thế)
+      return n < 1e12 ? n * 1000 : n;
+    }
+    return KT.parseDateLoose(s);
+  }
+
+  /**
+   * Giá trị THÔ của mấy cột quyết định, để soi khi parse ra rỗng.
+   * Đoán kiểu dữ liệu rồi thấy kết quả rỗng là đúng cái bẫy đã dính hai lần.
+   */
+  function thesisSample(payload) {
+    const data = (payload && payload.data) || payload;
+    const items = (data && data.items) || (Array.isArray(data) ? data : null);
+    const first = Array.isArray(items) ? items[0] : null;
+    if (!first || typeof first !== "object") return null;
+    const show = (k) => k + "=" + JSON.stringify(first[k]) + " (" + typeof first[k] + ")";
+    return [show("author_id"), show("fomo_created_at"), show("id"), show("closed_at")];
+  }
+
   function parseThesis(payload) {
     const data = (payload && payload.data) || payload;
     const items = (data && data.items) || (Array.isArray(data) ? data : null);
@@ -376,7 +407,11 @@
       const unrealized = num(raw.unrealized_pnl_usd);
 
       out.push({
+        // `xId` CHỈ nhận dãy số — đó mới là id tài khoản X. `authorId` giữ
+        // nguyên văn dù nó là dạng gì: chưa biết GMGN đánh số kiểu nào thì
+        // đừng vứt, mà cũng đừng vội gọi nó là id của X.
         xId: /^[0-9]{5,25}$/.test(xId) ? xId : "",
+        authorId: xId,
         username: handle,
         displayName: String(raw.author_name || "").trim(),
         avatar: String(raw.author_avatar_url || "").trim(),
@@ -386,8 +421,8 @@
 
         postId: String(raw.id == null ? "" : raw.id),
         postText: String(raw.thesis || "").trim(),
-        postedAt: String(raw.fomo_created_at || "").trim(),
-        postedTs: raw.fomo_created_at ? KT.parseDateLoose(raw.fomo_created_at) : null,
+        postedAt: String(raw.fomo_created_at == null ? "" : raw.fomo_created_at).trim(),
+        postedTs: tsFrom(raw.fomo_created_at),
         likes: num(raw.like_count),
 
         tokenAddress: KT.walletKey(raw.token_address) || "",
@@ -433,6 +468,8 @@
     parseEndpoint,
     apiPath,
     parseThesis,
+    thesisSample,
+    tsFrom,
     scanPeople,
     shapeOf,
     xIdFrom: pickId,
