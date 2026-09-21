@@ -194,7 +194,7 @@
       const handle = KT.handleKey(caller.username || person.username || "");
       // ID SỐ trước đã: username đổi lúc nào cũng được, đổi xong là dòng cũ
       // trong Sheet mồ côi — im lặng, không triệu chứng. ID thì không đổi.
-      const xId = (api.xIdFor && api.xIdFor(handle)) || "";
+      const xId = caller.xId || (api.xIdFor && api.xIdFor(handle)) || "";
       if (xId) return "x:" + xId;
       return handle ? "x:" + handle : "";
     }
@@ -211,7 +211,7 @@
       if (has) return has;
       const handle = KT.handleKey(caller.username || person.username || "");
       if (!handle) return "";
-      const xId = (api.xIdFor && api.xIdFor(handle)) || "";
+      const xId = caller.xId || (api.xIdFor && api.xIdFor(handle)) || "";
       return xId ? "https://x.com/i/user/" + xId : "https://x.com/" + (caller.username || person.username);
     }
 

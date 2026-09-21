@@ -337,6 +337,87 @@
     return out;
   }
 
+  /**
+   * `/pf/api/v1/fomo/thesis/token` — NGUỒN THẬT của mấy mốc trên chart.
+   *
+   * Mười bốn vòng đi tìm, và nó nằm ngay đây từ đầu; `scanPeople` không nhặt
+   * ra vì tên cột là `author_handle` chứ không phải `username` — đúng cái bẫy
+   * "đoán tên cột rồi lấy kết quả rỗng làm bằng chứng".
+   *
+   * Nó cho đủ thứ mà đường hover không bao giờ có:
+   *   author_id        ← KHOÁ KHÔNG ĐỔI ĐƯỢC, thứ đi tìm suốt mấy vòng
+   *   fomo_created_at  ← mốc call CHÍNH XÁC, không phải "6h" làm tròn
+   *   thesis           ← nguyên văn luận điểm
+   *   holdings_usd / author_trade_usd / realized_pnl_usd / unrealized_pnl_usd
+   *
+   * ⚠ Đây là feed NHIỀU TOKEN: mỗi dòng mang `token_address` riêng. Không lọc
+   * theo token đang mở là panel liệt kê người của token khác.
+   */
+  function parseThesis(payload) {
+    const data = (payload && payload.data) || payload;
+    const items = (data && data.items) || (Array.isArray(data) ? data : null);
+    if (!Array.isArray(items)) return [];
+
+    const out = [];
+    const seen = Object.create(null);
+    for (const raw of items) {
+      if (!raw || typeof raw !== "object") continue;
+      const handle = String(raw.author_handle || "").trim().replace(/^@/, "");
+      const xId = String(raw.author_id == null ? "" : raw.author_id).trim();
+      if (!handle && !xId) continue;
+
+      const key = (xId || KT.handleKey(handle)) + "|" + String(raw.id || "");
+      if (seen[key]) continue;
+      seen[key] = true;
+
+      const holdings = num(raw.holdings_usd);
+      const traded = num(raw.author_trade_usd);
+      const realized = num(raw.realized_pnl_usd);
+      const unrealized = num(raw.unrealized_pnl_usd);
+
+      out.push({
+        xId: /^[0-9]{5,25}$/.test(xId) ? xId : "",
+        username: handle,
+        displayName: String(raw.author_name || "").trim(),
+        avatar: String(raw.author_avatar_url || "").trim(),
+        // Có id thì dùng dạng link theo id: nó đổi tên link vẫn sống.
+        twitterUrl: xId ? "https://x.com/i/user/" + xId : handle ? "https://x.com/" + handle : "",
+        wallet: "", // feed này không kèm ví
+
+        postId: String(raw.id == null ? "" : raw.id),
+        postText: String(raw.thesis || "").trim(),
+        postedAt: String(raw.fomo_created_at || "").trim(),
+        postedTs: raw.fomo_created_at ? KT.parseDateLoose(raw.fomo_created_at) : null,
+        likes: num(raw.like_count),
+
+        tokenAddress: KT.walletKey(raw.token_address) || "",
+        chain: String(raw.chain || "").trim(),
+        tokenSymbol: String(raw.token_symbol || "").trim(),
+
+        holdingUsd: holdings,
+        tradeUsd: traded,
+        pnlUsd: realized == null && unrealized == null ? null : (realized || 0) + (unrealized || 0),
+        isDev: raw.author_is_dev === true,
+
+        // ⚠ CHỈ kết luận khi có đủ SỐ. Thiếu dữ liệu mà đoán là gắn cờ đỏ oan
+        // cho người ta — "không biết" và "không mua" là hai chuyện khác nhau.
+        holding: holdingFromUsd(holdings, traded),
+        holdingLabel: HOLDING_LABELS[holdingFromUsd(holdings, traded)] || "",
+        isHoldingRedFlag: HOLDING_RED_FLAGS.indexOf(holdingFromUsd(holdings, traded)) !== -1,
+        source: "thesis",
+        tuChart: true,
+      });
+    }
+    return out;
+  }
+
+  function holdingFromUsd(holdings, traded) {
+    if (holdings == null && traded == null) return "unknown";
+    if ((traded || 0) <= 0 && (holdings || 0) <= 0) return "no_buy";
+    if ((holdings || 0) > 0) return "holding";
+    return "sold_all";
+  }
+
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
   function parseEndpoint(url) {
     const m = String(url || "").match(/\/api\/v1\/token\/([^/]+)\/([^/]+)\/community\/messages/);
@@ -351,6 +432,7 @@
     groupCallers,
     parseEndpoint,
     apiPath,
+    parseThesis,
     scanPeople,
     shapeOf,
     xIdFrom: pickId,
