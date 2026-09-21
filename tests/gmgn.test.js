@@ -314,18 +314,15 @@ test("feed NHIỀU token — mỗi dòng mang token_address riêng", () => {
   assert.deepStrictEqual(list.map((p) => p.tokenAddress), ["0xaaa", "0xbbb"]);
 });
 
-test("thiếu số thì KHÔNG kết luận giữ hay xả", () => {
-  // "không biết" và "hô mà không mua" là hai chuyện khác nhau — gắn cờ đỏ oan
-  // cho người ta là hỏng đúng thứ mình đang cố đo
+test("KHÔNG kết luận giữ hay xả, kể cả khi có đủ số", () => {
+  // Hai test cũ ở đây khoá đúng hành vi đã bị bỏ CỐ Ý: đo trên 200 người
+  // thật thì `holdings_usd > 0` đúng với 200/200, nên nhãn đó không phân
+  // loại được gì mà lại trông như đã kiểm chứng. Tiền thì vẫn giữ nguyên.
   const list = KT.gmgn.parseThesis(THESIS);
+  assert.strictEqual(list[0].holding, "unknown");
   assert.strictEqual(list[1].holding, "unknown");
-  assert.strictEqual(list[1].isHoldingRedFlag, false);
-  assert.strictEqual(list[0].holding, "holding");
-});
-
-test("có mua mà không còn giữ thì là đã xả, không phải hô suông", () => {
-  const one = KT.gmgn.parseThesis({ data: { items: [{ id: "x", author_handle: "a", author_id: "1", holdings_usd: 0, author_trade_usd: 500 }] } });
-  assert.strictEqual(one[0].holding, "sold_all");
+  assert.strictEqual(list[0].holdingUsd, 120);
+  assert.strictEqual(list[0].tradeUsd, 100);
 });
 
 test("mốc call nhận cả epoch giây, epoch mili lẫn chuỗi ISO", () => {
@@ -344,4 +341,16 @@ test("author_id không phải dãy số thì KHÔNG gọi là id của X", () =>
   const list = KT.gmgn.parseThesis({ data: { items: [{ id: "p", author_handle: "a", author_id: "abc-123" }] } });
   assert.strictEqual(list[0].xId, "");
   assert.strictEqual(list[0].authorId, "abc-123");
+});
+
+test("feed thesis KHÔNG gắn nhãn giữ/xả", () => {
+  // Đo trên 200 người thật: holdings_usd > 0 đúng với 200/200. Một nhãn đúng
+  // với tất cả mọi người thì không phân loại được gì, mà lại TRÔNG như một
+  // phát hiện đã kiểm chứng
+  const list = KT.gmgn.parseThesis({
+    data: { items: [{ id: "a", author_handle: "x", author_id: "1", holdings_usd: "8060.36", author_trade_usd: "8060.36" }] },
+  });
+  assert.strictEqual(list[0].holding, "unknown");
+  assert.strictEqual(list[0].isHoldingRedFlag, false);
+  assert.strictEqual(list[0].tradeUsd, 8060.36); // tiền thì vẫn giữ
 });

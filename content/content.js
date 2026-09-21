@@ -708,10 +708,21 @@
           nguoiNgoaiBang: state.extra.size,
           nguoiTrenChart: state.chartPeople.length,
           doiTen: state.renames.map((r) => r.tenCu + " → " + r.tenMoi),
-          phanBoHolding: state.chartPeople.reduce((acc, p) => {
-            acc[p.holding] = (acc[p.holding] || 0) + 1;
-            return acc;
-          }, {}),
+          // Feed có lọc sẵn người đã xả ra không? Ai đã chốt lãi thì
+          // realized_pnl khác 0. Nếu KHÔNG ai khác 0 thì đúng là feed chỉ
+          // chứa người còn giữ, và cái nhãn "còn giữ" vô nghĩa thật.
+          tienTrenChart: (function () {
+            const co = state.chartPeople.filter((p) => p.tradeUsd != null);
+            const daChot = state.chartPeople.filter((p) => p.pnlUsd != null && p.realizedKhac0).length;
+            const vao = co.map((p) => p.tradeUsd).sort((a, b) => a - b);
+            return {
+              coSoTien: co.length,
+              nhoNhat: vao.length ? KT.fmtUsd(vao[0]) : "-",
+              giua: vao.length ? KT.fmtUsd(vao[Math.floor(vao.length / 2)]) : "-",
+              lonNhat: vao.length ? KT.fmtUsd(vao[vao.length - 1]) : "-",
+              daChotLai: daChot,
+            };
+          })(),
           thesisTong: state.thesisAll.length,
           mauChart: state.chartPeople
             .slice(0, 3)
