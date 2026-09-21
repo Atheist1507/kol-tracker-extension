@@ -25,7 +25,36 @@ git clone git@github.com:Atheist1507/kol-tracker-extension.git
 
 Chrome → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục vừa clone.
 
-Không có bước build, không có `npm install`. Sửa code xong bấm ⟳ ở thẻ extension là xong.
+Không có bước build, không có `npm install`.
+
+### Lấy bản mới
+
+```bash
+git pull
+```
+
+rồi bấm **⟳** ở thẻ extension trong `chrome://extensions`, rồi **F5 lại trang GMGN**.
+
+⚠ Thiếu bước F5 là hỏng theo kiểu khó đoán: bấm ⟳ **cắt** bản cũ trong mọi tab
+đang mở khỏi extension ngay lập tức — tab đó không trả lời ai nữa, trông y hệt
+"extension hỏng". Phải F5 tab đó mới nạp bản mới.
+
+⚠ **Hai nút ⟳ khác nhau.** Nút ⟳ trong popup của extension chỉ **tải lại dữ
+liệu từ Sheet** (bấm khi vừa sửa hạng/ghi chú trên Sheet). Nút ⟳ ở
+`chrome://extensions` mới là **nạp lại code**.
+
+### Dùng chung với người khác
+
+Hai người dùng **chung một Sheet**: người thứ hai cài y như trên, rồi trong
+Cài đặt dán **đúng URL Web App và SECRET** của người thứ nhất — **không**
+deploy Apps Script riêng. Mỗi người chỉ khác ô **Tên của bạn** (cột
+`added_by`), để Sheet biết ghi chú nào của ai.
+
+Trang Cài đặt có nút **Copy lời mời cài đặt** soạn sẵn các bước trên.
+
+⚠ `SECRET` là **mật khẩu ghi** vào Sheet — gửi bằng tin nhắn riêng, đừng dán
+vào nhóm chat. Nút copy lời mời cố ý **không** kèm secret vì lời mời thì hay
+bị dán vào chat và nằm lại đó vĩnh viễn.
 
 ## 2. Dựng Google Sheet
 

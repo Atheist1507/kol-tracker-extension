@@ -501,3 +501,30 @@ sửa code về cũ cho test xanh.
 `tienTrenChart` trong chẩn đoán đếm xem có ai `realized_pnl != 0` không — nếu
 không một ai thì feed đúng là chỉ chứa người còn giữ, và nhãn kia vô nghĩa
 thật chứ không phải mình đọc sai cột.
+
+## Trang Options: hai lỗi im lặng chỉ lộ ra khi có người thứ hai (21/09/2026)
+
+1. **Dòng trạng thái chết từ lâu.** `renderStatus` đọc `data.kols`/`data.calls`
+   và `db.kols` — hình dạng của đường CSV CŨ. Service worker lưu
+   `{ overview, detail }`, còn `buildDb` trả `{ people, counts:{people,notes} }`,
+   nên `db.kols.filter` ném lỗi giữa chừng và dòng trạng thái đứng nguyên ở
+   "Đang kiểm tra…" mãi mãi. Không có lỗi nào hiện ra — mà đây đúng là thứ
+   người mới nhìn thấy đầu tiên.
+2. **`addedBy` không có ô nhập.** Nó nằm trong `DEFAULTS` từ đầu, `note-box`
+   vẫn ghi nó vào cột `added_by`, nhưng trang Options chưa bao giờ có ô để
+   điền → luôn rỗng. Một người dùng thì không ai để ý; hai người dùng chung
+   Sheet thì **không phân biệt được ghi chú của ai**, mà cột vẫn nằm đó trông
+   như đang hoạt động.
+
+Cả hai đều thuộc loại "chỉ sai khi có người thứ hai", nên đừng chỉ thử bằng
+máy của chính mình.
+
+### Lời mời cài đặt cố ý KHÔNG kèm SECRET
+`SECRET` là mật khẩu GHI vào Sheet, mà lời mời thì người ta dán vào chat và nó
+nằm lại đó vĩnh viễn. Nút "Copy lời mời" để một chỗ trống bắt người gửi tự
+điền, kèm câu nhắc gửi riêng.
+
+### Hai nút ⟳ khác nhau — phải nói rõ ở cả Options lẫn README
+- ⟳ trong popup/Options = **tải lại dữ liệu từ Sheet**.
+- ⟳ ở `chrome://extensions` = **nạp lại code**, và bắt buộc **F5 lại trang
+  GMGN** sau đó.

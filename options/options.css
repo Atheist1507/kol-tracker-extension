@@ -99,3 +99,14 @@ input[type="number"] { max-width: 160px; }
   vertical-align: middle;
   margin-left: 6px;
 }
+
+/* Hướng dẫn cho người mới (xem options.html) */
+.steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fg, #C9D1D9);
+}
+.steps li { margin-bottom: 4px; }
+.hint.warn { color: #E3B341; }

@@ -6,7 +6,11 @@
   "use strict";
   const KT = globalThis.KT;
 
-  const TEXT_FIELDS = ["sheetApiUrl", "sheetApiSecret", "kolsCsvUrl", "callsCsvUrl", "sheetUrl"];
+  // ⚠ `addedBy` nằm trong DEFAULTS từ đầu và note-box vẫn ghi nó vào cột
+  // `added_by`, nhưng trang này chưa bao giờ có ô nhập — nên nó luôn rỗng.
+  // Một người dùng thì không ai để ý; hai người dùng chung Sheet thì không
+  // phân biệt được ghi chú của ai, mà cột vẫn nằm đó trông như đang hoạt động.
+  const TEXT_FIELDS = ["sheetApiUrl", "sheetApiSecret", "addedBy", "kolsCsvUrl", "callsCsvUrl", "sheetUrl"];
   const NUMBER_FIELDS = ["winMultiple", "minSample", "refreshMinutes", "staleMinutes"];
   const BOOL_FIELDS = ["panelEnabled", "overlayRings", "overlayHover"];
 
@@ -163,6 +167,55 @@
     });
   });
 
+  /* ---------- mời người khác dùng chung ---------- */
+
+  const REPO = "https://github.com/Atheist1507/kol-tracker-extension";
+
+  /**
+   * ⚠ CỐ Ý không kèm SECRET.
+   *
+   * Nó là mật khẩu ghi vào Sheet, mà lời mời thì người ta dán vào chat. Để
+   * một chỗ trống bắt người gửi tự điền thì secret đi đường riêng — còn nếu
+   * copy sẵn, nó sẽ nằm lại trong lịch sử chat vĩnh viễn mà không ai nghĩ tới.
+   */
+  function inviteText(cfg) {
+    return [
+      "KOL Tracker — research caller ngay trên chart GMGN. Cài thế này:",
+      "",
+      "1. Tải code: " + REPO + " → nút Code → Download ZIP → giải nén.",
+      "   (Có git thì: git clone " + REPO + ".git)",
+      "2. Chrome → gõ chrome://extensions vào thanh địa chỉ → bật Developer mode (góc trên phải)",
+      "   → Load unpacked → chọn đúng thư mục vừa giải nén.",
+      "3. Bấm icon extension → Cài đặt, rồi điền:",
+      "   • URL Web App: " + (cfg.sheetApiUrl || "(người mời điền vào đây)"),
+      "   • SECRET: mình gửi riêng ở tin nhắn sau",
+      "   • Tên của bạn: tên bạn, để Sheet biết ghi chú nào của ai",
+      "   Bấm 'Thử kết nối' — ra chữ xanh là xong.",
+      "4. Mở một chart GMGN, bấm Alt+K.",
+      "",
+      "Lưu ý: dùng CHUNG Sheet với mình nên đừng deploy Apps Script riêng.",
+      "Muốn lấy bản mới: tải code mới về, bấm ⟳ ở chrome://extensions, rồi F5 lại trang GMGN.",
+    ].join("\n");
+  }
+
+  const inviteBtn = $("copy-invite");
+  if (inviteBtn) {
+    inviteBtn.addEventListener("click", async () => {
+      const cfg = await KT.getConfig();
+      const note = $("invite-test");
+      try {
+        await navigator.clipboard.writeText(inviteText(cfg));
+        note.className = "test ok";
+        note.textContent = cfg.sheetApiUrl
+          ? "Đã copy. Nhớ gửi SECRET bằng tin nhắn riêng."
+          : "Đã copy, nhưng chưa có URL Web App — điền ở mục 1 rồi copy lại.";
+      } catch (e) {
+        note.className = "test err";
+        note.textContent = "Không copy được: " + (e && e.message ? e.message : e);
+      }
+    });
+  }
+
   /* ---------- trạng thái dữ liệu ---------- */
 
   async function renderStatus() {
@@ -178,12 +231,17 @@
       el.textContent = "Chưa tải lần nào.";
       return;
     }
-    const db = KT.buildDb(data.kols, data.calls, cfg);
-    const ghosts = db.kols.filter((k) => k.ghost);
+    // ⚠ Đọc ĐÚNG hình dạng đang lưu: service worker ghi { overview, detail },
+    // không phải { kols, calls } của đường CSV cũ. Bản trước đọc tên cũ nên
+    // `db.kols` undefined → ném lỗi ngay giữa renderStatus, và dòng trạng
+    // thái đứng nguyên ở "Đang kiểm tra…" mãi mãi. Không có lỗi nào hiện ra,
+    // mà đây lại đúng là thứ người mới nhìn thấy đầu tiên.
+    const db = KT.buildDb(data.overview, data.detail);
+    const ghosts = db.people.filter((p) => p.ghost);
     el.className = "status";
     el.textContent =
-      `${db.counts.kols} KOL · ${db.counts.calls} call · cập nhật ${KT.timeAgo(data.syncedAt)}` +
-      (ghosts.length ? ` · ${ghosts.length} handle có call nhưng chưa có hồ sơ ở tab KOLs` : "");
+      `${db.counts.people} người · ${db.counts.notes} ghi chú · cập nhật ${KT.timeAgo(data.syncedAt)}` +
+      (ghosts.length ? ` · ${ghosts.length} người có ghi chú nhưng chưa có dòng ở tab Overview` : "");
   }
 
   $("refresh").addEventListener("click", async () => {
