@@ -63,10 +63,82 @@
     return { standalone, at, plain };
   }
 
+  /* Tuổi bài post trên thẻ chart: "6h", "75d", "13h", "2mo", "45m". */
+  /**
+   * ⚠ CHỮ THƯỜNG, cố ý không có cờ `i`.
+   *
+   * GMGN viết tuổi bài bằng chữ thường ("6h", "75d"), còn CHỮ HOA là đơn vị
+   * độ lớn: "100M" là một trăm triệu vốn hoá. Bật `i` thì "100M" thành 100
+   * PHÚT, và một mốc call hoàn toàn bịa được ghi thẳng vào Sheet — không có
+   * triệu chứng nào, mà lại đúng vào cột mày dùng để điều tra. Test khoá lại.
+   *
+   * Thà bỏ sót một mốc còn hơn bịa ra một mốc.
+   */
+  const AGE_RE = /^(\d{1,3})\s*(s|m|h|d|w|mo|y)$/;
+  const AGE_MS = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+    w: 7 * 24 * 60 * 60 * 1000,
+    mo: 30 * 24 * 60 * 60 * 1000,
+    y: 365 * 24 * 60 * 60 * 1000,
+  };
+
+  function ageToMs(chunk) {
+    const m = AGE_RE.exec(String(chunk || "").trim());
+    if (!m) return null;
+    return AGE_MS[m[2]] ? Number(m[1]) * AGE_MS[m[2]] : null;
+  }
+
+  /**
+   * Thẻ trên chart → những gì đáng giữ lại.
+   *
+   * Vì sao cần: thẻ chart nói THỜI ĐIỂM CALL — đó là lý do người ta soi chart
+   * chứ không soi bảng dưới. Mà tuổi bài ("6h") thì cứ trôi, nên phải quy ngay
+   * về mốc TUYỆT ĐỐI lúc đọc được. Để nguyên "6h" thì tuần sau đọc lại là sai
+   * một tuần, mà không có triệu chứng nào.
+   *
+   * ⚠ Mốc quy ra chỉ chính xác tới ĐƠN VỊ của nó: "6h" nghĩa là đâu đó trong
+   * khoảng một giờ, "75d" thì sai số cả ngày. So hai mốc với nhau phải nới
+   * đúng bằng `saiSoMs`, đừng so bằng dấu bằng.
+   */
+  function cardFacts(chunks, now) {
+    const list = (chunks || []).map((c) => String(c == null ? "" : c).trim());
+    const { standalone } = candidateHandles(list);
+    const handle = standalone[0] || "";
+
+    let ageMs = null;
+    let saiSoMs = null;
+    let postText = "";
+    for (const chunk of list) {
+      const ms = ageToMs(chunk);
+      if (ms !== null && ageMs === null) {
+        ageMs = ms;
+        saiSoMs = AGE_MS[AGE_RE.exec(chunk)[2]];
+        continue;
+      }
+      // Bài post là mẩu DÀI NHẤT. Tên, tuổi, nhãn ("Thesis", "Best Callout")
+      // đều ngắn; chỉ nội dung post mới dài.
+      if (chunk.length > postText.length && chunk.length > 20 && chunk.indexOf("@") !== 0) postText = chunk;
+    }
+
+    const moc = now || Date.now();
+    return {
+      handle,
+      postText,
+      ageMs,
+      saiSoMs,
+      postedTs: ageMs === null ? null : moc - ageMs,
+    };
+  }
+
   KT.candidateHandles = candidateHandles;
+  KT.cardFacts = cardFacts;
+  KT.ageToMs = ageToMs;
   KT.TOOLTIP_MAX_CHUNK_LEN = MAX_CHUNK_LEN;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { candidateHandles, MAX_CHUNK_LEN };
+    module.exports = { candidateHandles, cardFacts, ageToMs, MAX_CHUNK_LEN };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);

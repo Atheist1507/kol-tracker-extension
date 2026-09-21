@@ -32,7 +32,17 @@
    */
   const ANY_API_RE = /\/api\//;
   const MAX_BYTES = 800000;
-  const PERSON_HINT_RE = /"(username|screen_name|twitter_username|twitter_screen_name|handle)"/;
+  const PERSON_HINT_RE = /"(username|user_name|screen_name|twitter_username|twitter_screen_name|handle|nickname|author|twitter|profile_image_url|avatar_url)"/;
+  /**
+   * Endpoint NGHI CAN: cứ gửi nguyên văn, bỏ qua bộ lọc mùi người.
+   *
+   * ⚠ Bộ lọc kia đoán trước tên cột. Đo 21/09/2026: `/pf/api/v1/fomo/thesis/
+   * token` — cái tên đúng nghĩa đen là nguồn của thẻ "Thesis" trên chart — bị
+   * loại vì trong đó không có chữ "username". Loại xong thì `nguoi: 0`, trông
+   * y hệt "endpoint này không có ai". Đoán tên cột rồi lấy kết quả rỗng làm
+   * bằng chứng là tự bịt mắt mình.
+   */
+  const SUSPECT_RE = /thesis|fomo|callout|callback|social|community|tweet|twitter|kol|caller/i;
 
   if (window.__KT_MAIN_WORLD__) return;
   window.__KT_MAIN_WORLD__ = true;
@@ -68,15 +78,21 @@
     // Endpoint lạ: báo tên nó ra dù không đọc được gì. Biết "có endpoint này
     // mà rỗng người" khác hẳn với không biết endpoint đó tồn tại.
     const body = String(text || "");
-    if (body.length > MAX_BYTES || !PERSON_HINT_RE.test(body)) {
-      send("api", u, null);
+    if (body.length > MAX_BYTES) {
+      // Nói RÕ vì sao bỏ qua. "Bỏ vì quá to" và "bỏ vì không thấy người" là
+      // hai chuyện khác hẳn, mà trong sổ chẩn đoán thì trông giống hệt nhau.
+      send("api", u + "#qua-to-" + body.length, null);
+      return;
+    }
+    if (!SUSPECT_RE.test(u) && !PERSON_HINT_RE.test(body)) {
+      send("api", u + "#khong-thay-nguoi", null);
       return;
     }
     let json;
     try {
       json = JSON.parse(body);
     } catch (e) {
-      send("api", u, null);
+      send("api", u + "#khong-phai-json", null);
       return;
     }
     send("api", u, json);
