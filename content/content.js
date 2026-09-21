@@ -23,7 +23,9 @@
     cfg: KT.withDefaults(null),
     data: null,
     db: null,
-    callers: [], // người đang hiện trên chart (từ API GMGN)
+    callers: [], // bảng X Tracker dưới chart (API community/messages)
+    chartPeople: [], // người trên CHART, của token đang mở (feed fomo/thesis)
+    thesisAll: [], // cả feed thesis, gồm token khác — làm sổ nhận mặt
     // Người nhặt được từ các API KHÁC của GMGN (xem noteApi). Bảng X Tracker
     // và đám avatar trên cây nến là HAI đám khác nhau — cái sau không có danh
     // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
@@ -48,7 +50,10 @@
     if (!ref) return null;
     const key = KT.handleKey(ref.username);
     const wallet = KT.walletKey(ref.wallet);
+    // Đám CHART đứng trước: đó là đám đáng điều tra, và hồ sơ của nó đầy đủ
+    // hơn (có author_id, có mốc call chính xác).
     const caller =
+      state.chartPeople.find((c) => key && KT.handleKey(c.username) === key) ||
       state.callers.find((c) => (wallet && c.wallet === wallet) || (key && KT.handleKey(c.username) === key)) ||
       findExtra(key, wallet) ||
       null;
@@ -189,6 +194,34 @@
     } catch (e) {
       /* storage đầy hoặc hình dạng lạ — không phải việc sống còn */
     }
+  }
+
+  /**
+   * Đám người trên CHART, từ feed thesis.
+   *
+   * ⚠ Feed này NHIỀU TOKEN — mỗi dòng mang `token_address` riêng. Lọc theo
+   * token đang mở, nếu không panel liệt kê người của token khác.
+   *
+   * Giữ cả phần ngoài token này làm sổ nhận mặt: gặp lại một tay cầm ở chart
+   * khác thì vẫn tra ra `author_id`, và `author_id` mới là thứ không đổi được.
+   */
+  function takeThesis(list) {
+    if (!list || !list.length) return;
+    state.thesisAll = list;
+    for (const p of list) {
+      const key = KT.handleKey(p.username);
+      if (key && !state.extra.has(key)) state.extra.set(key, p);
+    }
+    applyThesis();
+    if (isTop) chrome.runtime.sendMessage({ type: KT.MSG.THESIS, list }).catch(() => {});
+  }
+
+  function applyThesis() {
+    const addr = KT.walletKey((state.token && state.token.address) || "");
+    const here = addr ? state.thesisAll.filter((p) => p.tokenAddress === addr) : state.thesisAll;
+    state.chartPeople = here;
+    if (panel) panel.update();
+    if (overlay) overlay.reset();
   }
 
   /** ID số của tài khoản X, nếu API nào đó của GMGN có nhắc tới người này. */
@@ -357,6 +390,8 @@
         if (panel) panel.update();
         if (overlay) overlay.reset();
         shareCallers();
+      } else if (msg.kind === "thesis") {
+        takeThesis(KT.gmgn.parseThesis(msg.payload));
       } else if (msg.kind === "api") {
         noteApi(msg.url, msg.payload);
       } else if (msg.kind === "token") {
@@ -368,6 +403,9 @@
             name: first.name,
             address: KT.walletKey(first.address),
           });
+          // Feed thesis có thể về TRƯỚC khi biết token đang mở là cái nào —
+          // lúc đó bộ lọc theo token chưa chạy được. Lọc lại.
+          if (state.thesisAll.length) applyThesis();
           if (panel) panel.update();
         }
       }
@@ -554,6 +592,16 @@
       setTimeout(sayHello, 1200); // chờ quét xong rồi hãy khai lại số liệu
       return;
     }
+    if (msg.type === KT.MSG.THESIS) {
+      if (isTop) return; // chính mình vừa gửi đi
+      state.thesisAll = msg.list || [];
+      for (const p of state.thesisAll) {
+        const key = KT.handleKey(p.username);
+        if (key && !state.extra.has(key)) state.extra.set(key, p);
+      }
+      applyThesis();
+      return;
+    }
     if (msg.type === KT.MSG.API) {
       // Chỉ GỘP, không chia lại: tin này đã đi tới mọi frame rồi, chia tiếp là
       // vòng lặp. (addExtra trả false khi không có ai mới, nhưng đừng dựa vào
@@ -600,6 +648,9 @@
           // ra endpoint nuôi chúng.
           apiLog: state.apiLog.slice(0, 40),
           nguoiNgoaiBang: state.extra.size,
+          nguoiTrenChart: state.chartPeople.length,
+          thesisTong: state.thesisAll.length,
+          mauChart: state.chartPeople.slice(0, 3).map((p) => p.username + " id=" + (p.xId || "?") + " " + KT.fmtDateTime(p.postedTs)),
           mauMessage: state.mauMessage || null,
           ulidOnDinh: state.ulidProbe || null,
           // Người có trong API mà KHÔNG có trong bảng X Tracker — nếu đám trên

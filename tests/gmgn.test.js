@@ -272,3 +272,58 @@ test("ID không phải dãy số thì bỏ, đừng lấy bừa làm khoá", () 
   const people = KT.gmgn.scanPeople({ data: [{ username: "Shea", user_id: "abc-def" }] });
   assert.strictEqual(people[0].xId, "");
 });
+
+/* ---------- feed thesis: nguồn thật của mấy mốc trên chart ---------- */
+
+const THESIS = {
+  code: 0,
+  data: {
+    items: [
+      {
+        id: "t1", chain: "robinhood", token_address: "0xAAA", token_symbol: "CASHCAT",
+        author_id: "1445867362", author_handle: "@PappaJimss", author_name: "Papa Jim",
+        thesis: "nr1 coin on chain", like_count: 3,
+        holdings_usd: 120, author_trade_usd: 100, realized_pnl_usd: 5, unrealized_pnl_usd: 2,
+        fomo_created_at: "2026-08-21T10:00:00Z", author_avatar_url: "https://gmgn.ai/a.jpg",
+      },
+      {
+        id: "t2", chain: "sol", token_address: "0xBBB", token_symbol: "OTHER",
+        author_id: "999", author_handle: "someone_else", thesis: "khác token",
+        fomo_created_at: "2026-08-22T10:00:00Z",
+      },
+    ],
+  },
+};
+
+test("thesis cho ra author_id — khoá không đổi được", () => {
+  const list = KT.gmgn.parseThesis(THESIS);
+  assert.strictEqual(list[0].xId, "1445867362");
+  assert.strictEqual(list[0].username, "PappaJimss"); // bỏ dấu @ ở đầu
+  assert.strictEqual(list[0].twitterUrl, "https://x.com/i/user/1445867362");
+});
+
+test("mốc call lấy từ fomo_created_at, không phải tuổi làm tròn trên thẻ", () => {
+  const list = KT.gmgn.parseThesis(THESIS);
+  assert.strictEqual(new Date(list[0].postedTs).toISOString(), "2026-08-21T10:00:00.000Z");
+  assert.strictEqual(list[0].postText, "nr1 coin on chain");
+});
+
+test("feed NHIỀU token — mỗi dòng mang token_address riêng", () => {
+  // Không lọc theo token đang mở là panel liệt kê người của token khác
+  const list = KT.gmgn.parseThesis(THESIS);
+  assert.deepStrictEqual(list.map((p) => p.tokenAddress), ["0xaaa", "0xbbb"]);
+});
+
+test("thiếu số thì KHÔNG kết luận giữ hay xả", () => {
+  // "không biết" và "hô mà không mua" là hai chuyện khác nhau — gắn cờ đỏ oan
+  // cho người ta là hỏng đúng thứ mình đang cố đo
+  const list = KT.gmgn.parseThesis(THESIS);
+  assert.strictEqual(list[1].holding, "unknown");
+  assert.strictEqual(list[1].isHoldingRedFlag, false);
+  assert.strictEqual(list[0].holding, "holding");
+});
+
+test("có mua mà không còn giữ thì là đã xả, không phải hô suông", () => {
+  const one = KT.gmgn.parseThesis({ data: { items: [{ id: "x", author_handle: "a", author_id: "1", holdings_usd: 0, author_trade_usd: 500 }] } });
+  assert.strictEqual(one[0].holding, "sold_all");
+});

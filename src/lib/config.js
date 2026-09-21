@@ -44,6 +44,7 @@
     FRAME_HELLO: "kt:frameHello", // mỗi frame tự khai báo, để Chẩn đoán thấy được
     POINTER: "kt:pointer", // frame chart → SW → frame trên cùng: chuột đang ở đâu
     FRAMES: "kt:frames", // popup hỏi SW: content script đã vào được những frame nào
+    THESIS: "kt:thesis", // frame trên cùng → SW → mọi frame: đám người trên chart
     API: "kt:api", // frame nghe được người trong API lạ → SW → mọi frame
   };
 

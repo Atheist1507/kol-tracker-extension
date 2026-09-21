@@ -379,3 +379,38 @@ Giờ: endpoint khớp `SUSPECT_RE` thì gửi nguyên văn bất kể bộ lọ
 bỏ qua đều phải NÓI LÝ DO (`#qua-to-N` / `#khong-thay-nguoi` / `#khong-phai-json`).
 `scanPeople` về tay không thì ghi `hinhDang` (chỉ TÊN cột, không lấy giá trị —
 giá trị là nội dung post của người ta).
+
+## Nguồn thật của mấy mốc trên chart: `/pf/api/v1/fomo/thesis/token` (21/09/2026)
+
+Mười bốn vòng đi tìm, và nó nằm ngay trong `apiLog` từ đầu — báo `nguoi: 0`.
+Không phải vì trong đó không có ai: `scanPeople` đòi cột tên `username`, còn
+feed này đặt tên là **`author_handle`**. Đoán tên cột, rồi lấy chính kết quả
+rỗng do mình đoán sai làm bằng chứng "endpoint này trống".
+
+`data.items` (200 dòng) mang đủ thứ mà đường hover không bao giờ có:
+
+| Cột | Là gì |
+|---|---|
+| `author_id` | **khoá KHÔNG đổi được** — thứ đi tìm suốt mấy vòng |
+| `fomo_created_at` | mốc call CHÍNH XÁC, không phải `"6h"` làm tròn |
+| `thesis` | nguyên văn luận điểm |
+| `holdings_usd` / `author_trade_usd` / `realized_pnl_usd` / `unrealized_pnl_usd` | nó có bỏ tiền thật không |
+| `author_avatar_url`, `author_name`, `author_is_dev`, `like_count` | phần còn lại |
+
+`KT.gmgn.parseThesis` đọc nó. Ba chỗ dễ sai, đều có test khoá:
+
+1. ⚠ **Feed NHIỀU TOKEN** — mỗi dòng mang `token_address` riêng. Không lọc
+   theo token đang mở là panel liệt kê người của token khác. Phần ngoài token
+   vẫn giữ (`state.thesisAll`) làm sổ nhận mặt: gặp lại tay cầm đó ở chart
+   khác vẫn tra ra `author_id`.
+2. ⚠ Feed có thể về **TRƯỚC** khi biết token đang mở là cái nào → `applyThesis()`
+   phải chạy lại khi `mutil_window_token_info` về.
+3. ⚠ Chỉ kết luận giữ/xả **khi có đủ SỐ**. Thiếu dữ liệu mà đoán là gắn cờ đỏ
+   oan — "không biết" và "hô mà không mua" là hai chuyện khác nhau.
+
+Panel ưu tiên `state.chartPeople` hơn `state.callers`: chart nói THỜI ĐIỂM
+CALL, bảng X Tracker dưới trang thì không. **Không gộp hai đám vào một danh
+sách** — gộp thì không biết mình đang nhìn ai.
+
+`ulid` đã đo là ổn định (`kiem: 31, lech: 0`), nhưng giờ không cần tới nữa:
+`author_id` mạnh hơn hẳn.

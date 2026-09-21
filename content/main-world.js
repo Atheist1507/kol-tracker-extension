@@ -19,6 +19,7 @@
   const TAG = "kol-tracker";
   const MESSAGES_RE = /\/api\/v1\/token\/([^/?#]+)\/([^/?#]+)\/community\/messages/;
   const TOKEN_INFO_RE = /\/api\/v1\/mutil_window_token_info/;
+  const THESIS_RE = /\/fomo\/thesis\//; // nguồn thật của mấy mốc trên chart
   /**
    * MỌI API của GMGN, không chỉ hai cái trên.
    *
@@ -57,12 +58,21 @@
 
   function watched(url) {
     const u = String(url || "");
-    return MESSAGES_RE.test(u) || TOKEN_INFO_RE.test(u) || ANY_API_RE.test(u);
+    return MESSAGES_RE.test(u) || TOKEN_INFO_RE.test(u) || THESIS_RE.test(u) || ANY_API_RE.test(u);
   }
 
   function inspect(url, text) {
     const u = String(url || "");
     if (!watched(u)) return;
+
+    if (THESIS_RE.test(u)) {
+      try {
+        send("thesis", u, JSON.parse(text));
+      } catch (e) {
+        send("api", u + "#khong-phai-json", null);
+      }
+      return;
+    }
 
     if (MESSAGES_RE.test(u) || TOKEN_INFO_RE.test(u)) {
       let json;

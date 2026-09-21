@@ -150,7 +150,12 @@
 
     /** Khối "ai đang trên chart này" — phần đáng giá nhất của panel. */
     function callersHtml() {
-      const { callers, token } = api.getState();
+      const st = api.getState();
+      const token = st.token;
+      // Đám trên CHART là đám đáng điều tra (chart nói THỜI ĐIỂM CALL, bảng
+      // dưới thì không). Có nó thì dùng nó; gộp hai đám vào một danh sách là
+      // không phân biệt được mình đang nhìn ai.
+      const callers = st.chartPeople.length ? st.chartPeople : st.callers;
       if (!callers.length) return "";
 
       let known = 0;
@@ -168,9 +173,10 @@
         .join("");
 
       const label = token && token.symbol ? "$" + token.symbol : "token này";
+      const tuChart = callers.length && callers[0].tuChart;
       const posts = callers.reduce((n, c) => n + (c.postCount || 1), 0);
       const bits = [
-        `${callers.length} người đã post về ${label}` +
+        `${callers.length} người ${tuChart ? "call trên chart" : "đã post về"} ${label}` +
           (posts > callers.length ? ` (${posts} bài)` : ""),
       ];
       if (known) bits.push(`${known} đã có hồ sơ`);
@@ -318,7 +324,8 @@
         const key = callerRow.dataset.caller;
         const caller = api
           .getState()
-          .callers.find((c) => (c.postId || c.wallet) === key);
+          .chartPeople.concat(api.getState().callers)
+          .find((c) => (c.postId || c.wallet) === key);
         if (caller) renderDetail(caller);
         return;
       }

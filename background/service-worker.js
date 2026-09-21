@@ -439,6 +439,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     testUrl(msg.url).then(sendResponse);
     return true;
   }
+  if (msg.type === KT.MSG.THESIS) {
+    relay(sender, msg); // mọi frame trong tab
+    return;
+  }
   if (msg.type === KT.MSG.CALLERS) {
     relay(sender, msg); // không nêu frameId = mọi frame trong tab
     return;
