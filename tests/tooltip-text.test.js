@@ -62,3 +62,42 @@ test("dấu @ trơ trọi mà mẩu sau không phải tên thì không ghép b�
   const out = KT.candidateHandles(["@", "câu văn dài có dấu cách"]);
   assert.deepStrictEqual(out.standalone, []);
 });
+
+/* ---------- cardFacts: thời điểm call trên thẻ chart ---------- */
+
+const MOC = Date.parse("2026-09-21T10:04:00Z");
+
+test("tuổi bài trên thẻ quy về mốc TUYỆT ĐỐI ngay lúc đọc", () => {
+  // Để nguyên "6h" thì tuần sau đọc lại là sai một tuần, không triệu chứng nào
+  const f = KT.cardFacts(["Soko", "Thesis", "6h", "@", "soko_eth", "CAT leader will reign supreme"], MOC);
+  assert.strictEqual(f.handle, "soko_eth");
+  assert.strictEqual(new Date(f.postedTs).toISOString(), "2026-09-21T04:04:00.000Z");
+  assert.strictEqual(f.saiSoMs, 3600000); // "6h" chỉ chính xác tới GIỜ
+});
+
+test("bài post là mẩu dài nhất, không phải nhãn hay tên", () => {
+  const f = KT.cardFacts(["Manifesto", "Best Callout", "Yeon", "@", "yeon__", "75d", "The most valuable cat with the clearest narrative."], MOC);
+  assert.strictEqual(f.postText, "The most valuable cat with the clearest narrative.");
+  assert.strictEqual(f.saiSoMs, 86400000); // "75d" sai số cả NGÀY
+});
+
+test("thẻ không có tuổi thì trả null, KHÔNG lấy giờ hiện tại", () => {
+  // Lấy bừa now() là ghi vào Sheet một mốc call hoàn toàn bịa
+  const f = KT.cardFacts(["Ai Đó", "@", "ai_do", "câu gì đó dài hơn hai mươi ký tự"], MOC);
+  assert.strictEqual(f.postedTs, null);
+  assert.strictEqual(f.ageMs, null);
+});
+
+test("ageToMs không nuốt chuỗi lạ", () => {
+  assert.strictEqual(KT.ageToMs("6h"), 6 * 3600000);
+  assert.strictEqual(KT.ageToMs("2mo"), 2 * 30 * 86400000);
+  assert.strictEqual(KT.ageToMs("100M"), null); // "100M" là vốn hoá, không phải tuổi
+  assert.strictEqual(KT.ageToMs("abc"), null);
+});
+
+test('"100M" là VỐN HOÁ, không phải 100 phút', () => {
+  // Bật cờ /i là một mốc call bịa được ghi thẳng vào Sheet, không triệu chứng
+  assert.strictEqual(KT.ageToMs("100M"), null);
+  assert.strictEqual(KT.ageToMs("2B"), null);
+  assert.strictEqual(KT.ageToMs("6h"), 6 * 3600000);
+});

@@ -343,3 +343,39 @@ nó đổi mỗi lần gọi. Nên `probeUlid` nhận mặt bài post bằng th�
 ulid (ví + giờ post), rồi đếm xem ulid gắn với nó có giữ nguyên qua các lần gọi
 và qua cả lần F5 sau (lưu ở `chrome.storage.local`, khoá `ulidProbe`).
 `lech > 0` là dấu chấm hết cho leg số 3 — đừng xây gì lên trên nó nữa.
+
+## Đám trên CHART mới là mục tiêu (21/09/2026)
+
+Chủ máy chốt: thứ đáng điều tra là người trên chart, **vì chart nói THỜI ĐIỂM
+CALL** — bảng X Tracker dưới trang không nói. Mọi ưu tiên xoay theo đó.
+
+Và điều đó đảo ngược đánh giá ở mục trên: tao từng bảo người trên chart "chỉ
+có tên + nội dung post, yếu". Sai. Thẻ chart còn có **tuổi bài** ("6h", "75d"),
+quy ra là mốc call tuyệt đối. Nên dấu của một người trên chart là:
+
+> **(token, nội dung post, mốc call)**
+
+Bộ ba đó **không dính gì tới tên lẫn ví** — nó là một việc ĐÃ XẢY RA, nên sống
+qua cả đổi tên lẫn đổi ví. Đó là dấu bền nhất trong cả hệ, không phải yếu nhất.
+
+`KT.cardFacts(chunks, now)` đọc bộ ba đó ra, và note-box ghi thẳng vào hai cột
+`post_text` + `posted_at` đã có sẵn — **không phải đụng Code.gs**.
+
+⚠ Quy về mốc TUYỆT ĐỐI ngay lúc đọc. Để nguyên "6h" thì tuần sau đọc lại là
+sai một tuần, không triệu chứng nào.
+
+⚠ Mốc chỉ chính xác tới ĐƠN VỊ của nó — "6h" là đâu đó trong một giờ, "75d"
+sai số cả ngày. So hai mốc phải nới đúng bằng `saiSoMs`, đừng so bằng dấu bằng.
+
+⚠⚠ `AGE_RE` **không có cờ `i`**, cố ý: chữ thường là tuổi bài, CHỮ HOA là đơn
+vị độ lớn. Bật `i` thì `"100M"` (vốn hoá) thành 100 PHÚT và một mốc call bịa
+được ghi thẳng vào cột mày dùng để điều tra. Có test khoá lại.
+
+### Đừng đoán tên cột rồi lấy kết quả rỗng làm bằng chứng
+`/pf/api/v1/fomo/thesis/token` — tên nó đúng nghĩa đen là nguồn của thẻ
+"Thesis" trên chart — bị bộ lọc "mùi người" loại vì trong đó không có chữ
+`"username"`. Loại xong thì `nguoi: 0`, trông y hệt "endpoint này không có ai".
+Giờ: endpoint khớp `SUSPECT_RE` thì gửi nguyên văn bất kể bộ lọc, và mọi lần
+bỏ qua đều phải NÓI LÝ DO (`#qua-to-N` / `#khong-thay-nguoi` / `#khong-phai-json`).
+`scanPeople` về tay không thì ghi `hinhDang` (chỉ TÊN cột, không lấy giá trị —
+giá trị là nội dung post của người ta).

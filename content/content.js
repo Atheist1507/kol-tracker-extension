@@ -108,7 +108,12 @@
     if (!payload) return;
 
     const people = KT.gmgn.scanPeople(payload);
-    if (!people.length) return;
+    if (!people.length) {
+      // Đọc được JSON mà không nhặt ra ai: ghi lại HÌNH DẠNG để biết mình
+      // đang bỏ sót vì tên cột lạ, hay vì trong đó thật sự không có người.
+      if (!row.hinhDang) row.hinhDang = KT.gmgn.shapeOf(payload);
+      return;
+    }
     row.nguoi = Math.max(row.nguoi, people.length);
     for (const p of people) {
       if (row.ten.length < 4 && row.ten.indexOf(p.username) < 0) row.ten.push(p.username);
@@ -196,7 +201,7 @@
   function ghostHit(ref) {
     if (!ref || !ref.username) return null;
     return {
-      caller: null,
+      caller: ref.postText || ref.postedTs ? { username: ref.username, postText: ref.postText, postedTs: ref.postedTs, tuChart: true } : null,
       person: KT.personFromCaller({ username: ref.username, wallet: ref.wallet || "" }),
       known: false,
       renamedFrom: "",
@@ -258,7 +263,15 @@
         chrome.runtime
           .sendMessage({
             type: KT.MSG.NOTE_FOR,
-            ref: { wallet: hit.person && hit.person.wallet, username: hit.person && hit.person.username },
+            ref: {
+              wallet: hit.person && hit.person.wallet,
+              username: hit.person && hit.person.username,
+              // Thẻ chart chỉ sống lúc đang hover, mà hover thì ở frame NÀY.
+              // Không gửi kèm thì frame trên cùng phải đọc lại từ đầu — lúc
+              // đó thẻ có thể đã biến mất, và mốc call mất theo.
+              postText: hit.caller && hit.caller.postText,
+              postedTs: hit.caller && hit.caller.postedTs,
+            },
           })
           .catch(() => {});
         return;

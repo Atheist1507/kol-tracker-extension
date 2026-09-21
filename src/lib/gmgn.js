@@ -313,6 +313,30 @@
     return out;
   }
 
+  /**
+   * Hình dạng gọn của một JSON lạ: tên cột ở vài tầng đầu.
+   *
+   * Dùng khi `scanPeople` về tay không. "Không nhặt ra ai" có hai nghĩa rất
+   * khác nhau — trong đó không có người, hay có người mà tên cột lạ nên mình
+   * không nhận ra — và không nhìn hình dạng thì hai cái đó y hệt nhau.
+   * Chỉ lấy TÊN cột, không lấy giá trị: giá trị là nội dung post của người ta.
+   */
+  function shapeOf(payload, depth) {
+    const d = depth || 0;
+    if (d > 3 || !payload || typeof payload !== "object") return null;
+    if (Array.isArray(payload)) {
+      return payload.length ? ["[" + payload.length + "]", shapeOf(payload[0], d + 1)] : ["[0]"];
+    }
+    const keys = Object.keys(payload).slice(0, 25);
+    if (d >= 2) return keys;
+    const out = {};
+    for (const k of keys) {
+      const v = payload[k];
+      out[k] = v && typeof v === "object" ? shapeOf(v, d + 1) : typeof v;
+    }
+    return out;
+  }
+
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
   function parseEndpoint(url) {
     const m = String(url || "").match(/\/api\/v1\/token\/([^/]+)\/([^/]+)\/community\/messages/);
@@ -328,6 +352,7 @@
     parseEndpoint,
     apiPath,
     scanPeople,
+    shapeOf,
     xIdFrom: pickId,
     HOLDING_LABELS,
     HOLDING_RED_FLAGS,

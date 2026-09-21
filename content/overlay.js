@@ -362,8 +362,18 @@
         const name = standalone[0];
         if (KT.handleKey(name).length >= 2) {
           if (!quiet) rememberTooltip(el, chunks, name, true);
+          // Giữ lại THỜI ĐIỂM CALL và nội dung post: đó là thứ duy nhất trên
+          // thẻ chart sống qua được phép đổi tên, và cũng đúng là thứ khiến
+          // người ta soi chart thay vì soi bảng dưới.
+          const facts = KT.cardFacts(chunks);
           return {
-            caller: null,
+            caller: {
+              username: name,
+              postText: facts.postText,
+              postedTs: facts.postedTs,
+              saiSoMs: facts.saiSoMs,
+              tuChart: true,
+            },
             person: KT.personFromCaller({ username: name }),
             known: false,
             renamedFrom: "",
