@@ -134,3 +134,11 @@ test("chuỗi từ Sheet và rác thì không làm vỡ dòng", () => {
   assert.strictEqual(KT.fmtMultiple("chưa rõ"), "");
   assert.strictEqual(KT.fmtMultiple(""), "");
 });
+
+test("fmtUsd rút gọn cho vừa một hàng hẹp", () => {
+  assert.strictEqual(KT.fmtUsd(8060.36), "$8.1K");
+  assert.strictEqual(KT.fmtUsd(1250000), "$1.3M");
+  assert.strictEqual(KT.fmtUsd(950), "$950");
+  assert.strictEqual(KT.fmtUsd(-3400), "-$3.4K");
+  assert.strictEqual(KT.fmtUsd("hỏng"), "");
+});

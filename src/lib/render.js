@@ -135,6 +135,18 @@
    * Một người đang hiện trên chart. `caller` là message đã chuẩn hoá từ API,
    * `person` là hồ sơ trong Sheet (có thể null = người lạ).
    */
+  /** 8060.36 → "$8.1K". Số dài ngoằng trong một hàng hẹp thì không ai đọc. */
+  function fmtUsd(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "";
+    const abs = Math.abs(n);
+    const dau = n < 0 ? "-$" : "$";
+    if (abs >= 1e9) return dau + trimZeros((abs / 1e9).toFixed(1)) + "B";
+    if (abs >= 1e6) return dau + trimZeros((abs / 1e6).toFixed(1)) + "M";
+    if (abs >= 1e3) return dau + trimZeros((abs / 1e3).toFixed(1)) + "K";
+    return dau + trimZeros(abs.toFixed(abs < 10 ? 2 : 0));
+  }
+
   function callerRow(caller, person) {
     const known = !!person;
     const bits = [];
@@ -142,6 +154,10 @@
     if (caller.postCount > 1) bits.push("hô " + caller.postCount + " lần");
     if (caller.followers != null) bits.push(caller.followers + " follower");
     if (caller.postedTs) bits.push(timeAgo(caller.postedTs));
+    // Tiền là số GMGN đưa thẳng, không phải mình diễn giải — và nó PHÂN LOẠI
+    // được, khác hẳn cái nhãn "còn giữ" đúng với cả 200 người.
+    if (caller.tradeUsd != null) bits.push("vào " + fmtUsd(caller.tradeUsd));
+    if (caller.pnlUsd != null && caller.tuChart) bits.push("lãi " + fmtUsd(caller.pnlUsd));
     const postedFull = KT.fmtDateTime(caller.postedTs || caller.postedAt);
 
     const flag = person && person.redFlags ? ' <span style="color:#F85149" title="có cờ đỏ">⚑</span>' : "";
@@ -271,6 +287,7 @@
   KT.shortWallet = shortWallet;
   KT.timeAgo = timeAgo;
   KT.fmtMultiple = fmtMultiple;
+  KT.fmtUsd = fmtUsd;
   KT.render = {
     personRow,
     resultsHtml,

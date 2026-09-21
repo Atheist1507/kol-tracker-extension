@@ -444,12 +444,23 @@
         tradeUsd: traded,
         pnlUsd: realized == null && unrealized == null ? null : (realized || 0) + (unrealized || 0),
         isDev: raw.author_is_dev === true,
+        // Có ai chốt lãi chưa? Dùng để biết feed này có lọc sẵn người đã xả
+        // ra không — chứ KHÔNG dùng để gắn nhãn cho từng người.
+        realizedKhac0: realized != null && realized !== 0,
 
-        // ⚠ CHỈ kết luận khi có đủ SỐ. Thiếu dữ liệu mà đoán là gắn cờ đỏ oan
-        // cho người ta — "không biết" và "không mua" là hai chuyện khác nhau.
-        holding: holdingFromUsd(holdings, traded),
-        holdingLabel: HOLDING_LABELS[holdingFromUsd(holdings, traded)] || "",
-        isHoldingRedFlag: HOLDING_RED_FLAGS.indexOf(holdingFromUsd(holdings, traded)) !== -1,
+        // ⚠⚠ KHÔNG gán nhãn giữ/xả cho feed này. Đo trên 200 người thật:
+        // `holdings_usd > 0` đúng với **200/200**. Một nhãn đúng với tất cả
+        // mọi người thì không phân loại được gì — mà tệ hơn, nó TRÔNG như
+        // một phát hiện, nên người đọc tưởng đã kiểm chứng. Đúng vết xe bản
+        // đầu gắn cờ đỏ cho 46/50 người, chỉ lật ngược lại.
+        //
+        // Chưa biết `holdings_usd` là "đang giữ bây giờ" hay "giá trị lúc
+        // call", cũng chưa biết feed có lọc sẵn người đã xả ra không. Tiền
+        // thì là số GMGN đưa thẳng, không phải tao diễn giải — nên hiện tiền,
+        // đừng hiện nhãn.
+        holding: "unknown",
+        holdingLabel: "",
+        isHoldingRedFlag: false,
         source: "thesis",
         tuChart: true,
       });
@@ -457,12 +468,6 @@
     return out;
   }
 
-  function holdingFromUsd(holdings, traded) {
-    if (holdings == null && traded == null) return "unknown";
-    if ((traded || 0) <= 0 && (holdings || 0) <= 0) return "no_buy";
-    if ((holdings || 0) > 0) return "holding";
-    return "sold_all";
-  }
 
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
   function parseEndpoint(url) {

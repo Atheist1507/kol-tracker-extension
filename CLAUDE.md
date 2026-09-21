@@ -477,3 +477,27 @@ test khoá lại, đừng đảo thứ tự đó.
 ⚠ `findRenames` phải chạy lại khi **Sheet** tải xong, không chỉ khi feed về:
 người đổi tên chỉ lộ ra khi có CẢ hồ sơ cũ lẫn danh sách đang hiện, mà hai
 thứ đó không về cùng lúc.
+
+## Nhãn đúng với 200/200 người thì KHÔNG phải phát hiện (21/09/2026)
+
+`phanBoHolding` đo trên feed thật: `{holding: 200}`. Cả 200 người đều
+"còn giữ", vì `holdings_usd > 0` đúng với tất cả.
+
+Một nhãn đúng với mọi người thì không phân loại được gì — mà tệ hơn, nó
+**trông như** một phát hiện đã kiểm chứng, nên người đọc tin vào nó. Đây đúng
+là vết xe của bản đầu (gắn cờ đỏ cho 46/50 người), chỉ lật ngược lại.
+
+Nên feed thesis **không gán nhãn giữ/xả**: `holding: "unknown"`, không cờ đỏ.
+Chưa biết `holdings_usd` là "đang giữ bây giờ" hay "giá trị lúc call", cũng
+chưa biết feed có lọc sẵn người đã xả ra không.
+
+Thay vào đó hiện **TIỀN** — `author_trade_usd`, lãi/lỗ — vì đó là số GMGN đưa
+thẳng, không qua diễn giải của mình, và nó phân loại được thật (`$500` với
+`$80K` là hai câu chuyện khác nhau). `KT.fmtUsd` rút gọn cho vừa hàng hẹp.
+
+⚠ Hai test cũ khoá hành vi gắn nhãn đã được sửa theo quyết định mới, KHÔNG
+sửa code về cũ cho test xanh.
+
+`tienTrenChart` trong chẩn đoán đếm xem có ai `realized_pnl != 0` không — nếu
+không một ai thì feed đúng là chỉ chứa người còn giữ, và nhãn kia vô nghĩa
+thật chứ không phải mình đọc sai cột.
