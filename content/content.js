@@ -703,7 +703,7 @@
           thesisTong: state.thesisAll.length,
           mauChart: state.chartPeople
             .slice(0, 3)
-            .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " lúc " + (KT.fmtDateTime(p.postedTs) || "?")),
+            .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " — " + (KT.fmtDateTime(p.postedTs) || "?")),
           mauThesisTho: state.mauThesisTho || null,
           authorIdOnDinh: state.authorIdProbe || null,
           mauMessage: state.mauMessage || null,
