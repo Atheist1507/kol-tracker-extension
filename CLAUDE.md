@@ -414,3 +414,33 @@ sách** — gộp thì không biết mình đang nhìn ai.
 
 `ulid` đã đo là ổn định (`kiem: 31, lech: 0`), nhưng giờ không cần tới nữa:
 `author_id` mạnh hơn hẳn.
+
+## `author_id` là UUID **v5** — băm ra, không phải số ngẫu nhiên (21/09/2026)
+
+```
+author_id        = "70715228-7368-5979-a748-92662d913812"   (UUID v5)
+fomo_created_at  = 1789986741960                            (number, epoch MILI)
+id               = "3f1b3eae-ff45-4543-ae21-e372418f2453"   (UUID v4 — id của DÒNG post)
+```
+
+UUID v5 nghĩa là GMGN **băm từ một chuỗi gốc** (SHA-1 + namespace). Đã thử 5
+namespace chuẩn × 14 dạng tên (handle, @handle, x.com/handle, twitter:handle…)
+— **không tổ hợp nào khớp**. Nên chuỗi gốc là gì thì KHÔNG biết được từ ngoài.
+
+⚠ Hệ quả, phải nói rõ vì nó quyết định cả thiết kế: **không chứng minh được
+`author_id` sống qua phép đổi tên.** Nếu GMGN băm từ handle thì nó đổi theo
+tên; nếu băm từ id tài khoản X thì nó không đổi. Hai khả năng đó không phân
+biệt được bằng cách nhìn giá trị.
+
+### Cây cầu KHÔNG phụ thuộc vào câu hỏi đó
+Nhận ra người đổi tên bằng **`post_id`**, không bằng `author_id`:
+
+> thấy lại một `post_id` đã ghi trong Sheet, mà `author_handle` bây giờ KHÁC
+> tên đã ghi → chính nó đổi tên.
+
+Đúng với cả hai khả năng trên, nên không phải chờ trả lời câu kia. Và Sheet
+**đã có sẵn** cột `post_id` + `username` bên `Detail` — không phải đụng Code.gs.
+
+`probeAuthorId` đánh số theo `post_id`, nên lần đo sau trả lời LUÔN cả hai:
+`kiem > 0` nghĩa là `post_id` ổn định (bằng không không bao giờ khớp để mà
+đếm), còn `lech` nói `author_id` có đổi không.

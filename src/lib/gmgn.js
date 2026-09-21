@@ -381,7 +381,18 @@
     const first = Array.isArray(items) ? items[0] : null;
     if (!first || typeof first !== "object") return null;
     const show = (k) => k + "=" + JSON.stringify(first[k]) + " (" + typeof first[k] + ")";
-    return [show("author_id"), show("fomo_created_at"), show("id"), show("closed_at")];
+    // Mấy cột SỐ cũng phải soi: panel đang ghi "còn giữ" cho cả 200 người,
+    // mà một nhãn đúng với tất cả mọi người thì không phân loại được gì —
+    // đúng vết xe của bản đầu, gắn cờ đỏ cho 46/50 người.
+    return [
+      show("author_id"),
+      show("fomo_created_at"),
+      show("id"),
+      show("holdings_usd"),
+      show("author_trade_usd"),
+      show("realized_pnl_usd"),
+      show("unrealized_pnl_usd"),
+    ];
   }
 
   function parseThesis(payload) {
