@@ -29,6 +29,7 @@
     // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
     extra: new Map(), // handleKey → { username, displayName, avatar, wallet, tuDau }
     mauMessage: null, // các cột THẬT của một message GMGN (xem rememberShape)
+    ulidProbe: null, // ulid có ổn định không (xem probeUlid)
     apiLog: [], // { path, lan, nguoi, ten[] } — để Chẩn đoán chỉ ra endpoint nào có người
     token: null, // { symbol, address, chain }
     // KHÔNG giữ "người đang hover" ở đây nữa: state toàn cục thì mutation nào
@@ -124,6 +125,9 @@
       if (!first || typeof first !== "object") return;
       state.mauMessage = {
         cot: Object.keys(first).slice(0, 60),
+        // Link X của họ là dạng nào? Có tên trong đó thì nó chết khi đổi tên;
+        // có id thì cả bài toán này xong.
+        twitterUrlMau: String(first.user_twitter_url || "").slice(0, 80),
         dangId: Object.keys(first)
           .filter((k) => /id$/i.test(k) || /_id/i.test(k))
           .slice(0, 12)
@@ -131,6 +135,54 @@
       };
     } catch (e) {
       /* hình dạng lạ — bỏ qua */
+    }
+  }
+
+  /**
+   * `ulid` của một bài post có ĐỔI giữa các lần gọi không?
+   *
+   * Câu này phải trả lời bằng ĐO, không bằng suy luận. `encrypted_user_id`
+   * trông cũng như một cái khoá tử tế, mà đo ra thì nó đổi giá trị mỗi lần
+   * gọi — lấy nó làm khoá là mỗi lần mở chart đẻ thêm một người trong Sheet.
+   *
+   * Nhận mặt bài post bằng thứ KHÔNG dính tới ulid: ví + giờ post. Rồi xem
+   * ulid gắn với nó có giữ nguyên qua các lần gọi, qua cả lần F5 sau.
+   */
+  async function probeUlid(payload) {
+    try {
+      const data = (payload && payload.data) || payload;
+      const list = (data && (data.messages || data.list)) || (Array.isArray(data) ? data : null);
+      if (!Array.isArray(list) || !list.length) return;
+
+      const box = (await chrome.storage.local.get(KT.STORAGE.ULID))[KT.STORAGE.ULID] || {
+        map: {},
+        kiem: 0,
+        lech: 0,
+        viDu: [],
+      };
+
+      for (const raw of list.slice(0, 30)) {
+        if (!raw || typeof raw !== "object") continue;
+        const ulid = String(raw.ulid || raw.id || "").trim();
+        const key = String(raw.wallet_address || "").trim().toLowerCase() + "|" + String(raw.created_at || "");
+        if (!ulid || key === "|") continue;
+
+        const cu = box.map[key];
+        if (cu === undefined) {
+          if (Object.keys(box.map).length < 300) box.map[key] = ulid;
+          continue;
+        }
+        box.kiem++;
+        if (cu !== ulid) {
+          box.lech++;
+          if (box.viDu.length < 3) box.viDu.push(cu + " → " + ulid);
+          box.map[key] = ulid;
+        }
+      }
+      await chrome.storage.local.set({ [KT.STORAGE.ULID]: box });
+      state.ulidProbe = { kiem: box.kiem, lech: box.lech, viDu: box.viDu, nho: Object.keys(box.map).length };
+    } catch (e) {
+      /* storage đầy hoặc hình dạng lạ — không phải việc sống còn */
     }
   }
 
@@ -278,6 +330,7 @@
         // "GMGN có gửi id tài khoản X xuống không" nằm đúng ở đây.
         // Chỉ giữ TÊN cột và các giá trị dạng id; không giữ nội dung post.
         rememberShape(msg.payload);
+        probeUlid(msg.payload);
         const callers = KT.gmgn.parseMessages(msg.payload);
         if (!callers.length) return;
         state.callers = callers;
@@ -535,6 +588,7 @@
           apiLog: state.apiLog.slice(0, 40),
           nguoiNgoaiBang: state.extra.size,
           mauMessage: state.mauMessage || null,
+          ulidOnDinh: state.ulidProbe || null,
           // Người có trong API mà KHÔNG có trong bảng X Tracker — nếu đám trên
           // chart là một đám khác thật thì chúng phải hiện ra ở đây.
           tenNgoaiBang: (function () {

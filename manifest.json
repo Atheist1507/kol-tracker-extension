@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KOL Tracker",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Research KOL/caller crypto ngay trên chart GMGN: ai đã post về token này, ai đáng tin, ghi chú thẳng vào Google Sheet.",
   "permissions": [
     "storage",

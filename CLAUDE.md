@@ -305,3 +305,41 @@ HTTP không có ai, thẻ trên chart chỉ có chữ hiển thị. Đang truy h
 
 Ghi nhận rồi mới dùng: **đoán sai chỗ lấy id là mọi dòng trong Sheet gắn nhầm
 người**, và đó là loại sai không có triệu chứng.
+
+## GMGN KHÔNG gửi id tài khoản X xuống (đo 21/09/2026)
+
+Đổ ra toàn bộ tên cột thật của một message (`mauMessage`), không có
+`twitter_id` nào cả. Ba cột có đuôi id, và cả ba đều KHÔNG dùng làm khoá người
+được:
+
+| Cột | Giá trị thật | Là gì |
+|---|---|---|
+| `id` | `gmgn_01M1MRA95JX9A0FPENYZ5Q1RB` | `"gmgn_"` + ulid **bị cắt mất ký tự cuối** |
+| `ulid` | `01M1MRA95JX9A0FPENYZ5Q1RBH` | ULID của DÒNG POST, không phải của người |
+| `encrypted_user_id` | `AAAAAW53UaAv/yecYOrcDeSmScoaIg` | mã hoá lại mỗi lần gọi — cấm dùng |
+
+⚠ `id` = `ulid[0..25]` — thiếu đúng một ký tự. Nên **dùng `ulid`, đừng dùng
+`id`**: cắt cụt thì về lý còn có thể đụng nhau, mà lỗi kiểu đó không bao giờ
+lộ ra lúc chạy.
+
+Hệ quả: khoá một người phải là **một CHÙM DẤU**, không phải một cột. Xếp theo
+độ bền trước phép "đổi tên cho khỏi bị nhận ra":
+
+1. `wallet_address` — chết khi họ đổi ví
+2. hash avatar (`profile_image_url` → `KT.avatarKey`, GMGN băm theo NỘI DUNG
+   ảnh nên không dính gì tới tên) — chết khi họ đổi ảnh đại diện
+3. `ulid` của bài post đã ghi — bài cũ vẫn là bài cũ, **không chết vì đổi tên**
+   (đang đo độ ổn định bằng `probeUlid`, xem dưới)
+4. `username` — chết ngay lúc đổi tên
+
+⚠ Và có một **bất đối xứng** phải nhớ: người trên CHART (thẻ Thesis) không có
+ví, không có avatar trong thẻ (`datId` rỗng — không `<a href>`, không ảnh).
+Với họ chỉ còn tên + tên hiển thị + nội dung post. Chùm dấu ở trên gần như chỉ
+phục vụ người trong bảng X Tracker.
+
+### probeUlid — đo trước, tin sau
+`ulid` trông như một cái khoá tử tế. `encrypted_user_id` cũng thế, mà đo ra thì
+nó đổi mỗi lần gọi. Nên `probeUlid` nhận mặt bài post bằng thứ KHÔNG dính tới
+ulid (ví + giờ post), rồi đếm xem ulid gắn với nó có giữ nguyên qua các lần gọi
+và qua cả lần F5 sau (lưu ở `chrome.storage.local`, khoá `ulidProbe`).
+`lech > 0` là dấu chấm hết cho leg số 3 — đừng xây gì lên trên nó nữa.
