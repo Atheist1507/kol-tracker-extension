@@ -28,6 +28,7 @@
     // và đám avatar trên cây nến là HAI đám khác nhau — cái sau không có danh
     // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
     extra: new Map(), // handleKey → { username, displayName, avatar, wallet, tuDau }
+    mauMessage: null, // các cột THẬT của một message GMGN (xem rememberShape)
     apiLog: [], // { path, lan, nguoi, ten[] } — để Chẩn đoán chỉ ra endpoint nào có người
     token: null, // { symbol, address, chain }
     // KHÔNG giữ "người đang hover" ở đây nữa: state toàn cục thì mutation nào
@@ -112,6 +113,25 @@
       if (row.ten.length < 4 && row.ten.indexOf(p.username) < 0) row.ten.push(p.username);
     }
     if (addExtra(people, path) && alive()) shareExtra(people, path);
+  }
+
+  /** Một message thô của GMGN thật ra có những cột gì? */
+  function rememberShape(payload) {
+    try {
+      const data = (payload && payload.data) || payload;
+      const list = (data && (data.messages || data.list)) || (Array.isArray(data) ? data : null);
+      const first = Array.isArray(list) ? list[0] : null;
+      if (!first || typeof first !== "object") return;
+      state.mauMessage = {
+        cot: Object.keys(first).slice(0, 60),
+        dangId: Object.keys(first)
+          .filter((k) => /id$/i.test(k) || /_id/i.test(k))
+          .slice(0, 12)
+          .map((k) => k + "=" + String(first[k]).slice(0, 30)),
+      };
+    } catch (e) {
+      /* hình dạng lạ — bỏ qua */
+    }
   }
 
   /** ID số của tài khoản X, nếu API nào đó của GMGN có nhắc tới người này. */
@@ -253,6 +273,11 @@
 
     try {
       if (msg.kind === "messages") {
+        // ⚠ normalizeMessage chỉ đọc vài field mình BIẾT TÊN rồi vứt phần còn
+        // lại. Mười ba vòng qua chưa ai nhìn xem trong đó còn gì — mà câu hỏi
+        // "GMGN có gửi id tài khoản X xuống không" nằm đúng ở đây.
+        // Chỉ giữ TÊN cột và các giá trị dạng id; không giữ nội dung post.
+        rememberShape(msg.payload);
         const callers = KT.gmgn.parseMessages(msg.payload);
         if (!callers.length) return;
         state.callers = callers;
@@ -509,6 +534,7 @@
           // ra endpoint nuôi chúng.
           apiLog: state.apiLog.slice(0, 40),
           nguoiNgoaiBang: state.extra.size,
+          mauMessage: state.mauMessage || null,
           // Người có trong API mà KHÔNG có trong bảng X Tracker — nếu đám trên
           // chart là một đám khác thật thì chúng phải hiện ra ở đây.
           tenNgoaiBang: (function () {
