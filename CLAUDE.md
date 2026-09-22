@@ -555,3 +555,34 @@ Dán vào thanh địa chỉ **cửa sổ ẩn danh**:
 Lỗi nằm lại trong storage tới lần tải THÀNH CÔNG kế tiếp, nên lỗi từ ba hôm
 trước trông hệt như vừa mới hỏng — và người đọc đi sửa một thứ đang chạy tốt.
 Panel đã hiện tuổi từ v0.3.8; trang Options thì tới 22/09/2026 mới có.
+
+## Đừng để thông báo lỗi KHẲNG ĐỊNH một nguyên nhân mình chỉ đang đoán
+
+`httpHint(404)` bản trước viết: *"không có bản deploy nào ở URL này. Vào Apps
+Script → Deploy → Manage deployments, copy lại URL Web app."* Nghe rất dứt
+khoát. Và **sai**, ở cả hai người dùng đầu tiên: link đúng, không ai đụng vào
+Apps Script, vẫn 404. Họ đi copy lại một cái URL vốn đã đúng, nhiều lần, rồi
+kết luận extension hỏng.
+
+Một câu khẳng định sai còn tệ hơn một câu "chưa rõ": nó **chỉ định sai chỗ để
+sửa**, và người ta tin.
+
+Giờ 404 **liệt kê** các khả năng theo thứ tự hay gặp, và nói thẳng "URL sai là
+cái ÍT gặp nhất":
+1. Trình duyệt đăng nhập nhiều tài khoản Google → Google phục vụ bằng nhầm
+   tài khoản (xem mục `credentials: "omit"` ở trên).
+2. Deploy để `"Anyone with Google account"` thay vì `"Anyone"`.
+3. Dán nhầm link `/dev` thay vì `/exec`.
+
+### Bằng chứng thay cho suy đoán
+`sheetPing` trả thêm `chiTiet`: `status`, `urlCuoi` (URL **sau** chuyển hướng),
+`chuyenHuong`, **`taiKhoanThu`** (bắt từ `/u/<N>/` trong URL cuối), `giay`, và
+`dauBody` khi response không phải JSON.
+
+`taiKhoanThu` là thứ phân biệt DỨT KHOÁT "URL sai" với "sai tài khoản" — mã
+404 trần không bao giờ nói được điều đó. Khi nó có giá trị, thông báo lỗi nói
+thẳng "Google chuyển hướng sang tài khoản thứ N của trình duyệt".
+
+⚠ `.test` và `.status` trong `options.css` phải có `white-space: pre-wrap`:
+thông báo 404 nhiều dòng, không có nó thì dồn thành một dòng dài và không ai
+đọc tới dòng cuối — mà dòng cuối mới là cách chữa.
