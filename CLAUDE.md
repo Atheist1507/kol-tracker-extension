@@ -528,3 +528,30 @@ nằm lại đó vĩnh viễn. Nút "Copy lời mời" để một chỗ trống
 - ⟳ trong popup/Options = **tải lại dữ liệu từ Sheet**.
 - ⟳ ở `chrome://extensions` = **nạp lại code**, và bắt buộc **F5 lại trang
   GMGN** sau đó.
+
+## HTTP 404 Apps Script: nghi can số một là TÀI KHOẢN GOOGLE, không phải cấu hình
+
+`credentials: "omit"` là **bắt buộc** cho mọi lời gọi Apps Script. Deploy chế
+độ "Anyone" thì không cần đăng nhập; nhưng nếu request mang theo cookie Google
+mà trình duyệt đang đăng nhập **nhiều tài khoản**, `/exec` chuyển hướng sang
+URL gắn số tài khoản (`/u/1/`, `/u/2/`…) — tài khoản đó có thể không phải chủ
+script → **404**.
+
+Đây chính là kiểu 404 "tự nhiên hỏng dù không đụng gì vào Apps Script": thứ
+đổi không phải cấu hình, mà là tài khoản Google đang đăng nhập.
+
+⚠ `fetchCsv` có dòng này từ đầu, còn `callSheetApi` / `saveNote` / `sheetPing`
+thì KHÔNG (sửa 22/09/2026) — nên cùng một Sheet mà đường CSV chạy còn đường
+Apps Script 404, trông vô lý và không ai nghĩ tới chuyện tài khoản.
+
+### Tách "hỏng ở đâu" trong 30 giây
+Dán vào thanh địa chỉ **cửa sổ ẩn danh**:
+`<URL_WEB_APP>?action=ping&secret=<SECRET>`
+- Ẩn danh ra JSON `"ok":true` mà extension vẫn 404 → lỗi phía extension.
+- Ẩn danh cũng 404 → không liên quan extension, vào Apps Script kiểm deploy.
+- Cửa sổ thường 404 nhưng ẩn danh chạy → đúng ca nhiều tài khoản ở trên.
+
+### Lỗi trong Options phải kèm TUỔI
+Lỗi nằm lại trong storage tới lần tải THÀNH CÔNG kế tiếp, nên lỗi từ ba hôm
+trước trông hệt như vừa mới hỏng — và người đọc đi sửa một thứ đang chạy tốt.
+Panel đã hiện tuổi từ v0.3.8; trang Options thì tới 22/09/2026 mới có.

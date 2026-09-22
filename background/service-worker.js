@@ -40,6 +40,19 @@ const ALARM = "kt-refresh";
  * xoá vùng cache mạng riêng của nó). `cache: "no-store"` không chặn được
  * phần redirect.
  */
+/**
+ * ⚠ `credentials: "omit"` là BẮT BUỘC cho mọi lời gọi Apps Script.
+ *
+ * Deploy ở chế độ "Anyone" thì không cần đăng nhập gì cả. Nhưng nếu request
+ * mang theo cookie Google, mà trình duyệt đang đăng nhập NHIỀU tài khoản, thì
+ * /exec chuyển hướng sang một URL gắn số thứ tự tài khoản (/u/1/, /u/2/…) —
+ * và tài khoản đó có thể không phải chủ script. Kết quả là **404**, đúng cái
+ * 404 "tự nhiên hỏng dù không đụng gì vào Apps Script": thứ đổi không phải
+ * cấu hình, mà là tài khoản Google đang đăng nhập trên trình duyệt.
+ *
+ * `fetchCsv` có dòng này từ đầu; ba chỗ còn lại thì không — nên cùng một
+ * Sheet mà đường CSV chạy còn đường Apps Script thì 404, trông vô lý.
+ */
 function bust(url) {
   return url + (url.includes("?") ? "&" : "?") + "_=" + Date.now();
 }
@@ -114,7 +127,12 @@ async function callSheetApi(cfg, params) {
   try {
     const qs = new URLSearchParams(Object.assign({ secret: cfg.sheetApiSecret || "" }, params));
     const url = cfg.sheetApiUrl + (cfg.sheetApiUrl.includes("?") ? "&" : "?") + qs.toString();
-    const res = await fetch(bust(url), { signal: controller.signal, cache: "no-store", redirect: "follow" });
+    const res = await fetch(bust(url), {
+      signal: controller.signal,
+      cache: "no-store",
+      credentials: "omit", // xem ghi chú ngay trên hàm bust()
+      redirect: "follow",
+    });
     if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     try {
@@ -160,6 +178,8 @@ async function saveNote(payload) {
     const res = await fetch(bust(cfg.sheetApiUrl), {
       method: "POST",
       signal: controller.signal,
+      cache: "no-store",
+      credentials: "omit", // xem ghi chú ngay trên hàm bust()
       redirect: "follow",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(Object.assign({ secret: cfg.sheetApiSecret || "" }, payload)),
@@ -303,7 +323,12 @@ async function sheetPing(url, secret) {
   try {
     const target =
       url + (url.includes("?") ? "&" : "?") + "action=ping&secret=" + encodeURIComponent(secret || "");
-    const res = await fetch(bust(target), { signal: controller.signal, cache: "no-store", redirect: "follow" });
+    const res = await fetch(bust(target), {
+      signal: controller.signal,
+      cache: "no-store",
+      credentials: "omit", // xem ghi chú ngay trên hàm bust()
+      redirect: "follow",
+    });
     if (!res.ok) throw new Error(httpHint(res.status));
     const text = await res.text();
     try {

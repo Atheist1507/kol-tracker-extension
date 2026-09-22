@@ -223,7 +223,12 @@
     const el = $("status");
     if (data.error) {
       el.className = "status err";
-      el.textContent = data.error;
+      // ⚠ Kèm TUỔI của lỗi. Lỗi nằm lại trong storage cho tới lần tải THÀNH
+      // CÔNG kế tiếp, nên một lỗi từ ba hôm trước trông hệt như vừa mới hỏng —
+      // và người đọc sẽ đi sửa một thứ đang chạy tốt. Đã mất một buổi vì đúng
+      // chuyện này rồi.
+      const tuoi = data.errorAt ? " (lúc " + KT.fmtDateTime(data.errorAt) + ", " + KT.timeAgo(data.errorAt) + ")" : "";
+      el.textContent = data.error + tuoi;
       return;
     }
     if (!data.syncedAt) {
