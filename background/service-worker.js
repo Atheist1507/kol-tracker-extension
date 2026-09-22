@@ -57,9 +57,40 @@ function bust(url) {
   return url + (url.includes("?") ? "&" : "?") + "_=" + Date.now();
 }
 
-function httpHint(status) {
+/**
+ * Mã HTTP trần không nói được gì với người dùng. Nhưng ĐOÁN BỪA nguyên nhân
+ * còn tệ hơn: bản trước khẳng định 404 = "không có bản deploy nào ở URL này",
+ * và người ta đi copy lại một cái URL vốn đã đúng, nhiều lần, rồi kết luận là
+ * extension hỏng. Đo thực tế: 404 xảy ra cả với link đúng, script không ai
+ * đụng vào, trên máy người mới cài.
+ *
+ * Nên 404 giờ LIỆT KÊ các khả năng theo thứ tự hay gặp, và dùng URL CUỐI CÙNG
+ * sau chuyển hướng làm bằng chứng — nó phân biệt được ca "nhiều tài khoản
+ * Google" với ca "deploy thật sự không tồn tại", thứ mà mã 404 trần không làm
+ * được.
+ */
+function httpHint(status, finalUrl) {
+  const cuoi = String(finalUrl || "");
   if (status === 404) {
-    return "HTTP 404 — không có bản deploy nào ở URL này. Vào Apps Script → Deploy → Manage deployments, copy lại URL Web app.";
+    // Chuyển hướng sang URL gắn số tài khoản (/u/1/, /u/2/…) = Google đang
+    // phục vụ request bằng một tài khoản khác chủ script.
+    if (/\/u\/\d+\//.test(cuoi)) {
+      return (
+        "HTTP 404 — Google chuyển hướng sang tài khoản thứ " +
+        (cuoi.match(/\/u\/(\d+)\//) || [])[1] +
+        " của trình duyệt, tài khoản đó không có quyền chạy script. " +
+        "Đây KHÔNG phải lỗi URL. Cách chữa: đăng xuất bớt tài khoản Google, " +
+        "hoặc mở Apps Script bằng tài khoản chủ script rồi deploy lại."
+      );
+    }
+    return (
+      "HTTP 404. Ba nguyên nhân hay gặp, theo thứ tự — URL sai là cái ÍT gặp nhất:\n" +
+      "1. Trình duyệt đang đăng nhập nhiều tài khoản Google; Google phục vụ bằng nhầm tài khoản.\n" +
+      '2. Deploy để "Who has access" là "Anyone with Google account" thay vì "Anyone".\n' +
+      "3. Dán nhầm link /dev (bản thử, chỉ chủ script gọi được) thay vì link /exec.\n" +
+      "Thử ping URL đó trong CỬA SỔ ẨN DANH: ra JSON thì lỗi nằm ở tài khoản, " +
+      "ẩn danh cũng 404 thì mới vào Apps Script kiểm deploy."
+    );
   }
   if (status === 403) {
     return 'HTTP 403 — bản deploy không cho gọi. Manage deployments → ✏️ → "Who has access" phải là Anyone.';
@@ -133,7 +164,7 @@ async function callSheetApi(cfg, params) {
       credentials: "omit", // xem ghi chú ngay trên hàm bust()
       redirect: "follow",
     });
-    if (!res.ok) throw new Error(httpHint(res.status));
+    if (!res.ok) throw new Error(httpHint(res.status, res.url));
     const text = await res.text();
     try {
       return JSON.parse(text);
@@ -184,7 +215,7 @@ async function saveNote(payload) {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(Object.assign({ secret: cfg.sheetApiSecret || "" }, payload)),
     });
-    if (!res.ok) throw new Error(httpHint(res.status));
+    if (!res.ok) throw new Error(httpHint(res.status, res.url));
     const text = await res.text();
     let json;
     try {
@@ -329,15 +360,26 @@ async function sheetPing(url, secret) {
       credentials: "omit", // xem ghi chú ngay trên hàm bust()
       redirect: "follow",
     });
-    if (!res.ok) throw new Error(httpHint(res.status));
+    // Bằng chứng thô, trả về cho CẢ lúc chạy được lẫn lúc hỏng. Không có nó
+    // thì "404" là một câu chữ, ai cũng chỉ còn cách đoán — mà đoán ở bước
+    // này đã làm hai người mất buổi rồi.
+    const chiTiet = {
+      status: res.status,
+      chuyenHuong: res.redirected === true,
+      urlCuoi: String(res.url || "").slice(0, 160),
+      taiKhoanThu: (String(res.url || "").match(/\/u\/(\d+)\//) || [])[1] || null,
+      giay: Math.round((Date.now() - started) / 100) / 10,
+    };
+    if (!res.ok) return { ok: false, error: httpHint(res.status, res.url), chiTiet };
     const text = await res.text();
     try {
-      return JSON.parse(text);
+      return Object.assign(JSON.parse(text), { chiTiet });
     } catch (e) {
       // Apps Script trả HTML khi deploy sai chế độ truy cập, hoặc khi URL là
       // link /edit của trình soạn thảo thay vì link /exec của bản deploy.
       return {
         ok: false,
+        chiTiet: Object.assign({ dauBody: text.slice(0, 120) }, chiTiet),
         error:
           "Script trả về HTML chứ không phải JSON — nhiều khả năng deploy chưa đặt " +
           '"Who has access: Anyone", hoặc dán nhầm link trình soạn thảo thay vì link /exec.',

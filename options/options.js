@@ -123,6 +123,23 @@
 
   /* ---------- thử kết nối Apps Script ---------- */
 
+  /**
+   * Bằng chứng thô của lần gọi vừa rồi.
+   *
+   * Người dùng không đọc được mã HTTP, nhưng ĐỌC ĐƯỢC "Google chuyển hướng
+   * sang tài khoản thứ 2" — và đó là câu phân biệt giữa "URL sai" với "sai
+   * tài khoản", thứ mà cả hai người dùng đầu tiên đều mắc kẹt.
+   */
+  function chiTietText(res) {
+    const c = res && res.chiTiet;
+    if (!c) return "";
+    const bits = ["HTTP " + c.status, c.giay + "s"];
+    if (c.taiKhoanThu) bits.push("Google phục vụ bằng TÀI KHOẢN THỨ " + c.taiKhoanThu + " của trình duyệt");
+    else if (c.chuyenHuong) bits.push("có chuyển hướng");
+    if (c.dauBody) bits.push("trả về: " + c.dauBody.replace(/\s+/g, " ").slice(0, 60) + "…");
+    return "\n↳ " + bits.join(" · ") + (c.urlCuoi ? "\n↳ URL cuối: " + c.urlCuoi : "");
+  }
+
   $("sheet-ping").addEventListener("click", async () => {
     const out = $("sheetApi-test");
     out.className = "test";
@@ -143,7 +160,7 @@
       if (/secret/i.test(msg)) {
         msg += ` — extension gửi chuỗi ${secret.length} ký tự. Đếm lại chuỗi trong Code.gs xem có đúng bấy nhiêu không.`;
       }
-      out.textContent = "✕ " + msg;
+      out.textContent = "✕ " + msg + chiTietText(res);
       return;
     }
     if (!res.hasOverview || !res.hasDetail) {
