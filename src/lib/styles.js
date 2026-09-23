@@ -40,6 +40,20 @@
 .kt-x-sum { margin-top: 3px; }
 .kt-x-note { margin-top: 4px; color: #D7DEE6; }
 .kt-x-meta { margin-top: 2px; font-size: 11px; color: #6E7A88; }
+
+/* --- trong dòng thời gian --- */
+.kt-x-pill {
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  padding: 1px 8px; border-radius: 999px; line-height: 1.5;
+  background: transparent; border: 1px solid currentColor; color: #6E7A88;
+  white-space: nowrap;
+}
+.kt-x-pill.co:hover, .kt-x-pill:hover { filter: brightness(1.25); }
+.kt-x-card {
+  position: fixed; z-index: 2147483000; width: 260px; padding: 9px 11px;
+  background: #0F1319; border: 1px solid #262C36; border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.6); color: #E6EDF3; line-height: 1.45;
+}
 `;
 
   KT.X_CSS = X_CSS;

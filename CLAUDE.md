@@ -654,3 +654,32 @@ Dựng lại trang hồ sơ X với đúng các `data-testid`.
 đổi gốc, `stub.js` 404, và triệu chứng duy nhất là
 `chrome.storage.sync undefined`.
 ⚠ `stub.js` gọi `KT.withDefaults` ngay lúc chạy nên phải nạp **sau** thư viện.
+
+## Trong DÒNG THỜI GIAN của X — v0.14.0
+
+Mỗi bài viết mọc thêm một **pill** cạnh tên: người đã có hồ sơ thì hiện hạng +
+số ghi chú (màu theo hạng), người lạ thì hiện `+`. Bấm pill = mở hộp ghi chú.
+Rê chuột vào **avatar** (hoặc pill) = thẻ nổi với hạng, tóm tắt, ghi chú gần
+nhất.
+
+### ⚠⚠ X TÁI DÙNG LẠI node khi cuộn
+Cùng một thẻ `<article>` lúc trước là bài của A, cuộn một đoạn thành bài của B
+— node thì vẫn nguyên đó. Nên **"đã gắn rồi thì bỏ qua" là SAI**: nó để lại
+hạng của A trên bài của B, và đó là kiểu sai tệ nhất ở đây, vì người đọc thấy
+hạng S trên bài của thằng hạng D mà **không có dấu hiệu gì**.
+
+Cách chữa: nhớ tay cầm đã gắn ngay trên node (`data-kt-pill`), mỗi lượt quét
+**đọc lại tay cầm thật** rồi so, khác thì vẽ lại. Listener trên avatar cũng
+phải đọc lại tay cầm lúc CHẠY, không bắt theo biến đóng gói lúc gắn.
+Có kiểm bằng Playwright: đổi `href` của một bài rồi xác nhận pill đổi theo.
+
+⚠ Pill dùng **CLASS**, không dùng `id`: mỗi bài một cái, mà `id` phải duy nhất
+trong cả trang — dùng `id` thì `document.getElementById` chỉ thấy cái đầu
+tiên, sai âm thầm.
+
+⚠ Quét có **trần 60 bài**: một cú cuộn dài để lại hàng trăm `<article>` trong
+DOM, mà mình chỉ cần mấy bài đang nhìn thấy.
+
+⚠ MutationObserver trong feed **không** kiểm "nút còn không" để quyết định vẽ
+lại nữa — feed đổi liên tục nên lúc nào cũng hẹn quét, `veTrongFeed` tự bỏ qua
+bài đã gắn đúng người nên không tốn gì.

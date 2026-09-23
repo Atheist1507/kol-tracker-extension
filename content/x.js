@@ -21,6 +21,10 @@
   globalThis.__KOL_TRACKER_X__ = true;
 
   const BTN_ID = "kol-tracker-x-btn";
+  // ⚠ CLASS chứ không phải id: mỗi bài trong feed một cái, mà id thì phải
+  // duy nhất trong cả trang. Dùng id là document.getElementById chỉ thấy cái
+  // đầu tiên — sai âm thầm, đúng kiểu khó lần ra nhất.
+  const PILL_CLASS = "kol-tracker-x-pill";
   const STRIP_ID = "kol-tracker-x-strip";
 
   const state = { cfg: KT.withDefaults(null), data: null, db: null, handle: null };
@@ -85,7 +89,7 @@
 
   function khungRieng(id) {
     const host = document.createElement("div");
-    host.id = id;
+    if (id) host.id = id;
     const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = KT.X_CSS;
@@ -153,6 +157,156 @@
     sau.parentElement ? sau.parentElement.insertBefore(host, sau.nextSibling) : sau.appendChild(host);
   }
 
+
+  /* ---------- trong dòng thời gian ---------- */
+
+  const PILL_ID_ATTR = "ktPill"; // dataset trên <article>: đã gắn cho tay cầm nào
+
+  /**
+   * ⚠⚠ X TÁI DÙNG LẠI node khi cuộn (virtualized list).
+   *
+   * Cùng một thẻ <article> lúc trước là bài của A, cuộn một đoạn thành bài của
+   * B — mà node thì vẫn nguyên đó. Nên "đã gắn rồi thì bỏ qua" là SAI: nó để
+   * lại hạng của A trên bài của B, và đó là kiểu sai tệ nhất ở đây, vì mày sẽ
+   * đọc hạng S trên một bài của thằng hạng D mà không có dấu hiệu gì.
+   *
+   * Cách chữa: nhớ tay cầm ĐÃ GẮN ngay trên node, mỗi lượt quét đọc lại tay
+   * cầm thật rồi so. Khác thì vẽ lại.
+   */
+  function handleOfTweet(article) {
+    const khoi = article.querySelector('[data-testid="User-Name"]');
+    if (!khoi) return null;
+    for (const a of khoi.querySelectorAll('a[href^="/"]')) {
+      const h = KT.xPage.handleFromPath(a.getAttribute("href") || "");
+      if (h) return h;
+    }
+    return null;
+  }
+
+  function veTrongFeed(article) {
+    const handle = handleOfTweet(article);
+    const daGan = article.dataset[PILL_ID_ATTR];
+    if (!handle) return;
+    if (daGan === handle && article.querySelector("." + PILL_CLASS)) return;
+
+    article.querySelector("." + PILL_CLASS)?.remove();
+    const khoi = article.querySelector('[data-testid="User-Name"]');
+    if (!khoi) return;
+
+    const person = personFor(handle);
+    const { host, wrap } = khungRieng(null);
+    host.className = PILL_CLASS;
+    host.style.cssText = "display:inline-flex;align-items:center;margin-left:6px;vertical-align:middle;";
+    const mau = person ? KT.tierColor(person.tier) : "#6E7A88";
+    wrap.innerHTML =
+      `<button class="kt-x-pill${person ? " co" : ""}" type="button" style="color:${KT.esc(mau)}" ` +
+      `title="${KT.esc(person ? "Xem ghi chú · bấm để ghi thêm" : "Ghi chú người này")}">` +
+      KT.esc(person ? (person.tierLetter || "•") + (person.noteCount ? " " + person.noteCount : "") : "+") +
+      `</button>`;
+
+    const btn = wrap.querySelector("button");
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      moHopCho(handle, ev.currentTarget.getBoundingClientRect());
+    });
+    btn.addEventListener("pointerenter", () => moThe(handle, btn.getBoundingClientRect()));
+    btn.addEventListener("pointerleave", dongThe);
+
+    khoi.appendChild(host);
+
+    // Rê chuột vào AVATAR cũng mở thẻ — đó mới là chỗ mắt người ta nhìn vào
+    // đầu tiên trong dòng thời gian, cái pill chỉ là nút bấm.
+    const ava = article.querySelector('[data-testid="Tweet-User-Avatar"]');
+    if (ava && !ava.dataset.ktHover) {
+      ava.dataset.ktHover = "1";
+      ava.addEventListener("pointerenter", () => {
+        const h = handleOfTweet(article); // đọc LẠI: node có thể đã đổi chủ
+        if (h) moThe(h, ava.getBoundingClientRect());
+      });
+      ava.addEventListener("pointerleave", dongThe);
+    }
+
+    article.dataset[PILL_ID_ATTR] = handle;
+  }
+
+  function quetFeed() {
+    const list = document.querySelectorAll('article[data-testid="tweet"]');
+    // Chặn trần: một cú cuộn dài có thể để lại hàng trăm bài trong DOM, mà
+    // mình chỉ cần mấy bài đang nhìn thấy.
+    let n = 0;
+    for (const a of list) {
+      if (++n > 60) break;
+      try {
+        veTrongFeed(a);
+      } catch (e) {
+        /* một bài hỏng không được làm chết cả feed */
+      }
+    }
+  }
+
+  /* ---------- thẻ nổi khi rê chuột ---------- */
+
+  let theHost = null;
+  let theTimer = null;
+
+  function dongThe() {
+    clearTimeout(theTimer);
+    if (theHost) theHost.style.display = "none";
+  }
+
+  function moThe(handle, rect) {
+    const person = personFor(handle);
+    if (!person) return; // chưa có hồ sơ thì không có gì để khoe
+    clearTimeout(theTimer);
+    if (!theHost) {
+      const k = khungRieng("kol-tracker-x-card");
+      theHost = k.host;
+      theHost.__wrap = k.wrap;
+      theHost.style.cssText = "position:fixed;z-index:2147483000;display:none;";
+      document.body.appendChild(theHost);
+    }
+    const note = (person.notes && person.notes[0]) || null;
+    const mau = KT.tierColor(person.tier);
+    theHost.__wrap.innerHTML =
+      `<div class="kt-x-card">` +
+      `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
+      (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
+      (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
+      `</div>` +
+      (person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
+      (note && note.note
+        ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
+          `<div class="kt-x-meta">${KT.esc(
+            [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
+              .filter(Boolean)
+              .join(" · ")
+          )}</div>`
+        : `<div class="kt-x-meta">Chưa ghi chú gì — bấm để ghi.</div>`) +
+      `</div>`;
+    theHost.style.display = "block";
+    // Đặt DƯỚI cái pill, kéo vào trong màn nếu tràn mép phải.
+    const w = 260;
+    let left = Math.min(rect.left, window.innerWidth - w - 8);
+    theHost.style.left = Math.max(8, left) + "px";
+    theHost.style.top = Math.min(rect.bottom + 6, window.innerHeight - 40) + "px";
+  }
+
+  function moHopCho(handle, rect) {
+    if (!noteBox) return;
+    const person = personFor(handle);
+    dongThe();
+    noteBox.open({
+      caller: { username: handle, twitterUrl: "https://x.com/" + handle },
+      person: person || KT.personFromCaller({ username: handle }),
+      renamedFrom: "",
+      token: "",
+      tokenAddress: "",
+      chain: "",
+      rect,
+    });
+  }
+
   /* ---------- hộp ghi chú ---------- */
 
   const api = {
@@ -164,7 +318,7 @@
     onSaved: async (res) => {
       if (!res || !res.ok) return;
       await load();
-      ve();
+      veTatCa();
     },
   };
 
@@ -204,11 +358,16 @@
     if (!handle) {
       document.getElementById(BTN_ID)?.remove();
       document.getElementById(STRIP_ID)?.remove();
-      return;
+      return; // vẫn quét feed: trang chủ không có hồ sơ nhưng đầy bài viết
     }
     const person = personFor(handle);
     veNut(person);
     veDai(person);
+  }
+
+  function veTatCa() {
+    ve();
+    quetFeed();
   }
 
   /**
@@ -223,7 +382,7 @@
     let timer = null;
     const hen = () => {
       clearTimeout(timer);
-      timer = setTimeout(ve, 250);
+      timer = setTimeout(veTatCa, 250);
     };
 
     let urlCu = location.href;
@@ -244,8 +403,9 @@
 
     new MutationObserver(() => {
       doiUrl();
-      if (!state.handle) return;
-      if (!document.getElementById(BTN_ID)) hen();
+      // Feed đổi liên tục lúc cuộn, nên lúc nào cũng phải hẹn quét lại;
+      // `veTrongFeed` tự bỏ qua bài đã gắn đúng người nên không tốn gì.
+      hen();
     }).observe(document.body, { childList: true, subtree: true });
   }
 
@@ -253,11 +413,11 @@
     await load();
     noteBox = KT.createNoteBox(api);
     noteBox.mount();
-    ve();
+    veTatCa();
     theoDoiTrang();
 
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && changes[KT.STORAGE.DATA]) load().then(ve);
+      if (area === "local" && changes[KT.STORAGE.DATA]) load().then(veTatCa);
     });
 
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -272,6 +432,8 @@
         neoNut: lastAnchors.nut,
         neoDai: lastAnchors.dai,
         nutDangCo: !!document.getElementById(BTN_ID),
+        baiTrongFeed: document.querySelectorAll('article[data-testid="tweet"]').length,
+        baiDaGan: document.querySelectorAll("article[data-kt-pill]").length,
       });
     });
   })();
