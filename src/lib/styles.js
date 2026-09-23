@@ -260,6 +260,14 @@
 .kt-card .kt-card-desc { margin-top: 5px; color: #9BA6B2; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .kt-card .kt-card-stat { margin-top: 5px; color: #6E7A88; font-size: 11px; font-variant-numeric: tabular-nums; }
 .kt-card .kt-card-flag { margin-top: 5px; color: #FFB4AE; font-size: 11px; }
+/* Ghi chú của CHÍNH MÌNH — thứ đáng đọc nhất trên thẻ, nên nó phải khác hẳn
+   mấy dòng số liệu của GMGN. Vạch trái để mắt tách ra ngay. */
+.kt-card .kt-card-note {
+  margin-top: 6px; padding-left: 7px; border-left: 2px solid #3FB950;
+  color: #E6EDF3; font-size: 12px;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.kt-card .kt-card-note-meta { margin-top: 3px; color: #6E7A88; font-size: 10px; }
 `;
 
   if (typeof module !== "undefined" && module.exports) {

@@ -390,7 +390,16 @@
       const person = hit.person;
       const caller = hit.caller;
       const bits = [];
-      if (person.noteCount) bits.push(`${person.noteCount} ghi chú`);
+      // Ghi chú GẦN NHẤT, in thẳng ra thẻ.
+      //
+      // Bản trước chỉ ghi "có 1 ghi chú" rồi bắt người dùng đi mở chỗ khác để
+      // đọc — trong khi nội dung đã nằm sẵn trong bộ nhớ. Mà đây đúng là câu
+      // hỏi lúc hover: "thằng này mình từng nghĩ gì về nó?".
+      const note = (person.notes && person.notes[0]) || null;
+      // Chỉ còn đếm khi có NHIỀU hơn một: đã in nội dung ra rồi thì dòng
+      // "1 ghi chú" chẳng thêm gì.
+      if (person.noteCount > 1) bits.push(`${person.noteCount} ghi chú`);
+      else if (person.noteCount && !(note && note.note)) bits.push(`${person.noteCount} ghi chú`);
       if (caller && caller.multiple != null) bits.push("hiện " + KT.fmtMultiple(caller.multiple));
       if (caller && caller.followers != null) bits.push(caller.followers + " follower");
 
@@ -410,6 +419,16 @@
           )}</span>
         </div>
         ${person.summary ? `<div class="kt-card-desc">${KT.esc(person.summary)}</div>` : ""}
+        ${
+          note && note.note
+            ? `<div class="kt-card-note">${KT.esc(note.note)}</div>
+               <div class="kt-card-note-meta">${KT.esc(
+                 [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
+                   .filter(Boolean)
+                   .join(" · ")
+               )}</div>`
+            : ""
+        }
         ${
           caller && caller.holdingLabel
             ? `<div class="kt-card-stat" style="color:${
