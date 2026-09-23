@@ -586,3 +586,29 @@ thẳng "Google chuyển hướng sang tài khoản thứ N của trình duyệt
 ⚠ `.test` và `.status` trong `options.css` phải có `white-space: pre-wrap`:
 thông báo 404 nhiều dòng, không có nó thì dồn thành một dòng dài và không ai
 đọc tới dòng cuối — mà dòng cuối mới là cách chữa.
+
+## Thẻ hover in thẳng GHI CHÚ, không chỉ đếm số (23/09/2026)
+
+Bản trước ghi `"1 ghi chú"` rồi bắt người dùng đi mở chỗ khác để đọc — trong
+khi nội dung đã nằm sẵn trong `person.notes`. Mà đó đúng là câu hỏi lúc hover:
+*"thằng này mình từng nghĩ gì về nó?"*. Đếm một thứ rồi giấu nó đi là bắt
+người ta làm thêm một bước không cần thiết.
+
+`cardHtml` lấy `person.notes[0]` (mảng đã sắp mới→cũ trong `buildDb`) và in
+nội dung + ngày + token + người ghi.
+
+⚠ Dòng đếm chỉ còn hiện khi có **nhiều hơn một** ghi chú. In nội dung ra rồi
+thì "1 ghi chú" không thêm được thông tin nào — trừ khi ô `note` rỗng, lúc đó
+con số vẫn là thứ duy nhất nói lên có ghi chú.
+
+`.kt-card-note` có vạch trái xanh + `-webkit-line-clamp: 4`: nó phải tách khỏi
+mấy dòng số liệu của GMGN bằng mắt, và ghi chú dài không được kéo thẻ cao
+tràn màn hình.
+
+### Soi thẻ bằng mắt mà không cần GMGN
+`dev/preview.html` + Playwright dựng lại được đúng thẻ đó. Trong môi trường
+này Chromium có sẵn: `chromium.launch({ executablePath: "/opt/pw-browsers/chromium" })`,
+đừng gọi `npx playwright install`.
+⚠ Muốn chụp riêng thẻ thì giấu `#kol-tracker-panel` trước — panel nằm đè lên,
+và `elementHandle.screenshot` chụp đúng cái đang được VẼ ở chỗ đó. Giấu bằng
+`[id^="kol-tracker"]` là giấu nhầm cả `#kol-tracker-overlay` chứa thẻ.
