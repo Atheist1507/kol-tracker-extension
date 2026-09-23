@@ -11,6 +11,39 @@
   "use strict";
   const KT = (root.KT = root.KT || {});
 
+
+  /**
+   * CSS cho phần mọc thêm trên X. Nằm trong shadow root nên không đụng gì tới
+   * trang, nhưng cũng nghĩa là KHÔNG thừa hưởng gì từ X — kể cả font.
+   *
+   * ⚠ Màu nền/chữ tự khai, đừng dựa vào theme của X: X có ba theme (sáng, tối
+   * mờ, tối đặc) và người dùng đổi lúc nào cũng được. Dùng nền trong suốt +
+   * viền màu hạng thì đọc được trên cả ba.
+   */
+  const X_CSS = `
+.kt-x { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
+.kt-x-btn {
+  font: inherit; font-weight: 600; cursor: pointer;
+  padding: 6px 14px; border-radius: 999px;
+  background: transparent; color: #3FB950; border: 1px solid #3FB950;
+  white-space: nowrap;
+}
+.kt-x-btn:hover { background: rgba(63,185,80,.12); }
+.kt-x-btn.co { color: #E3B341; border-color: #E3B341; }
+.kt-x-btn.co:hover { background: rgba(227,179,65,.12); }
+.kt-x-strip {
+  border-left: 3px solid #6E7A88; padding: 6px 0 6px 10px;
+  color: #8B98A5; line-height: 1.5;
+}
+.kt-x-head { font-size: 12px; }
+.kt-x-flag { color: #F85149; }
+.kt-x-sum { margin-top: 3px; }
+.kt-x-note { margin-top: 4px; color: #D7DEE6; }
+.kt-x-meta { margin-top: 2px; font-size: 11px; color: #6E7A88; }
+`;
+
+  KT.X_CSS = X_CSS;
+
   KT.PANEL_CSS = `
 :host { all: initial; }
 *, *::before, *::after { box-sizing: border-box; }
@@ -271,6 +304,6 @@
 `;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { PANEL_CSS: KT.PANEL_CSS, OVERLAY_CSS: KT.OVERLAY_CSS };
+    module.exports = { PANEL_CSS: KT.PANEL_CSS, OVERLAY_CSS: KT.OVERLAY_CSS, X_CSS: KT.X_CSS };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);

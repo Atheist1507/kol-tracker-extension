@@ -612,3 +612,45 @@ này Chromium có sẵn: `chromium.launch({ executablePath: "/opt/pw-browsers/ch
 ⚠ Muốn chụp riêng thẻ thì giấu `#kol-tracker-panel` trước — panel nằm đè lên,
 và `elementHandle.screenshot` chụp đúng cái đang được VẼ ở chỗ đó. Giấu bằng
 `[id^="kol-tracker"]` là giấu nhầm cả `#kol-tracker-overlay` chứa thẻ.
+
+## KOL Tracker trên X (twitter.com / x.com) — v0.13.0
+
+Trên GMGN mình đi tìm người giữa một chart vẽ bằng canvas. Trên X thì ngược
+lại: **tay cầm nằm ngay trong URL**. Nên phần khó không phải "người này là ai"
+mà là "gắn cái nút vào đâu cho nó không rụng khi X đổi giao diện".
+
+Hai thứ mọc thêm: nút **Ghi chú** cạnh nút Theo dõi, và một **dải** ngay dưới
+dòng "Được theo dõi bởi" — hạng + ghi chú gần nhất. Chưa có hồ sơ thì nút ghi
+`+ Ghi chú` và **không** mọc dải rỗng.
+
+### Thang neo, không phải một selector
+Class của X sinh tự động, đọc không ra nghĩa. Mỗi chỗ gắn là một **thang**
+`data-testid`, thử lần lượt, và **ghi lại bắt được bằng nấc nào**
+(`neoNut`/`neoDai` trong Chẩn đoán) — hỏng thì biết ngay nấc nào vừa mất, thay
+vì chỉ thấy "nút không hiện".
+- Nút: `placementTracking` → `userActions` → `UserName`.
+- Dải: `a[href$="/followers_you_follow"]` → `UserProfileHeader_Items` →
+  `UserDescription` → `UserName`. Neo đầu là thẻ `<a>` nằm lọt trong một dòng
+  chữ nên phải trèo lên khối cha một nấc mới chèn được.
+
+⚠ Nút chèn **TRƯỚC** nút Theo dõi: chèn sau thì nó bị đẩy xuống dòng khi cửa
+sổ hẹp, vì nút Theo dõi vốn nằm sát mép phải.
+
+### X là SPA
+Bấm sang hồ sơ khác KHÔNG tải lại trang. Nghe cả `pushState`/`replaceState`/
+`popstate` lẫn `MutationObserver`. ⚠ Observer phải tự chặn vòng lặp: chính
+mình chèn node nên callback gọi lại mình — chỉ vẽ lại khi nút **thật sự**
+không còn trên trang, và hãm 250ms.
+
+### Ghi chú từ X không gắn với cú call nào
+Không token, không ví → `note-box` **ẩn** phần "call ở đoạn nào của sóng": câu
+hỏi không có câu trả lời thì hỏi chỉ tổ làm người ta phân vân. Khoá vẫn đi qua
+`keyOf`, nên người đã note từ GMGN thì ghi chú từ X rơi vào **đúng dòng cũ**.
+
+### `dev/x-preview.html` — soi bằng mắt, không cần X
+Dựng lại trang hồ sơ X với đúng các `data-testid`.
+⚠ Trang này gọi `history.replaceState` để giả `/cryptoape`, nên mọi thẻ
+`<script>` phải dùng đường dẫn **TUYỆT ĐỐI** — sau lệnh đó đường dẫn tương đối
+đổi gốc, `stub.js` 404, và triệu chứng duy nhất là
+`chrome.storage.sync undefined`.
+⚠ `stub.js` gọi `KT.withDefaults` ngay lúc chạy nên phải nạp **sau** thư viện.

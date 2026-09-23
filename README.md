@@ -25,6 +25,9 @@ git clone git@github.com:Atheist1507/kol-tracker-extension.git
 
 Chrome → `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục vừa clone.
 
+Chạy ở hai nơi: **GMGN** (panel + hover chart + phím `N`) và **X/Twitter**
+(nút Ghi chú trên trang hồ sơ + dải hạng/ghi chú dưới phần bio).
+
 Không có bước build, không có `npm install`.
 
 ### Lấy bản mới
