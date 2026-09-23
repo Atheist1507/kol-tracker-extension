@@ -98,7 +98,12 @@
                 placeholder="Ví dụ: call sớm, có luận điểm rõ, nhưng hay xả nhanh…"></textarea>
             </div>
 
-            <div class="kt-field">
+            ${
+              // Ghi chú từ trang X là ghi chú về NGƯỜI, không gắn với cú call
+              // nào — không có token thì "call ở đoạn nào của sóng" là câu hỏi
+              // không có câu trả lời, hỏi nó chỉ tổ làm người ta phân vân.
+              ctx.token
+                ? `<div class="kt-field">
               <label>Call ở đoạn nào của sóng</label>
               <div class="kt-chips" data-el="positions">
                 ${POSITIONS.map(
@@ -108,7 +113,9 @@
                     )}</button>`
                 ).join("")}
               </div>
-            </div>
+            </div>`
+                : ""
+            }
 
             <div class="kt-field">
               <label>Xếp hạng ${person.tier ? `(đang là ${KT.esc(person.tier)})` : ""}</label>
