@@ -163,6 +163,63 @@ tìm kiếm của họ thì chữ "n" vẫn là chữ "n".
 Dữ liệu tự làm tươi khi mở GMGN (nếu bản cache cũ hơn 10 phút) và theo chu kỳ 30 phút — chỉnh được
 trong Options. Nút ⟳ luôn tải lại ngay lập tức.
 
+### Trên X (twitter.com / x.com)
+
+Research chủ yếu diễn ra ở đây, nên extension chạy cả trên X chứ không chỉ GMGN.
+
+| Chỗ | Cái gì mọc ra |
+|---|---|
+| Trang hồ sơ, cạnh nút **Theo dõi** | Nút `+ Ghi chú`, hoặc `S · 3 ghi chú` nếu đã biết người này |
+| Dưới dòng "Được theo dõi bởi…" | Dải: hạng, cờ đỏ, ghi chú gần nhất, **và dòng trên chain** |
+| Mỗi bài trong dòng thời gian | Một pill cạnh tên: hạng (`S 2`) · `◆ 2` nếu chưa ghi chú nhưng **đã thấy trên chain** · `+` nếu chưa biết gì |
+| Rê chuột vào avatar trong feed | Thẻ tóm tắt ngay tại chỗ |
+| Bài có dán **contract address** | Chip `mở trên GMGN` ngay dưới nội dung bài |
+
+**Bấm pill trên một bài = ghi chú GẮN VỚI BÀI ĐÓ.** Hộp ghi chú mở ra với link bài, nguyên văn bài
+và giờ đăng điền sẵn — vào đúng ba cột `post_id` / `post_text` / `posted_at` của tab Detail, còn
+`source_url` là link thẳng tới bài chứ không phải `x.com/home`.
+
+Đây là chỗ tính năng này đáng giá: câu *"thằng này hô thuê"* nằm trơ thì sáu tháng sau không nhớ vì
+sao mình viết thế. Kèm nguyên văn bài + ngày giờ + link thì đó là **bằng chứng**. Và khi nó xoá bài —
+dấu hiệu bẩn nhất trong nghề này — bản chụp trong Sheet là thứ duy nhất còn lại. Không muốn gắn bài
+thì bấm `×` ở khối "Gắn với bài này", phần đã gõ vẫn còn nguyên.
+
+### Sổ trên chain — nối GMGN với X
+
+Feed `fomo/thesis` của GMGN nói ba thứ X không bao giờ nói: người này đã call token nào, **bỏ vào bao
+nhiêu tiền thật**, đang lãi lỗ bao nhiêu. Nhưng nó chỉ sống trong cái tab chart đang mở.
+
+Nên mỗi lần mở một chart GMGN, extension ghi đám người đó xuống `chrome.storage.local`
+(`src/lib/ledger.js`). Sang X là tra ra ngay, ngay dưới tên người đang đọc:
+
+> đã thấy call 6 token · bỏ vào $8.1K · lãi $1.1K
+
+Thằng viết luận điểm hay nhất mà bỏ đúng $200 thì cái luận điểm đó nghĩa khác hẳn.
+
+⚠ **Ba chỗ cố ý không làm:**
+
+- **"đã thấy"** không được bỏ khỏi câu. Đây là mấy cú call tình cờ bắt được lúc mở chart, không phải
+  toàn bộ sự nghiệp của người ta. Viết thành "đã call 6 token" là nói quá điều mình biết.
+- Mọi con số là **ảnh chụp lúc xem chart**, không phải kết cục. Lãi hôm nay có thể là lỗ tuần sau —
+  nên không có xếp hạng tự động, không có "win rate", không tô xanh đỏ. Số GMGN đưa, người đọc tự kết
+  luận. (Đã trả giá một lần cho cái nhãn "còn giữ" đúng với 200/200 người.)
+- Sổ lưu **theo từng token** rồi ghi đè dòng của token đó, chứ không cộng dồn vào một con số tổng.
+  Cộng dồn thì F5 ba lần là "bỏ vào" gấp ba, và không ai nhìn ra được.
+
+Sổ giữ tối đa 300 người × 20 token, vượt thì bỏ người lâu không gặp nhất.
+
+### Contract address → GMGN
+
+Bài nào dán contract address thì mọc chip `mở trên GMGN` ngay dưới, cắt đúng thao tác tốn nhất khi
+research: bôi đen → copy → đổi tab → dán.
+
+⚠ Với địa chỉ `0x…` thì **chain là một câu đoán** — eth, base, bsc, arbitrum dùng chung một dạng địa
+chỉ mà bài viết thì không nói chain nào. Nhãn ghi rõ `GMGN (đoán: eth)` để người bấm biết là đang
+đoán; đoán sai thì GMGN mở ra trang trống chứ không dẫn sai sang một token khác.
+
+Chữ ký giao dịch Solana (87–88 ký tự base58) **không** bị nhận nhầm thành địa chỉ — có test khoá lại,
+vì regex quét giữa câu thì nó khớp trọn 44 ký tự cuối của chữ ký và ra một link chết.
+
 ### Cờ đỏ tự tính
 
 GMGN trả về số liệu mua/bán của chính người đó với chính token đó. Từ đó suy ra:
@@ -239,6 +296,8 @@ content/content.js         Điều phối: ghép người-trên-chart (API) vớ
 content/note-box.js        Hộp ghi chú — phím N, điền sẵn tất cả, ⌘Enter ghi vào Sheet
 content/panel.js           Mức 1 — panel nổi (shadow DOM, kéo thả, tìm kiếm, thẻ chi tiết)
 content/overlay.js         Mức 2 — viền tier quanh avatar + thẻ hover + hàm chẩn đoán canvas/DOM
+content/x.js               Trên X: nút ghi chú ở hồ sơ, pill + thẻ hover trong feed, chip contract,
+                           dòng "đã thấy call N token" lấy từ sổ trên chain
 popup/                     Bản rút gọn của panel, dùng được ở mọi trang
 options/                   Cấu hình: 2 link CSV, ngưỡng win rate, bật/tắt overlay
 apps-script/Code.gs        Sống TRONG file Sheet: doGet trả JSON cho extension đọc, doPost nhận
@@ -250,8 +309,11 @@ src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ
   stats.js                   đọc "x5"/"đu đỉnh"/"+300%" → win rate, timing, mốc thời gian
   model.js                   dựng db người/ghi chú trong bộ nhớ (khoá là VÍ) + tìm kiếm + dò đổi tên
   tooltip-text.js            mẩu chữ trong tooltip → ứng viên handle (chủ thẻ vs tên bị nhắc tới)
-  gmgn.js                    đọc API community/messages của GMGN: danh tính, nội dung post, x mấy,
-                             và "mua thật hay hô xong xả sạch"
+  gmgn.js                    đọc API community/messages + fomo/thesis của GMGN: danh tính, nội dung
+                             post, x mấy, và "mua thật hay hô xong xả sạch"
+  x-page.js                  đọc trang X: đường dẫn nào là hồ sơ, id/link/nguyên văn của một bài
+  ledger.js                  sổ trên chain — gộp feed thesis của GMGN để tra lại được từ trang X
+  ca.js                      bắt contract address trong một đoạn chữ → link GMGN
   sheet-url.js               link Sheet kiểu gì cũng ra được link CSV
   render.js                  dựng HTML dùng CHUNG cho panel và popup
   styles.js                  CSS dạng chuỗi (shadow DOM phải nhét style bằng JS)
@@ -268,7 +330,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 94 test logic thuần, không cần cài gì
+npm test         # 174 test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```
@@ -279,6 +341,11 @@ Cả hai lệnh trên chạy trong CI (`.github/workflows/ci.yml`) ở mọi PR 
 `http://127.0.0.1:8099/dev/preview.html`): một trang thường với `chrome.*` giả và dữ liệu giả, nhưng
 panel + overlay là code THẬT trong `content/`. Soi CSS và bố cục ở đó, khỏi phải dựng Sheet rồi reload
 extension sau mỗi lần sửa một dòng. Thư mục `dev/` không nằm trong `manifest.json`.
+
+Phần chạy trên X thì mở **`dev/x-preview.html`** — một trang X giả (đúng mấy cái `data-testid` thật)
+kèm feed 3 bài, trong đó có bài dán contract address và một người đã có mặt trong sổ trên chain.
+`npm run check` kiểm cả hai trang preview có nạp đủ content script không: thiếu một file thì script
+ném lỗi giữa `init` và **không có gì mọc ra, cũng không có thông báo nào**.
 
 Thêm cột mới vào Sheet → khai ở `COLUMN_ALIASES` trong `src/lib/csv.js` (không khai thì vẫn hiện, chỉ
 là nằm trong `extra`). Thêm file content script mới → sửa **cả** `manifest.json` **và** `KT.CONTENT_FILES`

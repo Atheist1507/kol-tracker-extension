@@ -683,3 +683,75 @@ DOM, mà mình chỉ cần mấy bài đang nhìn thấy.
 ⚠ MutationObserver trong feed **không** kiểm "nút còn không" để quyết định vẽ
 lại nữa — feed đổi liên tục nên lúc nào cũng hẹn quét, `veTrongFeed` tự bỏ qua
 bài đã gắn đúng người nên không tốn gì.
+
+## Ghi chú GẮN VỚI MỘT BÀI — v0.15.0
+
+Bấm pill trên một bài trong feed = hộp ghi chú mở ra với **link bài, nguyên văn
+bài, giờ đăng** điền sẵn, chảy vào ba cột `post_id`/`post_text`/`posted_at` vốn
+đã có trong tab Detail và vốn đang rỗng với mọi ghi chú từ X. Không đụng
+Apps Script.
+
+⚠ `source_url` phải là link của **BÀI**, không phải `location.href`. Ghi chú từ
+dòng thời gian mà lưu `x.com/home` thì cột này vô dụng — mà đây lại đúng là cột
+phải bấm vào sáu tháng sau để xem lại bằng chứng.
+
+⚠ Khoá nhớ trên `<article>` giờ là `tay_cầm|id_bài`, không còn là tay cầm
+trần. Node tái dùng có thể mang bài **khác của cùng một người**, và lúc đó chip
+contract còn lại là của bài cũ — trỏ sang một token không liên quan gì.
+
+⚠ Đi từ thẻ `<time>` ra để lấy permalink (`time.closest('a[href*="/status/"]')`),
+không lấy `a[href*="/status/"]` đầu tiên trong `<article>`: một bài TRÍCH DẪN
+bài khác cũng có link dạng đó nằm bên trong.
+
+⚠ Nguyên văn bài phải **đi gom bằng TreeWalker**, không dùng `textContent`: X
+để mỗi đoạn trong một `<span>`, emoji là `<img alt>`, xuống dòng là `<br>`.
+`textContent` trần thì mất emoji và dính liền hai dòng — mà bài call viết mỗi ý
+một dòng.
+
+⚠ Nút `×` bỏ gắn bài phải **bê chữ đã gõ sang** bản vẽ lại (kể cả hạng/vị trí
+sóng đang chọn). Mất một đoạn nhận xét vừa gõ vì bấm nhầm là lỗi không tha được.
+
+## Sổ trên chain (`src/lib/ledger.js`) — v0.15.0
+
+Trang GMGN ghi feed `fomo/thesis` xuống `chrome.storage.local`; trang X đọc lên
+để hiện *"đã thấy call 6 token · bỏ vào $8.1K · lãi $1.1K"*.
+
+⚠⚠ Sổ lưu **theo từng token** rồi ghi đè dòng của token đó, KHÔNG cộng dồn vào
+một con số tổng. Mỗi lần mở lại đúng cái chart đó là feed về lại y nguyên; cộng
+dồn thì F5 ba lần là "bỏ vào" gấp ba, và không ai nhìn ra được. Có test khoá.
+
+⚠ Cộng một đống `null` ra `0`, mà `0` ở đây nghĩa là "bỏ vào 0 đồng" — sai hẳn
+nghĩa. `totals()` phải đếm xem có token nào CÓ số không, không có thì trả `null`
+và câu chữ bỏ hẳn vế đó đi.
+
+⚠ Khoá là `x:<author_id>` trước, `h:<tay cầm>` sau. Lần đầu chỉ biết tên, lần
+sau biết id thì **GỘP** dòng cũ vào khoá mới rồi bỏ khoá cũ — không gộp thì một
+người thành hai dòng, mỗi dòng kể một nửa câu chuyện. Chỉ mục tên → khoá dựng
+lại từ đầu mỗi lượt, để tên cũ chết theo khi người ta đổi tên.
+
+⚠ **CHỈ frame trên cùng ghi sổ.** Chart nằm trong iframe riêng, cả hai frame
+đều nghe được feed — hai frame cùng đọc-rồi-ghi một khoá storage là mất một nửa
+dữ liệu của lượt đó, im lặng.
+
+⚠ Câu chữ: giữ **"đã thấy"**, và không xếp hạng / không "win rate" / không tô
+xanh đỏ. Đây là ảnh chụp lúc xem chart, không phải kết cục. Cùng bài học với
+cái nhãn "còn giữ" đúng với 200/200 người.
+
+## Bắt contract address (`src/lib/ca.js`) — v0.15.0
+
+⚠⚠ **Cắt chữ thành TỪ rồi so khớp cả từ**, đừng dùng regex quét giữa câu. Chữ
+ký giao dịch Solana dài 87–88 ký tự base58: `/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/`
+không khớp được từ đầu, nhưng nó **trượt sang vị trí 44** rồi khớp trọn 44 ký
+tự cuối — ra một "địa chỉ" là nửa sau của một chữ ký, link dẫn tới trang trống.
+
+⚠ Địa chỉ `0x…` thì chain là câu ĐOÁN (eth/base/bsc dùng chung một dạng). Nhãn
+phải nói ra là đang đoán chain nào. Đoán sai thì GMGN mở trang trống — chấp
+nhận được; dẫn sai sang token khác thì không.
+
+## `alive()` chỉ dùng cho `sendMessage`
+
+Đừng chặn một lượt **đọc** `chrome.storage` bằng `alive()`. `dev/stub.js` không
+có `runtime.id` thật, nên trang xem thử sẽ im lặng không có dữ liệu, mà triệu
+chứng thì giống hệt "bên kia chưa ghi gì" — không lần ra được. (Đã dính đúng
+thế với sổ trên chain.) `dev/stub.js` giờ khai `runtime.id` để đường lưu trong
+preview chạy thật.

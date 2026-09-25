@@ -49,6 +49,22 @@
   white-space: nowrap;
 }
 .kt-x-pill.co:hover, .kt-x-pill:hover { filter: brightness(1.25); }
+/* Sổ trên chain: số GMGN đưa, không phải kết luận của mình. Màu trung tính
+   có chủ đích — tô xanh/đỏ là đang thay người đọc kết luận. */
+.kt-x-chain { margin-top: 3px; font-size: 12px; color: #58A6FF; }
+.kt-x-chain-tok { color: #6E7A88; font-size: 11px; }
+
+/* Chip "mở trên GMGN" dưới một bài có dán contract address. */
+.kt-x-ca { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.kt-x-ca a {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: inherit; font-size: 12px; font-weight: 600; text-decoration: none;
+  padding: 2px 9px; border-radius: 999px;
+  color: #58A6FF; border: 1px solid rgba(88,166,255,.45); background: rgba(88,166,255,.08);
+}
+.kt-x-ca a:hover { background: rgba(88,166,255,.18); }
+.kt-x-ca code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; opacity: .8; font-weight: 400; }
+
 .kt-x-card {
   position: fixed; z-index: 2147483000; width: 260px; padding: 9px 11px;
   background: #0F1319; border: 1px solid #262C36; border-radius: 10px;
@@ -129,6 +145,26 @@
 .kt-input::placeholder { color: var(--kt-fg-subtle); }
 
 .kt-hint { color: var(--kt-fg-subtle); font-size: 11px; margin: 8px 2px 0; }
+
+/* Bài được gắn vào ghi chú. Vạch xanh bên trái = "đây là dữ liệu chụp được",
+   cùng ngôn ngữ với .kt-card-note của thẻ hover. */
+.kt-post {
+  margin: 8px 0 0; padding: 6px 0 6px 9px;
+  border-left: 3px solid var(--kt-ok, #3FB950);
+  font-size: 12px; line-height: 1.5;
+}
+.kt-post-head {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--kt-fg-subtle); font-size: 11px;
+}
+.kt-post-head > span { flex: 1; min-width: 0; }
+/* Nguyên văn bài: GIỮ xuống dòng (bài call viết mỗi ý một dòng), nhưng chặn
+   cao 5 dòng — bài dài không được đẩy nút Lưu ra ngoài màn hình. */
+.kt-post-text {
+  margin-top: 3px; color: var(--kt-fg); white-space: pre-wrap; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
+}
+.kt-dim { color: var(--kt-fg-subtle); }
 .kt-sec-title {
   font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
   color: var(--kt-fg-subtle); margin: 12px 2px 6px;

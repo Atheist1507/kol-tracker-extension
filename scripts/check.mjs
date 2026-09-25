@@ -84,6 +84,27 @@ if (fs.existsSync(previewPath)) {
   void missing;
 }
 
+/* 3c. dev/x-preview.html phải nạp đủ content script của trang X
+ *
+ * Cùng một cách hỏng, chỉ khác trang: thiếu một file là x.js ném lỗi giữa
+ * init, nút Ghi chú đơn giản không mọc, không có thông báo nào. Trước đây chỉ
+ * preview của GMGN được kiểm — thêm file mới vào block X thì không ai nhắc.
+ * (Đường dẫn ở đây TUYỆT ĐỐI vì trang tự đổi base URL — xem comment trong file.)
+ */
+const xPreviewPath = path.join(ROOT, "dev/x-preview.html");
+if (fs.existsSync(xPreviewPath)) {
+  const xPreview = fs.readFileSync(xPreviewPath, "utf8");
+  const xFiles = (manifest.content_scripts.find((cs) => cs.js.includes("content/x.js")) || { js: [] }).js;
+  const thieu = xFiles.filter((f) => !xPreview.includes('"/' + f + '"'));
+  if (thieu.length) {
+    errors.push(
+      "dev/x-preview.html thiếu content script: " +
+        thieu.join(", ") +
+        "\n  (thiếu là x.js ném lỗi giữa init, nút Ghi chú không mọc mà không báo gì)"
+    );
+  }
+}
+
 /* 4. <script src> và <link href> trong HTML trỏ đúng chỗ */
 for (const html of ["popup/popup.html", "options/options.html"]) {
   const dir = path.dirname(path.join(ROOT, html));

@@ -75,6 +75,28 @@
 
   const TOKEN_PAYLOAD = { code: 0, data: [{ address: "0xtok1", symbol: "CASHCAT", name: "Cash Cat" }] };
 
+  /**
+   * Sổ trên chain mẫu — bình thường do trang GMGN ghi xuống. Có nó thì
+   * dev/x-preview.html soi được dòng "đã thấy call N token · bỏ vào $X".
+   */
+  const LEDGER = KT.ledger.mergeThesis(
+    null,
+    [
+      { xId: "111111111", authorId: "111111111", username: "cryptoape", displayName: "Ape",
+        tokenAddress: "So11111111111111111111111111111111111111112", tokenSymbol: "CASHCAT",
+        chain: "sol", tradeUsd: 6200, pnlUsd: 940, holdingUsd: 7140, postedTs: Date.now() - 36e5 },
+      { xId: "111111111", authorId: "111111111", username: "cryptoape", displayName: "Ape",
+        tokenAddress: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", tokenSymbol: "FOGO",
+        chain: "sol", tradeUsd: 1860, pnlUsd: 180, holdingUsd: 2040, postedTs: Date.now() - 864e5 },
+      // Người CHƯA có ghi chú nào nhưng đã thấy trên chain — đúng ca mà dòng
+      // này có giá nhất: đang đọc một người lạ.
+      { xId: "222222222", authorId: "222222222", username: "nguoila123", displayName: "Người Lạ",
+        tokenAddress: "So11111111111111111111111111111111111111112", tokenSymbol: "CASHCAT",
+        chain: "sol", tradeUsd: 210, pnlUsd: -80, holdingUsd: 130, postedTs: Date.now() - 72e5 },
+    ],
+    Date.now()
+  );
+
   const store = {
     sync: {
       config: KT.withDefaults({
@@ -86,6 +108,7 @@
     local: {
       data: { overview: OVERVIEW, detail: DETAIL, syncedAt: Date.now() - 4 * 60000, error: null },
       ui: { open: true },
+      ledger: LEDGER,
     },
   };
 
@@ -107,6 +130,11 @@
   globalThis.chrome = {
     storage: { sync: area("sync"), local: area("local"), onChanged: { addListener: (fn) => listeners.push(fn) } },
     runtime: {
+      // ⚠ PHẢI có: mọi content script dùng `chrome.runtime.id` để biết mình
+      // còn sống hay đã bị bản cập nhật bỏ rơi. Thiếu nó thì trong preview
+      // mọi đường lưu đều trả "Extension vừa cập nhật — bấm F5", tức là phần
+      // đáng soi nhất lại là phần không chạy.
+      id: "kol-tracker-preview",
       sendMessage: async (msg) => {
         if (msg && msg.type === "kt:saveNote") {
           console.log("[preview] saveNote payload:", JSON.parse(JSON.stringify(msg.payload)));

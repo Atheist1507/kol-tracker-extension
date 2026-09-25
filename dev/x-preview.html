@@ -54,31 +54,37 @@
 
       <!-- Dòng thời gian giả: đúng hình dạng data-testid của X -->
       <div id="feed">
+        <!-- ⚠ Hình dạng phải đúng như X thật, nếu không preview xanh mà trang
+             thật câm: nội dung bài nằm trong [data-testid="tweetText"], giờ
+             đăng trong <time datetime>, và permalink là thẻ <a> BỌC cái giờ. -->
         <article data-testid="tweet" class="tweet">
           <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
           <div class="tw-body">
             <div data-testid="User-Name">
-              <a href="/cryptoape"><b>Crypto Ape</b></a> <span>@cryptoape</span> · <span>2h</span>
+              <a href="/cryptoape"><b>Crypto Ape</b></a> <span>@cryptoape</span> ·
+              <a href="/cryptoape/status/1968000000000000001"><time datetime="2026-09-25T02:10:00.000Z">2h</time></a>
             </div>
-            <div>Ahaa only up from here</div>
+            <div data-testid="tweetText">Ahaa only up from here<br>contract clean, dev doxxed<br>So11111111111111111111111111111111111111112</div>
           </div>
         </article>
         <article data-testid="tweet" class="tweet">
           <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
           <div class="tw-body">
             <div data-testid="User-Name">
-              <a href="/nguoila123"><b>Người Lạ</b></a> <span>@nguoila123</span> · <span>5h</span>
+              <a href="/nguoila123"><b>Người Lạ</b></a> <span>@nguoila123</span> ·
+              <a href="/nguoila123/status/1968000000000000002"><time datetime="2026-09-24T23:10:00.000Z">5h</time></a>
             </div>
-            <div>gm</div>
+            <div data-testid="tweetText">gm 🔥 0xf1b6a4d6aecc5a618ade56a53fa9956ea508e16c</div>
           </div>
         </article>
         <article data-testid="tweet" class="tweet">
           <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
           <div class="tw-body">
             <div data-testid="User-Name">
-              <a href="/moonboy"><b>Moon Boy</b></a> <span>@moonboy</span> · <span>1d</span>
+              <a href="/moonboy"><b>Moon Boy</b></a> <span>@moonboy</span> ·
+              <a href="/moonboy/status/1968000000000000003"><time datetime="2026-09-24T04:10:00.000Z">1d</time></a>
             </div>
-            <div>ONLY UP</div>
+            <div data-testid="tweetText">ONLY UP</div>
           </div>
         </article>
       </div>
@@ -104,6 +110,8 @@
     <script src="/src/lib/config.js"></script>
     <script src="/src/lib/styles.js"></script>
     <script src="/src/lib/render.js"></script>
+    <script src="/src/lib/ca.js"></script>
+    <script src="/src/lib/ledger.js"></script>
     <!-- ⚠ stub.js dùng KT.withDefaults ngay lúc chạy, nên phải nạp SAU thư
          viện. Đặt trước là chrome.storage.sync thành undefined và không có
          lỗi nào chỉ thẳng vào đây. -->
