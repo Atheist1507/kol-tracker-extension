@@ -419,16 +419,7 @@
           )}</span>
         </div>
         ${person.summary ? `<div class="kt-card-desc">${KT.esc(person.summary)}</div>` : ""}
-        ${
-          note && note.note
-            ? `<div class="kt-card-note">${KT.esc(note.note)}</div>
-               <div class="kt-card-note-meta">${KT.esc(
-                 [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
-                   .filter(Boolean)
-                   .join(" · ")
-               )}</div>`
-            : ""
-        }
+        ${KT.render.noteLine(note)}
         ${
           caller && caller.holdingLabel
             ? `<div class="kt-card-stat" style="color:${

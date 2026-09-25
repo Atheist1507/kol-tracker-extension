@@ -20,6 +20,30 @@
    * mờ, tối đặc) và người dùng đổi lúc nào cũng được. Dùng nền trong suốt +
    * viền màu hạng thì đọc được trên cả ba.
    */
+  /**
+   * Khối "tóm tắt một người" — ĐỊNH NGHĨA MỘT CHỖ, ghép vào cả thẻ trên chart
+   * GMGN lẫn hai chỗ trên X. Trước đây cùng một khối có hai bộ tên lớp
+   * (`kt-card-note` / `kt-x-note`) với giá trị lệch nhau vài px và một bên có
+   * `line-clamp`, một bên không — tức là cùng một ghi chú hiện ra hai kiểu
+   * tuỳ chỗ mày đang rê chuột.
+   *
+   * ⚠ Shadow root nào dùng `KT.render.personBrief` thì phải nhét chuỗi này
+   * vào <style> của nó, nếu không khối chữ vẫn hiện nhưng mất hết định dạng.
+   */
+  const BRIEF_CSS = `
+.kt-brief-head { font-size: 12px; }
+.kt-brief-flag { color: #F85149; }
+.kt-brief-sum { margin-top: 4px; color: #9BA6B2; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* Ghi chú của CHÍNH MÌNH — thứ đáng đọc nhất trên thẻ, nên nó phải khác hẳn
+   mấy dòng số liệu của GMGN. Vạch trái để mắt tách ra ngay. */
+.kt-brief-note {
+  margin-top: 6px; padding-left: 7px; border-left: 2px solid #3FB950;
+  color: #E6EDF3; font-size: 12px;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.kt-brief-meta { margin-top: 3px; color: #6E7A88; font-size: 10px; }
+`;
+
   const X_CSS = `
 .kt-x { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
 .kt-x-btn {
@@ -35,11 +59,6 @@
   border-left: 3px solid #6E7A88; padding: 6px 0 6px 10px;
   color: #8B98A5; line-height: 1.5;
 }
-.kt-x-head { font-size: 12px; }
-.kt-x-flag { color: #F85149; }
-.kt-x-sum { margin-top: 3px; }
-.kt-x-note { margin-top: 4px; color: #D7DEE6; }
-.kt-x-meta { margin-top: 2px; font-size: 11px; color: #6E7A88; }
 
 /* --- trong dòng thời gian --- */
 .kt-x-pill {
@@ -72,7 +91,8 @@
 }
 `;
 
-  KT.X_CSS = X_CSS;
+  KT.BRIEF_CSS = BRIEF_CSS;
+  KT.X_CSS = X_CSS + BRIEF_CSS;
 
   KT.PANEL_CSS = `
 :host { all: initial; }
@@ -343,17 +363,9 @@
 .kt-card .kt-card-desc { margin-top: 5px; color: #9BA6B2; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .kt-card .kt-card-stat { margin-top: 5px; color: #6E7A88; font-size: 11px; font-variant-numeric: tabular-nums; }
 .kt-card .kt-card-flag { margin-top: 5px; color: #FFB4AE; font-size: 11px; }
-/* Ghi chú của CHÍNH MÌNH — thứ đáng đọc nhất trên thẻ, nên nó phải khác hẳn
-   mấy dòng số liệu của GMGN. Vạch trái để mắt tách ra ngay. */
-.kt-card .kt-card-note {
-  margin-top: 6px; padding-left: 7px; border-left: 2px solid #3FB950;
-  color: #E6EDF3; font-size: 12px;
-  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
-}
-.kt-card .kt-card-note-meta { margin-top: 3px; color: #6E7A88; font-size: 10px; }
-`;
+` + BRIEF_CSS;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { PANEL_CSS: KT.PANEL_CSS, OVERLAY_CSS: KT.OVERLAY_CSS, X_CSS: KT.X_CSS };
+    module.exports = { PANEL_CSS: KT.PANEL_CSS, OVERLAY_CSS: KT.OVERLAY_CSS, X_CSS: KT.X_CSS, BRIEF_CSS };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);
