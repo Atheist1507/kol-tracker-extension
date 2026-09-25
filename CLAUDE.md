@@ -44,8 +44,8 @@
 - **Hai danh sách content script** (`manifest.json` và `KT.CONTENT_FILES` trong `src/lib/config.js`)
   phải khớp nhau — `npm run check` khoá lại chuyện đó. Lệch nhau thì panel chạy trên GMGN nhưng không
   chạy khi chèn tay từ popup, và Chrome không báo gì.
-- **Logic thuần thì viết vào `src/lib/` kèm test.** Phần dễ sai nhất là đọc cột `result`/`called_at`
-  (chữ người gõ tay) — sai ở đó thì win rate sai mà không có triệu chứng gì.
+- **Logic thuần thì viết vào `src/lib/` kèm test.** Phần dễ sai nhất là đọc chữ NGƯỜI GÕ trong Sheet
+  (ngày tháng, hạng, vị trí sóng) — sai ở đó thì không có triệu chứng gì, chỉ có con số lệch.
 - Trước khi push: `npm test && npm run check`.
 
 - **Panel có ba màn (danh sách / tìm kiếm / chi tiết) nhưng chỉ một `el.content`.** Đường vào màn

@@ -6,7 +6,7 @@
  */
 const path = require("path");
 
-const FILES = ["normalize", "csv", "tier", "stats", "model", "gmgn", "tooltip-text", "geom", "x-page", "sheet-url", "render", "ca", "ledger", "config"];
+const FILES = ["normalize", "csv", "tier", "datetime", "model", "gmgn", "tooltip-text", "geom", "x-page", "sheet-url", "render", "ca", "ledger", "config"];
 for (const f of FILES) require(path.join(__dirname, "..", "src", "lib", f + ".js"));
 
 module.exports = globalThis.KT;
