@@ -40,6 +40,8 @@
 .kt-x-sum { margin-top: 3px; }
 .kt-x-note { margin-top: 4px; color: #D7DEE6; }
 .kt-x-meta { margin-top: 2px; font-size: 11px; color: #6E7A88; }
+.kt-x-ledger { margin-top: 4px; font-size: 11px; color: #8B98A5; }
+.kt-x-ledger b { color: #6E7A88; font-weight: 600; }
 
 /* --- trong dòng thời gian --- */
 .kt-x-pill {
@@ -49,6 +51,14 @@
   white-space: nowrap;
 }
 .kt-x-pill.co:hover, .kt-x-pill:hover { filter: brightness(1.25); }
+/* Nút "nói về chuyện này trước chưa" — chỉ mọc trên tweet có CA. Cố ý MỜ và
+   không màu: nó là công cụ lúc nghi ngờ, không phải một tín hiệu. */
+.kt-x-search {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-left: 4px; padding: 0; cursor: pointer;
+  border-radius: 999px; border: 1px solid #3A424D; background: transparent; color: #6E7A88;
+}
+.kt-x-search:hover { color: #D7DEE6; border-color: #6E7A88; }
 .kt-x-card {
   position: fixed; z-index: 2147483000; width: 260px; padding: 9px 11px;
   background: #0F1319; border: 1px solid #262C36; border-radius: 10px;
@@ -240,6 +250,8 @@
   background: var(--kt-bg-2); border: 1px solid var(--kt-border); border-radius: 8px;
 }
 .kt-snap .kt-note-post { flex: 1 0 100%; margin-top: 2px; }
+.kt-ledger { margin-top: 8px; font-size: 11.5px; line-height: 1.5; color: var(--kt-fg-subtle); }
+.kt-ledger b { font-weight: 600; }
 
 /* --- hộp ghi chú --- */
 .kt-sheet {

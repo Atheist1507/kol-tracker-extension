@@ -683,3 +683,80 @@ DOM, mà mình chỉ cần mấy bài đang nhìn thấy.
 ⚠ MutationObserver trong feed **không** kiểm "nút còn không" để quyết định vẽ
 lại nữa — feed đổi liên tục nên lúc nào cũng hẹn quét, `veTrongFeed` tự bỏ qua
 bài đã gắn đúng người nên không tốn gì.
+
+## Ngân sách giao diện — đọc TRƯỚC khi thêm bất cứ thứ gì hiện lên màn hình (25/09/2026)
+
+Máy tính được càng nhiều thì càng muốn bày hết ra, và extension thành một rừng
+số. Sáu luật, chủ máy đã duyệt:
+
+1. **Hiện kết luận, không hiện con số.** Số liệu chỉ nằm ở tầng "bấm vào".
+   Kết luận của máy (đợt sau) dùng một bộ từ CỐ ĐỊNH ~5 nhãn, không đẻ thêm.
+   Chưa đủ bằng chứng thì KHÔNG hiện gì — không có nhãn xám "chưa rõ".
+2. **Ba tầng, ngân sách cố định.** Nhìn lướt (hàng panel, pill X): tối đa MỘT
+   tín hiệu. Rê chuột (thẻ hover): tối đa 3 dòng. Bấm vào (màn chi tiết, trang
+   hồ sơ X): chỗ duy nhất được bày số. Thêm một thứ = bỏ một thứ, không mở chỗ mới.
+3. **Người thắng máy.** Hạng tay của chủ máy là thứ hiện; máy chỉ lên tiếng khi
+   KHÔNG đồng ý với hạng đó.
+4. **Rác thì gập lại**, không bày ra (dòng "Đã ẩn N người" — đợt sau).
+5. **Phần chạy ngầm không có giao diện.** Số liệu kỹ thuật vào Chẩn đoán.
+6. **Cảnh báo phải hiếm.**
+
+Mọi thứ hiện ra đều có công tắc ở trang Cài đặt (mục 5 cho phần sổ).
+
+## Sổ tự ghi cú call — v0.15.0 (25/09/2026)
+
+Trước bản này extension chỉ nhớ người được bấm N; feed thesis (200 cú call,
+nhiều token) sống trong RAM rồi mất khi F5. Giờ MỌI cú call nhìn thấy được ghi
+vào IndexedDB — logic ở `src/lib/ledger.js` (có test), lưu trữ ở
+`background/ledger-store.js`. Nguồn: feed thesis, bảng X Tracker, tweet có CA
+trên X. KHÔNG ghi vào Sheet.
+
+- **Sổ phải nằm ở service worker.** IndexedDB mở trong content script thuộc về
+  origin của TRANG (gmgn.ai / x.com) — sổ bị chia đôi theo trang.
+- ⚠⚠ **`ledger-store.js` lấy `KT` qua `globalThis`, không dùng tên trần.** Nó
+  được `importScripts` giữa lúc service-worker.js chạy, mà `const KT` ở đó khai
+  SAU lệnh import → tên trần rơi vào TDZ → ReferenceError → CẢ service worker
+  chết (kể cả tải Sheet), không lỗi nào hiện ra. Chỉ bắt được khi nạp extension
+  thật vào Chromium — test thuần không thấy.
+- **Khoá người là `personKeyOf`, KHÔNG phải `KT.handleKey`.** `handleKey` xoá
+  dấu `_` nên `foo_bar` ≡ `foobar` — hai tài khoản X khác nhau. Trong sổ thế là
+  trộn cú call của hai người vào một hồ sơ uy tín.
+  ⚠ `handleKey` vẫn đang dùng cho phần tra Sheet — cùng lỗi đó còn sống ở đó.
+- **Đơn vị đếm là (người, token)**, không phải bản ghi: cùng kèo thấy ở X lẫn
+  GMGN, hay hô năm lần, vẫn là MỘT kèo.
+- **"Ghi trước" / "ghi muộn" quyết định theo LÚC MÌNH THẤY, không theo kết
+  quả.** Chỉ cú "ghi trước" mới đáng chấm điểm — nhìn lại sau khi kèo pump thì
+  ai cũng giỏi. Lần thấy ĐẦU TIÊN quyết định; thấy lại muộn hơn không lật được
+  (`mergeCall`). Ngưỡng ở `LEDGER` (2h + <1.5x khi biết hệ số x; 30 phút khi
+  không biết). Luật "đã chạy ≥1.5x thì là ghi muộn" loại cú thắng nhanh nhiều
+  hơn cú thua — cố ý nghiêng về phía NGHI NGỜ người call.
+- **Đọc CA trong tweet** (`extractContracts`): địa chỉ trơ trọi có thể là VÍ —
+  chỉ nhận khi có cashtag / chữ CA / đuôi `pump`. Địa chỉ sau `/` là link
+  (thường là địa chỉ PAIR) → bỏ. ⚠ Quét EVM trước rồi XOÁ khỏi chuỗi mới quét
+  Solana: phần hex sau số 0 của địa chỉ EVM là một chuỗi base58 hợp lệ.
+- ⚠⚠ **Quote tweet** (`readTweet` trong x.js): hai khối tên, hai mốc giờ, hai
+  khối chữ. Đọc chữ trần là gán CA của bài BỊ trích cho người quote. Vùng bài
+  bị trích = leo từ khối tên thứ 2 lên tới tầng cao nhất chưa chứa khối tên
+  đầu. Link bài phải mang đúng tay cầm người viết, lệch thì bỏ. Có fixture trong
+  `dev/x-preview.html` (quoter_x không được có cú call nào).
+- **Mốc token ra đời** (đo "call sau bao lâu") đọc từ `mutil_window_token_info`
+  theo `CREATED_KEYS`. ⚠ CHƯA ĐO trên GMGN thật: Chẩn đoán in `mocTokenRaDoi`
+  (cột bắt được + tên mọi cột trông như thời gian). ⚠ CỐ Ý không có
+  `open_timestamp` — đó là lúc mở pool (pump.fun: lúc tốt nghiệp), dùng nó thì
+  spam-bot trông như người research chậm rãi. Call trước mốc tạo token > 2 phút
+  = mốc sai, loại khỏi phép đo (`speed.invalid`).
+- **"Có ngày ≥K kèo" là CẬN DƯỚI**: sổ chỉ thấy những gì chủ máy lướt qua.
+  Đừng đổi thành "K kèo/ngày".
+- **Kiểm xoá bài** (oEmbed `publish.twitter.com`, 6h một lượt, 20 tweet, nghỉ
+  1.5s, gặp 429 thì dừng lượt). Chỉ 404 là "mất"; mọi mã khác là "không biết".
+  "Đã xoá" đòi CẢ BA: mất ở 2 lần kiểm cách ≥20h, VÀ cùng lúc đó còn tweet khác
+  của chính người đó vẫn sống. Mọi bài cùng mất = tài khoản khoá/xoá
+  (`unreachable`), chuyện khác hẳn "xoá chọn lọc cú thua". Người đổi tên có
+  personKey mới nên bài cũ của họ không bao giờ làm "anh em còn sống" cho bài
+  mới. ⚠ CHƯA đo oEmbed trên máy thật (sandbox chặn mạng): Cài đặt + Chẩn đoán
+  in phân bố mã trả về của lượt gần nhất — toàn 429/0 thì tính năng đang mù.
+- **Dọn**: dữ liệu thô quá 90 ngày bị xoá bằng cursor (đừng `getAll` cả sổ),
+  trừ người có dòng trong Sheet. Bản tóm tắt cố định cỡ + "tấm bia" cho bot là
+  việc của đợt gắn nhãn — hình dạng của nó phụ thuộc nhãn cần gì.
+- `dev/stub.js` phải có `runtime.id` — thiếu là `alive()` tưởng extension bị gỡ
+  và mọi lời gửi sang SW im lặng. Stub giữ mọi cú call gửi sang ở `__LEDGER__`.

@@ -170,7 +170,14 @@
       } catch (e) {
         /* SW vừa ngủ dậy, chưa có sổ */
       }
-      const text = JSON.stringify(Object.assign({}, res, { framesWithScript: frames }), null, 2);
+      // Sổ tự ghi nằm ở service worker, không ở trang — hỏi riêng.
+      let soTuGhi = null;
+      try {
+        soTuGhi = await chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_STATS });
+      } catch (e) {
+        /* sổ là dữ liệu phụ */
+      }
+      const text = JSON.stringify(Object.assign({}, res, { framesWithScript: frames, soTuGhi }), null, 2);
       await navigator.clipboard.writeText(text);
       el.content.innerHTML = `<div class="kt-sec-title">Chẩn đoán (đã copy vào clipboard)</div>
         <div class="kt-hint" style="white-space:pre-wrap;font-family:ui-monospace,monospace">${KT.esc(text)}</div>`;

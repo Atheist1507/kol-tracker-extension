@@ -81,9 +81,78 @@
             <div>ONLY UP</div>
           </div>
         </article>
+
+        <!-- Bài CÓ CA: phải vào sổ, và mọc nút kính lúp -->
+        <article data-testid="tweet" class="tweet">
+          <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
+          <div class="tw-body">
+            <div data-testid="User-Name">
+              <a href="/caller_one"><b>Caller One</b></a> <span>@caller_one</span> ·
+              <a href="/caller_one/status/1840000000000000001"><time class="kt-fresh">5m</time></a>
+            </div>
+            <div data-testid="tweetText">$POPCAT sending it. CA: 7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr</div>
+          </div>
+        </article>
+
+        <!-- ⚠ QUOTE TWEET: người quote KHÔNG viết CA — CA nằm trong bài bị
+             trích. Không được ghi cú call nào cho quoter_x. -->
+        <article data-testid="tweet" class="tweet">
+          <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
+          <div class="tw-body">
+            <div data-testid="User-Name">
+              <a href="/quoter_x"><b>Quoter</b></a> <span>@quoter_x</span> ·
+              <a href="/quoter_x/status/1840000000000000003"><time class="kt-fresh">3m</time></a>
+            </div>
+            <div role="link" style="border:1px solid #2f3336;border-radius:12px;padding:8px;margin-top:6px">
+              <div data-testid="User-Name">
+                <a href="/orig_caller"><b>Orig</b></a> <span>@orig_caller</span> ·
+                <a href="/orig_caller/status/1840000000000000002"><time class="kt-fresh">1h</time></a>
+              </div>
+              <div data-testid="tweetText">$WIF CA: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm</div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Quote tweet mà người quote CŨNG có CA của riêng mình -->
+        <article data-testid="tweet" class="tweet">
+          <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
+          <div class="tw-body">
+            <div data-testid="User-Name">
+              <a href="/quoter_y"><b>Quoter Y</b></a> <span>@quoter_y</span> ·
+              <a href="/quoter_y/status/1840000000000000004"><time class="kt-fresh">2m</time></a>
+            </div>
+            <div data-testid="tweetText">better one → $BONK CA: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263</div>
+            <div role="link" style="border:1px solid #2f3336;border-radius:12px;padding:8px;margin-top:6px">
+              <div data-testid="User-Name">
+                <a href="/orig_caller"><b>Orig</b></a> <span>@orig_caller</span> ·
+                <a href="/orig_caller/status/1840000000000000002"><time class="kt-fresh">1h</time></a>
+              </div>
+              <div data-testid="tweetText">$WIF CA: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm</div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Đăng địa chỉ VÍ, không có dấu hiệu gọi kèo: KHÔNG phải cú call -->
+        <article data-testid="tweet" class="tweet">
+          <div data-testid="Tweet-User-Avatar" class="ava-sm"></div>
+          <div class="tw-body">
+            <div data-testid="User-Name">
+              <a href="/wallet_guy"><b>Wallet Guy</b></a> <span>@wallet_guy</span> ·
+              <a href="/wallet_guy/status/1840000000000000005"><time class="kt-fresh">4m</time></a>
+            </div>
+            <div data-testid="tweetText">copy my wallet 9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM</div>
+          </div>
+        </article>
       </div>
 
     </div>
+    <script>
+      // Mốc giờ tươi: bài "vừa đăng" thì cú call được tính là GHI TRƯỚC.
+      document.querySelectorAll("time.kt-fresh").forEach((t) => {
+        const phut = parseInt(t.textContent, 10) * (/h$/.test(t.textContent) ? 60 : 1);
+        t.setAttribute("datetime", new Date(Date.now() - phut * 60000).toISOString());
+      });
+    </script>
 
     <script>
       // Giả đường dẫn hồ sơ: x.js đọc location.pathname để biết đang xem ai.
@@ -98,6 +167,7 @@
     <script src="/src/lib/stats.js"></script>
     <script src="/src/lib/model.js"></script>
     <script src="/src/lib/gmgn.js"></script>
+    <script src="/src/lib/ledger.js"></script>
     <script src="/src/lib/tooltip-text.js"></script>
     <script src="/src/lib/sheet-url.js"></script>
     <script src="/src/lib/x-page.js"></script>

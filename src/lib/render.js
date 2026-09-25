@@ -241,6 +241,7 @@
       ${person.summary ? `<div class="kt-desc">${esc(person.summary)}</div>` : ""}
       ${person.redFlags ? `<div class="kt-flags"><b>⚑ Cờ đỏ:</b> ${esc(person.redFlags)}</div>` : ""}
       ${o.caller ? callerSnapshot(o.caller) : ""}
+      <div data-slot="ledger"></div>
       <div class="kt-btns">
         <button class="kt-btn kt-primary" data-act="note" data-key="${esc(person.wallet || person.usernameKey)}">Ghi chú (N)</button>
         ${person.twitterUrl ? `<button class="kt-btn" data-act="open-x" data-value="${esc(safeUrl(person.twitterUrl))}">Mở X</button>` : ""}
@@ -251,6 +252,19 @@
       ${notesHtml(person.notes || [], o.noteLimit || 8)}
       ${meta.length ? `<div class="kt-hint">${esc(meta.join(" · "))}</div>` : ""}
     </div>`;
+  }
+
+  /**
+   * Một dòng số liệu của sổ tự ghi (src/lib/ledger.js). Rỗng khi sổ chưa thấy
+   * cú call nào của người này — KHÔNG in "0 kèo": chưa thấy khác với không có.
+   */
+  function ledgerHtml(parts) {
+    if (!parts || !parts.length) return "";
+    return `<div class="kt-ledger" title="${esc(
+      "Extension tự ghi mọi cú call nó nhìn thấy trên GMGN và X. " +
+        "'Ghi trước' = thấy khi kèo CHƯA chạy — chỉ những cú đó mới đáng dùng để chấm điểm. " +
+        "Đây mới là số liệu, CHƯA phải kết luận."
+    )}"><b>Sổ tự ghi:</b> ${esc(parts.join(" · "))}</div>`;
   }
 
   /** Ảnh chụp tình trạng hiện tại của người này với token đang mở. */
@@ -293,6 +307,7 @@
     resultsHtml,
     callerRow,
     personDetail,
+    ledgerHtml,
     notesHtml,
     callerSnapshot,
     hydrateAvatars,
@@ -300,6 +315,6 @@
   };
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { esc, safeUrl, initials, shortWallet, timeAgo, fmtMultiple };
+    module.exports = { esc, safeUrl, initials, shortWallet, timeAgo, fmtMultiple, ledgerHtml };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);

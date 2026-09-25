@@ -123,33 +123,79 @@
     neo.el.parentElement ? neo.el.parentElement.insertBefore(host, neo.el) : neo.el.appendChild(host);
   }
 
+  /**
+   * Dòng số liệu của sổ tự ghi trên trang hồ sơ.
+   *
+   * ⚠ Có CACHE 60s: `ve()` chạy lại mỗi lần DOM của X đổi (vài lần một giây
+   * lúc trang đang tải), không có cache là mỗi lần đó một lời hỏi service
+   * worker.
+   */
+  const soCache = new Map(); // handle → { parts, at }
+  const soDangHoi = new Set();
+
+  function soCuaNguoi(handle) {
+    if (!state.cfg.ledgerEnabled || !state.cfg.showLedgerOnX || !handle) return null;
+    const key = handle.toLowerCase();
+    const hit = soCache.get(key);
+    if (hit && Date.now() - hit.at < 60000) return hit.parts;
+    if (!soDangHoi.has(key) && alive()) {
+      soDangHoi.add(key);
+      chrome.runtime
+        .sendMessage({ type: KT.MSG.LEDGER_PERSON, handle })
+        .then((res) => {
+          soCache.set(key, { parts: (res && res.parts) || [], at: Date.now() });
+          // Về muộn: chỉ vẽ nếu vẫn đang ở ĐÚNG hồ sơ đó.
+          if (state.handle && state.handle.toLowerCase() === key) veDai(personFor(state.handle));
+        })
+        .catch(() => {})
+        .finally(() => soDangHoi.delete(key));
+    }
+    return hit ? hit.parts : null;
+  }
+
+  function soHtml(parts) {
+    if (!parts || !parts.length) return "";
+    return (
+      `<div class="kt-x-ledger" title="Extension tự ghi mọi cú call nó thấy. 'Ghi trước' = thấy khi kèo chưa chạy. Mới là số liệu, chưa phải kết luận.">` +
+      `<b>Sổ tự ghi:</b> ${KT.esc(parts.join(" · "))}</div>`
+    );
+  }
+
   function veDai(person) {
     document.getElementById(STRIP_ID)?.remove();
-    if (!person) return; // chưa có hồ sơ thì không mọc dải rỗng ra làm gì
+    const so = soCuaNguoi(state.handle);
+    // Chưa có hồ sơ VÀ sổ chưa thấy gì thì không mọc dải rỗng ra làm gì.
+    if (!person && !(so && so.length)) return;
     const neo = timNeo(NEO_DAI);
     lastAnchors.dai = neo ? neo.ten : null;
     if (!neo) return;
 
-    const note = (person.notes && person.notes[0]) || null;
     const { host, wrap } = khungRieng(STRIP_ID);
     host.style.cssText = "display:block;margin:8px 0;";
-    const mau = KT.tierColor(person.tier);
-    wrap.innerHTML =
-      `<div class="kt-x-strip" style="border-color:${KT.esc(mau)}">` +
-      `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
-      (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
-      (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
-      `</div>` +
-      (person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
-      (note && note.note
-        ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
-          `<div class="kt-x-meta">${KT.esc(
-            [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
-              .filter(Boolean)
-              .join(" · ")
-          )}</div>`
-        : "") +
-      `</div>`;
+    if (!person) {
+      // Người lạ mà sổ đã thấy call: chỉ dòng số liệu, không giả vờ có hạng.
+      wrap.innerHTML = `<div class="kt-x-strip">${soHtml(so)}</div>`;
+    } else {
+      const note = (person.notes && person.notes[0]) || null;
+      const mau = KT.tierColor(person.tier);
+      wrap.innerHTML =
+        `<div class="kt-x-strip" style="border-color:${KT.esc(mau)}">` +
+        `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
+        (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
+        (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
+        `</div>` +
+        (person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
+        (note && note.note
+          ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
+            `<div class="kt-x-meta">${KT.esc(
+              [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
+                .filter(Boolean)
+                .join(" · ")
+            )}</div>`
+          : "") +
+        soHtml(so) +
+        `</div>`;
+    }
 
     // Dải nằm DƯỚI chỗ neo. Với "Được theo dõi bởi" thì phải trèo lên khối
     // cha một nấc, vì cái neo là thẻ <a> nằm lọt trong một dòng chữ.
@@ -183,11 +229,141 @@
     return null;
   }
 
+  /**
+   * Vùng BÀI ĐƯỢC TRÍCH DẪN (quote tweet) bên trong một bài.
+   *
+   * ⚠⚠ Quote tweet có HAI khối tên, HAI mốc giờ, HAI khối chữ. Đọc
+   * `querySelector('[data-testid="tweetText"]')` trần trên một bài quote
+   * không có chữ là lấy nhầm chữ của bài BỊ trích — tức là ghi cú call của
+   * người khác vào sổ của người đang quote. Sai kiểu đó làm sai uy tín của
+   * CẢ HAI người mà không để lại dấu vết.
+   *
+   * Cách tìm: mỗi khối tên thứ 2 trở đi, leo lên tới tầng cao nhất vẫn CHƯA
+   * chứa khối tên đầu tiên — đó là khung của bài bị trích.
+   */
+  function vungTrich(article) {
+    const names = article.querySelectorAll('[data-testid="User-Name"]');
+    const out = [];
+    for (let i = 1; i < names.length; i++) {
+      let node = names[i];
+      while (node.parentElement && node.parentElement !== article && !node.parentElement.contains(names[0])) {
+        node = node.parentElement;
+      }
+      out.push(node);
+    }
+    return out;
+  }
+
+  /**
+   * Đọc MỘT bài: ai viết, id, lúc nào, chữ — bỏ phần bài được trích dẫn.
+   * Thiếu id hoặc giờ thì trả null: cú call không có mốc thời gian thì không
+   * chấm điểm được, mà không có id thì không kiểm xoá bài được.
+   */
+  function readTweet(article) {
+    const handle = handleOfTweet(article);
+    if (!handle) return null;
+    const trich = vungTrich(article);
+    const ngoai = (el) => !trich.some((r) => r.contains(el));
+
+    let tweetId = "";
+    let calledAt = null;
+    for (const t of article.querySelectorAll("a[href*='/status/'] time")) {
+      if (!ngoai(t)) continue;
+      const a = t.closest("a");
+      const m = String((a && a.getAttribute("href")) || "").match(/^\/([A-Za-z0-9_]{1,15})\/status\/(\d{5,25})/);
+      // Link bài phải mang ĐÚNG tay cầm của người viết — lệch là cấu trúc lạ
+      // (bài bị trích lọt qua), thà bỏ còn hơn gán nhầm chủ.
+      if (!m || m[1].toLowerCase() !== handle.toLowerCase()) continue;
+      tweetId = m[2];
+      calledAt = Date.parse(t.getAttribute("datetime") || "");
+      break;
+    }
+    if (!tweetId || !Number.isFinite(calledAt)) return null;
+
+    const text = Array.from(article.querySelectorAll('[data-testid="tweetText"]'))
+      .filter(ngoai)
+      .map((el) => el.innerText || el.textContent || "")
+      .join("\n");
+    return { handle, tweetId, calledAt, text };
+  }
+
+  /* ---------- sổ tự ghi ---------- */
+
+  const daGhi = new Set(); // tweetId đã gửi sang sổ trong lượt mở trang này
+  let hangCho = [];
+  let henGui = null;
+
+  function ghiSo(tw, contracts) {
+    if (!state.cfg.ledgerEnabled || !alive() || daGhi.has(tw.tweetId)) return;
+    daGhi.add(tw.tweetId);
+    const tags = KT.ledger.cashtags(tw.text);
+    const seenAt = Date.now();
+    for (const c of contracts) {
+      hangCho.push({
+        id: "x:" + tw.tweetId + ":" + c.tokenKey,
+        source: "x",
+        handle: tw.handle,
+        tokenKey: c.tokenKey,
+        chain: c.chain,
+        // Một cashtag thì mới dám gắn nó với CA; nhiều cashtag thì không biết
+        // cái nào đi với cái nào — để trống còn hơn gắn nhầm tên.
+        tokenSymbol: tags.length === 1 ? tags[0] : "",
+        calledAt: tw.calledAt,
+        multiple: null,
+        tweetId: tw.tweetId,
+        text: tw.text,
+        seenAt,
+      });
+    }
+    clearTimeout(henGui);
+    henGui = setTimeout(() => {
+      const lo = hangCho;
+      hangCho = [];
+      if (lo.length) chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_ADD, calls: lo }).catch(() => {});
+    }, 800);
+  }
+
+  const SEARCH_SVG =
+    '<svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  /**
+   * Mở tìm kiếm "người này có nói về chuyện này trước khi token ra đời không".
+   * Hỏi sổ xem có mốc token ra đời không (chỉ có khi token đó từng được mở
+   * trên GMGN); không có thì cắt ở ngày của cú call.
+   */
+  async function timNarrative(tw, contracts) {
+    const tags = KT.ledger.cashtags(tw.text);
+    let createdAt = null;
+    try {
+      if (alive() && contracts[0]) {
+        const t = await chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_TOKEN_GET, tokenKey: contracts[0].tokenKey });
+        if (t && t.createdAt) createdAt = t.createdAt;
+      }
+    } catch (e) {
+      /* không có mốc token thì dùng mốc cú call */
+    }
+    const url = KT.xPage.narrativeSearchUrl({
+      handle: tw.handle,
+      keyword: tags[0] || "",
+      createdAt,
+      calledAt: tw.calledAt,
+    });
+    if (url) window.open(url, "_blank", "noopener");
+  }
+
   function veTrongFeed(article) {
     const handle = handleOfTweet(article);
-    const daGan = article.dataset[PILL_ID_ATTR];
     if (!handle) return;
-    if (daGan === handle && article.querySelector("." + PILL_CLASS)) return;
+    const tw = readTweet(article);
+    const contracts = tw ? KT.ledger.extractContracts(tw.text) : [];
+    if (tw && contracts.length) ghiSo(tw, contracts);
+
+    const coNutTim = !!(tw && contracts.length && state.cfg.xNarrativeBtn);
+    // Khoá vẽ gồm cả id bài: X tái dùng node khi cuộn, và nút tìm kiếm gắn
+    // với MỘT bài cụ thể — cùng người mà khác bài thì phải vẽ lại.
+    const khoaVe = handle + "|" + (coNutTim ? tw.tweetId : "");
+    const daGan = article.dataset[PILL_ID_ATTR];
+    if (daGan === khoaVe && article.querySelector("." + PILL_CLASS)) return;
 
     article.querySelector("." + PILL_CLASS)?.remove();
     const khoi = article.querySelector('[data-testid="User-Name"]');
@@ -213,6 +389,24 @@
     btn.addEventListener("pointerenter", () => moThe(handle, btn.getBoundingClientRect()));
     btn.addEventListener("pointerleave", dongThe);
 
+    if (coNutTim) {
+      const tim = document.createElement("button");
+      tim.type = "button";
+      tim.className = "kt-x-search";
+      tim.title = "Người này có nói về chuyện này TRƯỚC khi token ra đời không? (mở tìm kiếm X)";
+      tim.setAttribute("aria-label", tim.title);
+      tim.innerHTML = SEARCH_SVG;
+      tim.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        // Đọc LẠI bài lúc bấm: node có thể đã đổi sang bài khác khi cuộn.
+        const now = readTweet(article);
+        const ca = now ? KT.ledger.extractContracts(now.text) : [];
+        if (now && ca.length) timNarrative(now, ca);
+      });
+      wrap.appendChild(tim);
+    }
+
     khoi.appendChild(host);
 
     // Rê chuột vào AVATAR cũng mở thẻ — đó mới là chỗ mắt người ta nhìn vào
@@ -227,7 +421,7 @@
       ava.addEventListener("pointerleave", dongThe);
     }
 
-    article.dataset[PILL_ID_ATTR] = handle;
+    article.dataset[PILL_ID_ATTR] = khoaVe;
   }
 
   function quetFeed() {
@@ -434,6 +628,8 @@
         nutDangCo: !!document.getElementById(BTN_ID),
         baiTrongFeed: document.querySelectorAll('article[data-testid="tweet"]').length,
         baiDaGan: document.querySelectorAll("article[data-kt-pill]").length,
+        // Sổ tự ghi: bao nhiêu tweet có CA đã gửi sang sổ trong lượt mở trang này
+        soTweetDaGhi: daGhi.size,
       });
     });
   })();

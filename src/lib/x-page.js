@@ -40,7 +40,40 @@
     return first;
   }
 
-  KT.xPage = { handleFromPath, RESERVED, HANDLE_RE };
+  /**
+   * Link tìm kiếm X: "người này có nói về chuyện này TRƯỚC khi token ra đời
+   * không?"
+   *
+   * Câu hỏi đó tách người research thật (đã theo dõi narrative từ trước, nên
+   * call nhanh vì đã chuẩn bị) khỏi kẻ call bừa / insider (không có dấu vết gì
+   * trước đó).
+   *
+   * ⚠ `until:` của X là ngày theo UTC và KHÔNG gồm chính ngày đó. Nên mốc cắt
+   * là 00:00 UTC của ngày (sớm hơn trong hai mốc: token ra đời, cú call) — tức
+   * là bỏ mất vài giờ ngay trước mốc. Cố ý: cắt sau mốc thì chính bài call và
+   * mấy bài hô ngay sau đó lọt vào, và một thằng call bừa trông như đã "nói
+   * về nó từ trước".
+   *
+   * Từ khoá là ticker viết TRƠN lẫn cashtag: narrative thường là chữ thường
+   * ("goat", "ai agent") chứ không phải $GOAT.
+   */
+  function narrativeSearchUrl(opts) {
+    const o = opts || {};
+    const handle = String(o.handle || "").replace(/^@+/, "");
+    if (!HANDLE_RE.test(handle)) return "";
+    const times = [o.createdAt, o.calledAt].filter((t) => typeof t === "number" && Number.isFinite(t) && t > 0);
+    if (!times.length) return "";
+    const before = new Date(Math.min.apply(null, times)).toISOString().slice(0, 10);
+    const kw = String(o.keyword || "")
+      .replace(/^\$+/, "")
+      .replace(/[^A-Za-z0-9_]/g, "");
+    let q = "from:" + handle;
+    if (kw) q += " (" + kw + " OR $" + kw + ")";
+    q += " until:" + before;
+    return "https://x.com/search?f=live&q=" + encodeURIComponent(q);
+  }
+
+  KT.xPage = { handleFromPath, narrativeSearchUrl, RESERVED, HANDLE_RE };
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = KT.xPage;

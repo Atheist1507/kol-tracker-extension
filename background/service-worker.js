@@ -12,7 +12,9 @@ importScripts(
   "../src/lib/stats.js",
   "../src/lib/model.js",
   "../src/lib/sheet-url.js",
-  "../src/lib/config.js"
+  "../src/lib/config.js",
+  "../src/lib/ledger.js",
+  "ledger-store.js"
 );
 
 const KT = globalThis.KT;
@@ -21,6 +23,10 @@ const FETCH_TIMEOUT_MS = 20000;
 // lần đầu sau khi deploy. 20s là quá ngắn, cắt oan rồi báo như thể hỏng.
 const SHEET_TIMEOUT_MS = 45000;
 const ALARM = "kt-refresh";
+// Sổ cái: dọn dữ liệu thô quá hạn + kiểm bài bị xoá. 6 giờ một lần là đủ —
+// mỗi tweet chỉ được kiểm lại sau 24h (xem LEDGER.CHECK_EVERY_MS).
+const LEDGER_ALARM = "kt-ledger";
+const LEDGER_EVERY_MIN = 360;
 
 /**
  * Mã HTTP trần không nói được gì với người dùng. Ba mã dưới đây là ba tình
@@ -416,8 +422,45 @@ function refresh() {
   return inFlight;
 }
 
+/**
+ * Người đã có hồ sơ trong Sheet — sổ giữ dữ liệu thô của họ MÃI, không dọn.
+ * Đọc cả Overview lẫn Detail: người chỉ có dòng Detail (thiếu Overview) vẫn
+ * là người mình đã ghi chú.
+ */
+async function keepPersonKeys() {
+  const data = await KT.getData();
+  const keep = new Set();
+  for (const row of [].concat(data.overview || [], data.detail || [])) {
+    const k = KT.ledger.personKeyOf({ handle: row.username, wallet: row.wallet });
+    if (k) keep.add(k);
+    // Người có cả ví lẫn tên: giữ theo CẢ HAI khoá, vì sổ khoá theo tên nếu có.
+    const w = KT.ledger.personKeyOf({ wallet: row.wallet });
+    if (w) keep.add(w);
+  }
+  return keep;
+}
+
+let ledgerRunning = false;
+async function ledgerMaintenance() {
+  if (ledgerRunning) return;
+  ledgerRunning = true;
+  try {
+    const cfg = await KT.getConfig();
+    const now = Date.now();
+    await KT.ledgerStore.prune(await keepPersonKeys(), now);
+    if (cfg.ledgerEnabled && cfg.deletionCheck) await KT.ledgerStore.checkDeletions(now);
+  } catch (e) {
+    /* sổ là dữ liệu phụ — hỏng một lượt thì lượt sau làm lại */
+  } finally {
+    ledgerRunning = false;
+  }
+}
+
 async function syncAlarm() {
   const cfg = await KT.getConfig();
+  if (!(await chrome.alarms.get(LEDGER_ALARM))) {
+    chrome.alarms.create(LEDGER_ALARM, { periodInMinutes: LEDGER_EVERY_MIN, delayInMinutes: 2 });
+  }
   await chrome.alarms.clear(ALARM);
   if (cfg.refreshMinutes > 0) {
     chrome.alarms.create(ALARM, {
@@ -444,6 +487,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) refresh();
+  if (alarm.name === LEDGER_ALARM) ledgerMaintenance();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -504,6 +548,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === KT.MSG.TEST_URL) {
     testUrl(msg.url).then(sendResponse);
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_ADD) {
+    KT.getConfig()
+      .then((cfg) => (cfg.ledgerEnabled ? KT.ledgerStore.addCalls(msg.calls, Date.now()) : { off: true }))
+      .then(sendResponse, (e) => sendResponse({ error: String(e && e.message ? e.message : e) }));
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_TOKEN) {
+    KT.getConfig()
+      .then((cfg) => (cfg.ledgerEnabled ? KT.ledgerStore.putToken(msg.tokenKey, msg.created, Date.now()) : null))
+      .then(() => sendResponse({ ok: true }), () => sendResponse({ ok: false }));
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_PERSON) {
+    KT.ledgerStore
+      .person({ handle: msg.handle, wallet: msg.wallet }, Date.now())
+      .then(sendResponse, () => sendResponse({ summary: null, parts: [] }));
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_TOKEN_GET) {
+    KT.ledgerStore.getToken(msg.tokenKey).then(
+      (t) => sendResponse(t ? { createdAt: t.createdAt, key: t.key } : null),
+      () => sendResponse(null)
+    );
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_STATS) {
+    KT.ledgerStore.stats().then(sendResponse, (e) => sendResponse({ error: String(e) }));
     return true;
   }
   if (msg.type === KT.MSG.THESIS) {
