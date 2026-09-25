@@ -3,6 +3,37 @@
 Đọc `README.md` trước: nó là spec + hướng dẫn dùng. File này chỉ ghi những quyết định KHÔNG suy ra
 được từ code.
 
+## Code nằm ở đâu — bốn tầng, hỏi theo thứ tự này
+
+Trước 13/10/2026 repo không có câu trả lời cho "thứ này để đâu", nên câu trả
+lời mặc định là "chép sang file bên cạnh": đoạn dựng shadow root bị gõ tay ở
+**bốn** chỗ, khối "tóm tắt một người" ở **ba** chỗ (với hai bộ tên lớp CSS đã
+bắt đầu lệch nhau), và `alive()` ở **ba** chỗ. Bốn câu hỏi dưới đây trả lời
+một lần cho xong:
+
+| Hỏi | Thì để ở | Luật |
+|---|---|---|
+| Không đụng DOM, không đụng `chrome.*`? | **`src/lib/<việc>.js`** | Bắt buộc có test. Gắn vào `globalThis.KT` + export CommonJS ở cuối file. |
+| Đụng DOM nhưng **≥2 mặt** cùng cần? | **`content/dom.js`** | Không giữ state, không biết gì về GMGN/X/Sheet. |
+| Chỉ một mặt cần? | **`content/<mặt>.js`** | panel / overlay / note-box / x / content. |
+| Gọi mạng, đụng `chrome.tabs`, sống lâu? | **`background/service-worker.js`** | Chỗ DUY NHẤT được `fetch`. |
+
+⚠ **Một hàm chỉ có MỘT chỗ gọi thì để cạnh chỗ gọi**, đừng đẩy vào `src/lib/`
+cho "gọn". `parsePosition` từng nằm ở `stats.js` trong khi chỗ gọi duy nhất
+của nó là một dòng trong `model.js` — người đọc phải nhảy file để biết
+"đầu sóng" quy ra cái gì.
+
+⚠ **`KT.<tên> = …` là mặt tiền CÔNG KHAI.** `npm run check` báo đỏ nếu không
+file nào khác đọc nó. Helper nội bộ thì đừng export — trừ khi cần cho
+`node --test`, lúc đó chỗ dùng trong `tests/` cũng tính là sống.
+
+⚠ **Thêm file content script mới = sửa NĂM chỗ**: `manifest.json` (cả hai
+block — GMGN và X), `KT.CONTENT_FILES` trong `src/lib/config.js`,
+`dev/preview.html`, `dev/x-preview.html`. Quên chỗ nào thì `npm run check` báo.
+Test thì thêm vào `tests/load.js`.
+
+## Luật nền
+
 - **Không có bước build, không có dependency.** Clone về là "Load unpacked" chạy được ngay. Đừng thêm
   bundler/framework/thư viện chỉ để tiện hơn một chút — cái giá là người kia (không đọc code) phải
   cài toolchain mới dùng được extension.

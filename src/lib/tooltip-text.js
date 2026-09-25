@@ -136,7 +136,6 @@
   KT.candidateHandles = candidateHandles;
   KT.cardFacts = cardFacts;
   KT.ageToMs = ageToMs;
-  KT.TOOLTIP_MAX_CHUNK_LEN = MAX_CHUNK_LEN;
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { candidateHandles, cardFacts, ageToMs, MAX_CHUNK_LEN };

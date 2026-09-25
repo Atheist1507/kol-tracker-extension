@@ -46,6 +46,16 @@ if (JSON.stringify(shared) !== JSON.stringify(inManifest)) {
   );
 }
 
+function walkCollect(dir, into) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkCollect(full, into);
+    else if (entry.name.endsWith(".js") || entry.name.endsWith(".html")) into.push(full);
+  }
+}
+
 /* 3. mọi file .js trong repo phải parse được */
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -101,6 +111,66 @@ if (fs.existsSync(xPreviewPath)) {
       "dev/x-preview.html thiếu content script: " +
         thieu.join(", ") +
         "\n  (thiếu là x.js ném lỗi giữa init, nút Ghi chú không mọc mà không báo gì)"
+    );
+  }
+}
+
+/* 3d. KHÔNG được có hàm export ra KT mà chẳng ai gọi
+ *
+ * Đây là phép kiểm sinh ra sau khi xoá `stats.js`: 170 dòng chấm điểm track
+ * record đã nằm đó không có một chỗ gọi nào, kèm 128 dòng test canh gác
+ * chúng, kèm hai ô cài đặt trong Options chỉnh mà không đổi được gì. Không ai
+ * cố tình để lại — chỉ là tính năng đổi hướng, code cũ không có gì nhắc nên
+ * ở lại. Lần sau thì `npm run check` nhắc.
+ *
+ * Luật: mỗi `KT.<tên> = ...` trong `src/lib/` phải có ít nhất một chỗ đọc
+ * `KT.<tên>` Ở FILE KHÁC (app hoặc test). Chỉ mình nó nhắc tên mình thì đó là
+ * mặt tiền công khai không dẫn đi đâu cả.
+ *
+ * ⚠ Cố ý KHÔNG tính chỗ dùng trong `tests/` là đủ để sống: một hàm chỉ có
+ * test gọi thì cái test đó đang chứng minh một thứ không ai dùng. Nhưng cũng
+ * không báo đỏ ngay — liệt kê riêng để người đọc tự quyết.
+ */
+{
+  const libFiles = fs
+    .readdirSync(path.join(ROOT, "src/lib"))
+    .filter((f) => f.endsWith(".js"))
+    .map((f) => path.join("src/lib", f));
+
+  const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+  const allFiles = [];
+  walkCollect(path.join(ROOT, "src"), allFiles);
+  for (const d of ["content", "background", "popup", "options", "dev", "tests"]) {
+    walkCollect(path.join(ROOT, d), allFiles);
+  }
+
+  const mocCoi = [];
+  for (const lib of libFiles) {
+    const src = read(lib);
+    for (const m of src.matchAll(/^\s*KT\.([A-Za-z_][A-Za-z0-9_]*)\s*=/gm)) {
+      const ten = m[1];
+      const re = new RegExp("KT\\." + ten + "\\b");
+      let app = 0;
+      let test = 0;
+      for (const f of allFiles) {
+        const rel = path.relative(ROOT, f);
+        if (rel === lib) continue;
+        if (!re.test(fs.readFileSync(f, "utf8"))) continue;
+        if (rel.startsWith("tests" + path.sep)) test++;
+        else app++;
+      }
+      // ⚠ Chỗ dùng trong `tests/` CŨNG tính là sống. Repo không có ES module
+      // nên helper nội bộ phải export ra KT mới test được — bắt lỗi chúng là
+      // ép người ta bỏ test, đúng thứ mình đang muốn có thêm.
+      if (!app && !test) mocCoi.push(`${lib} → KT.${ten}`);
+    }
+  }
+
+  if (mocCoi.length) {
+    errors.push(
+      "Export ra KT mà KHÔNG file nào khác đọc (code chết):\n  " +
+        mocCoi.join("\n  ") +
+        "\n  (xoá đi, hoặc nếu cố ý để dành thì đừng export)"
     );
   }
 }

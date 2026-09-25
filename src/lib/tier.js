@@ -41,8 +41,6 @@
     return i === -1 ? TIER_ORDER.length : i;
   }
 
-  KT.TIER_ORDER = TIER_ORDER;
-  KT.TIER_COLORS = TIER_COLORS;
   KT.tierLetter = tierLetter;
   KT.tierColor = tierColor;
   KT.tierRank = tierRank;

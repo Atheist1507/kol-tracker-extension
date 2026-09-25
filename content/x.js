@@ -16,6 +16,7 @@
 (function () {
   "use strict";
   const KT = globalThis.KT;
+  const alive = KT.dom.alive;
 
   if (globalThis.__KOL_TRACKER_X__) return;
   globalThis.__KOL_TRACKER_X__ = true;
@@ -32,14 +33,6 @@
   let lastAnchors = { nut: null, dai: null };
 
   /* ---------- dữ liệu ---------- */
-
-  function alive() {
-    try {
-      return !!(chrome.runtime && chrome.runtime.id);
-    } catch (e) {
-      return false;
-    }
-  }
 
   async function load() {
     const [cfg, data, so] = await Promise.all([KT.getConfig(), KT.getData(), docSo()]);
@@ -136,16 +129,7 @@
   /* ---------- vẽ ---------- */
 
   function khungRieng(id) {
-    const host = document.createElement("div");
-    if (id) host.id = id;
-    const shadow = host.attachShadow({ mode: "open" });
-    const style = document.createElement("style");
-    style.textContent = KT.X_CSS;
-    shadow.appendChild(style);
-    const wrap = document.createElement("div");
-    wrap.className = "kt-x";
-    shadow.appendChild(wrap);
-    return { host, wrap };
+    return KT.dom.shadowHost({ id, css: KT.X_CSS, wrapClass: "kt-x" });
   }
 
   function veNut(person) {

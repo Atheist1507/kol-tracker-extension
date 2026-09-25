@@ -70,6 +70,7 @@
     "src/lib/styles.js",
     "src/lib/render.js",
     "src/lib/ledger.js",
+    "content/dom.js",
     "content/overlay.js",
     "content/note-box.js",
     "content/panel.js",

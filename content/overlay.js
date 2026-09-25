@@ -47,18 +47,12 @@
     // hay danh sách nào khác để lẫn, nên thẻ nào mọc ra cũng là nói về mốc
     // đang hover — khỏi đo khoảng cách, y như luật dành cho chart ở frame cha.
     const inChartFrame = window.top !== window;
-    const host = document.createElement("div");
-    host.id = "kol-tracker-overlay";
-    host.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:2147482999;";
-    const shadow = host.attachShadow({ mode: "open" });
-
-    const style = document.createElement("style");
-    style.textContent = KT.PANEL_CSS + KT.OVERLAY_CSS;
-    shadow.appendChild(style);
-
-    const layer = document.createElement("div");
-    layer.className = "kt-layer";
-    shadow.appendChild(layer);
+    const { host, shadow, wrap: layer } = KT.dom.shadowHost({
+      id: "kol-tracker-overlay",
+      hostStyle: "position:fixed;top:0;left:0;width:0;height:0;z-index:2147482999;",
+      css: KT.PANEL_CSS + KT.OVERLAY_CSS,
+      wrapClass: "kt-layer",
+    });
 
     const card = document.createElement("div");
     card.className = "kt-card";

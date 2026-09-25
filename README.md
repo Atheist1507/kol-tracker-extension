@@ -294,6 +294,8 @@ background/service-worker.js  CHỖ DUY NHẤT fetch CSV (content script gọi d
 content/main-world.js      Chạy CÙNG thế giới JS với GMGN (world: MAIN): bọc fetch/XHR để nghe
                            response của API community/messages, postMessage sang thế giới cách ly.
                            CHỈ ĐỌC, không sửa gì của trang
+content/dom.js             Helper DOM dùng chung cho mọi mặt: dựng shadow root, kiểm extension
+                           còn sống. Chỉ nhận hàm ≥2 mặt cùng cần, không giữ state
 content/content.js         Điều phối: ghép người-trên-chart (API) với hồ sơ (Sheet), phím tắt, tin nhắn
 content/note-box.js        Hộp ghi chú — phím N, điền sẵn tất cả, ⌘Enter ghi vào Sheet
 content/panel.js           Mức 1 — panel nổi (shadow DOM, kéo thả, tìm kiếm, thẻ chi tiết)
@@ -317,7 +319,8 @@ src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ
   ledger.js                  sổ trên chain — gộp feed thesis của GMGN để tra lại được từ trang X
   ca.js                      bắt contract address trong một đoạn chữ → link GMGN
   sheet-url.js               link Sheet kiểu gì cũng ra được link CSV
-  render.js                  dựng HTML dùng CHUNG cho panel và popup
+  render.js                  dựng HTML dùng CHUNG cho panel, popup, thẻ hover GMGN và hai chỗ
+                             trên X (`personBrief`/`noteLine` — MỘT bộ tên lớp `kt-brief-*`)
   styles.js                  CSS dạng chuỗi (shadow DOM phải nhét style bằng JS)
   config.js                  giá trị mặc định, khoá storage, danh sách content script
 tests/                     node --test, không dependency
@@ -332,8 +335,9 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 174 test logic thuần, không cần cài gì
-npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
+npm test         # 173 test logic thuần, không cần cài gì
+npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn
+                 # chưa? có hàm nào export ra KT mà chẳng ai gọi không?
 npm run icons    # sinh lại icons/icon-*.png
 ```
 

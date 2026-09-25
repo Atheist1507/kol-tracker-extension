@@ -91,7 +91,6 @@
 }
 `;
 
-  KT.BRIEF_CSS = BRIEF_CSS;
   KT.X_CSS = X_CSS + BRIEF_CSS;
 
   KT.PANEL_CSS = `
