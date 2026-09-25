@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KOL Tracker",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Research KOL/caller crypto ngay trên chart GMGN: ai đã post về token này, ai đáng tin, ghi chú thẳng vào Google Sheet.",
   "permissions": [
     "storage",
@@ -67,6 +67,7 @@
         "src/lib/config.js",
         "src/lib/styles.js",
         "src/lib/render.js",
+        "src/lib/ledger.js",
         "content/overlay.js",
         "content/note-box.js",
         "content/panel.js",
@@ -111,6 +112,8 @@
         "src/lib/config.js",
         "src/lib/styles.js",
         "src/lib/render.js",
+        "src/lib/ca.js",
+        "src/lib/ledger.js",
         "content/note-box.js",
         "content/x.js"
       ],

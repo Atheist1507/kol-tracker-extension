@@ -27,6 +27,9 @@
     UI: "ui", // chrome.storage.local — vị trí panel
     AUTHOR: "authorProbe", // chrome.storage.local — author_id có đổi giữa các lần gọi không
     ULID: "ulidProbe", // chrome.storage.local — ulid của bài post có đổi giữa các lần gọi không
+    // chrome.storage.local — sổ trên chain: ai đã call token nào, bỏ vào bao
+    // nhiêu. Ghi từ trang GMGN, ĐỌC từ trang X. Xem src/lib/ledger.js.
+    LEDGER: "ledger",
   };
 
   const MSG = {
@@ -68,6 +71,7 @@
     "src/lib/config.js",
     "src/lib/styles.js",
     "src/lib/render.js",
+    "src/lib/ledger.js",
     "content/overlay.js",
     "content/note-box.js",
     "content/panel.js",

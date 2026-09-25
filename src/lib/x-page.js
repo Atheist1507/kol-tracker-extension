@@ -40,7 +40,73 @@
     return first;
   }
 
-  KT.xPage = { handleFromPath, RESERVED, HANDLE_RE };
+
+  /**
+   * `/zachxbt/status/1968…` → "1968…". Kèm `/photo/1`, `/analytics`,
+   * `/quotes` cũng vẫn ra đúng id.
+   *
+   * Vì sao cần: ghi chú gắn với một BÀI cụ thể thì phải có id của bài, và
+   * link của bài là thứ DUY NHẤT còn lại nếu sau này nó xoá. "Hô xong xoá
+   * bài" là dấu hiệu bẩn nhất trong nghề này, mà cũng là dấu hiệu tự huỷ
+   * bằng chứng — chụp lại lúc đọc mới giữ được.
+   */
+  function statusIdFromHref(href) {
+    const m = String(href || "").match(/\/status(?:es)?\/(\d{5,25})(?:[/?#]|$)/);
+    return m ? m[1] : "";
+  }
+
+  /** Link thẳng tới bài. Dùng tay cầm vì X không có dạng link theo id bài. */
+  function statusUrl(handle, id) {
+    const h = String(handle || "").replace(/^@/, "");
+    const i = String(id || "");
+    if (!h || !i) return "";
+    return "https://x.com/" + h + "/status/" + i;
+  }
+
+  /**
+   * Ghép mấy mẩu chữ của một bài thành nguyên văn.
+   *
+   * X không để nội dung bài trong một node: mỗi đoạn là một `<span>`, emoji
+   * là `<img alt="🔥">`, link là `<a>` với chữ bị cắt ngắn (`t.co/…`). Nên
+   * phải đi gom, và gom rồi thì khoảng trắng lung tung.
+   *
+   * ⚠ GIỮ dấu xuống dòng: bài call hay viết mỗi ý một dòng, dồn thành một
+   * đoạn liền là đọc lại không ra ý gì. Chỉ bóp mấy dòng trống liên tiếp.
+   */
+  function joinTweetText(chunks) {
+    const raw = (Array.isArray(chunks) ? chunks : [chunks])
+      .map((c) => (c == null ? "" : String(c)))
+      .join("");
+    return raw
+      .replace(/[ \t\u00a0]+/g, " ")
+      .replace(/ ?\n ?/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  /**
+   * Cắt bớt trước khi ghi vào Sheet. Một ô Sheet chứa được rất nhiều, nhưng
+   * một cái bảng mà mỗi ô là ba nghìn chữ thì không đọc nổi — và phần đầu bài
+   * mới là phần mang luận điểm.
+   */
+  const POST_TEXT_MAX = 1000;
+
+  function trimPostText(text, max) {
+    const s = String(text || "");
+    const n = max || POST_TEXT_MAX;
+    return s.length <= n ? s : s.slice(0, n - 1).trimEnd() + "…";
+  }
+
+  KT.xPage = {
+    handleFromPath,
+    statusIdFromHref,
+    statusUrl,
+    joinTweetText,
+    trimPostText,
+    RESERVED,
+    HANDLE_RE,
+    POST_TEXT_MAX,
+  };
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = KT.xPage;

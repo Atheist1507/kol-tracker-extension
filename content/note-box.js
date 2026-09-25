@@ -91,6 +91,7 @@
 
             ${caller ? KT.render.callerSnapshot(caller) : ""}
             ${tokenLine ? `<div class="kt-hint">Token: ${KT.esc(tokenLine)}</div>` : ""}
+            ${postBlock()}
 
             <div class="kt-field">
               <label for="kt-note-text">Nhận xét của mày</label>
@@ -140,6 +141,61 @@
       KT.render.hydrateAvatars(wrap);
       tier = KT.tierLetter(person.tier);
       position = "";
+    }
+
+    /**
+     * Bài đang được gắn vào ghi chú này.
+     *
+     * Đây là phần biến một câu nhận xét thành BẰNG CHỨNG. "Thằng này hô thuê"
+     * nằm trơ thì sáu tháng sau không ai nhớ vì sao viết thế; kèm nguyên văn
+     * bài + giờ đăng + link thì đọc lại là hiểu ngay. Và nếu nó xoá bài thì
+     * bản chụp trong Sheet là thứ DUY NHẤT còn lại.
+     *
+     * Phải HIỆN RA chứ không gắn ngầm: người ta cần thấy mình đang ghi chú về
+     * bài nào trước khi bấm Lưu.
+     */
+    function postBlock() {
+      const post = ctx && ctx.post;
+      if (!post || (!post.text && !post.id)) return "";
+      const when = KT.fmtDateTime(post.postedTs || post.postedAt);
+      return (
+        `<div class="kt-post">` +
+        `<div class="kt-post-head">` +
+        `<span>Gắn với bài này${when ? " · " + KT.esc(when) : ""}</span>` +
+        `<button class="kt-icon" data-act="unpin" title="Bỏ gắn — ghi chú về người thôi">×</button>` +
+        `</div>` +
+        (post.text ? `<div class="kt-post-text">${KT.esc(post.text)}</div>` : `<div class="kt-post-text kt-dim">(bài không có chữ)</div>`) +
+        `</div>`
+      );
+    }
+
+    /**
+     * Bỏ gắn bài mà KHÔNG mất phần đã gõ. Vẽ lại là textarea mới, nên phải
+     * bê chữ sang — mất một đoạn nhận xét vừa gõ vì bấm nhầm một cái × là
+     * lỗi không thể tha.
+     */
+    function unpin() {
+      if (!ctx) return;
+      const el = wrap.querySelector('[data-el="note"]');
+      const giu = el ? el.value : "";
+      const giuTier = tier;
+      const giuPos = position;
+      ctx.post = null;
+      render();
+      const el2 = wrap.querySelector('[data-el="note"]');
+      if (el2) {
+        el2.value = giu;
+        el2.focus();
+      }
+      tier = giuTier;
+      position = giuPos;
+      for (const c of wrap.querySelectorAll("[data-tier]")) {
+        c.setAttribute("aria-pressed", c.dataset.tier === giuTier ? "true" : "false");
+      }
+      for (const c of wrap.querySelectorAll("[data-pos]")) {
+        c.setAttribute("aria-pressed", c.dataset.pos === giuPos ? "true" : "false");
+      }
+      place();
     }
 
     function setStatus(msg, isError) {
@@ -228,6 +284,7 @@
       const caller = ctx.caller || {};
       const me = api.getState().cfg.addedBy || "";
       const key = keyOf(person, caller);
+      const post = ctx.post || {};
 
       const personPatch = {
         wallet: key,
@@ -254,17 +311,20 @@
           chain: ctx.chain || "",
           token: ctx.token || "",
           token_address: ctx.tokenAddress || "",
-          post_id: caller.postId || "",
-          post_text: caller.postText || "",
+          post_id: post.id || caller.postId || "",
+          post_text: KT.xPage ? KT.xPage.trimPostText(post.text || caller.postText || "") : post.text || caller.postText || "",
           // Ghi kiểu người đọc được, không phải ISO của API — cột này nằm cạnh
           // noted_at trong Sheet, hai kiểu ngày khác nhau trông như lỗi.
-          posted_at: KT.fmtDateTime(caller.postedTs || caller.postedAt),
+          posted_at: KT.fmtDateTime(post.postedTs || post.postedAt || caller.postedTs || caller.postedAt),
           multiplier_at_note: caller.multiple == null ? "" : caller.multiple,
           holding_state: caller.holdingLabel || "",
           pnl_usd_at_note: caller.pnlUsd == null ? "" : caller.pnlUsd,
           note: note,
           chart_position: position,
-          source_url: location.href.split("#")[0],
+          // ⚠ Link của BÀI, không phải link trang đang mở. Ghi chú từ dòng
+          // thời gian mà lưu `x.com/home` thì cột này vô dụng — mà đây lại
+          // chính là cột phải bấm vào sáu tháng sau để xem lại bằng chứng.
+          source_url: post.url || location.href.split("#")[0],
           added_by: me,
         },
       };
@@ -285,6 +345,7 @@
       }
       const act = ev.target.closest("[data-act]");
       if (!act) return;
+      if (act.dataset.act === "unpin") return unpin();
       if (act.dataset.act === "close") return close();
       if (act.dataset.act === "save") return save();
     });

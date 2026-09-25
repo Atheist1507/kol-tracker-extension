@@ -26,6 +26,7 @@
     callers: [], // bảng X Tracker dưới chart (API community/messages)
     chartPeople: [], // người trên CHART, của token đang mở (feed fomo/thesis)
     thesisAll: [], // cả feed thesis, gồm token khác — làm sổ nhận mặt
+    soNguoi: 0, // đã ghi được bao nhiêu người vào sổ trên chain (ledger)
     renames: [], // ai đổi tên so với lúc ghi chú (tra bằng post_id)
     mauThesisTho: null, // giá trị THÔ mấy cột quyết định của feed thesis
     authorIdProbe: null, // author_id có ổn định không
@@ -216,7 +217,30 @@
       if (key && !state.extra.has(key)) state.extra.set(key, Object.assign({ tuDau: "fomo/thesis" }, p));
     }
     applyThesis();
-    if (isTop) chrome.runtime.sendMessage({ type: KT.MSG.THESIS, list }).catch(() => {});
+    if (isTop) {
+      chrome.runtime.sendMessage({ type: KT.MSG.THESIS, list }).catch(() => {});
+      ghiSo(list);
+    }
+  }
+
+  /**
+   * Ghi đám người vừa thấy vào SỔ TRÊN CHAIN, để lát nữa sang X còn tra được.
+   *
+   * ⚠ CHỈ frame trên cùng ghi. Chart nằm trong iframe riêng, cả hai frame đều
+   * nghe được feed — hai frame cùng đọc-rồi-ghi một khoá storage là mất một
+   * nửa dữ liệu của lượt đó, và không có lỗi nào hiện ra.
+   *
+   * Hỏng thì im: sổ này là tiện nghi, không phải đường sống của việc ghi chú.
+   */
+  async function ghiSo(list) {
+    try {
+      const got = await chrome.storage.local.get(KT.STORAGE.LEDGER);
+      const next = KT.ledger.mergeThesis(got[KT.STORAGE.LEDGER], list, Date.now());
+      await chrome.storage.local.set({ [KT.STORAGE.LEDGER]: next });
+      state.soNguoi = Object.keys(next.people).length;
+    } catch (e) {
+      /* storage đầy hoặc hình dạng lạ — không phải việc sống còn */
+    }
   }
 
   /**
@@ -724,6 +748,7 @@
             };
           })(),
           thesisTong: state.thesisAll.length,
+          soTrenChain: state.soNguoi,
           mauChart: state.chartPeople
             .slice(0, 3)
             .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " — " + (KT.fmtDateTime(p.postedTs) || "?")),
