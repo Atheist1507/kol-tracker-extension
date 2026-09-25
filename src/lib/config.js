@@ -19,6 +19,13 @@
     panelEnabled: true,
     overlayRings: true, // viền màu quanh avatar quen mặt trên chart
     overlayHover: true, // hover avatar → thẻ tóm tắt
+    // Sổ cái cú call (src/lib/ledger.js) — mặc định BẬT: sổ phải tích dữ liệu
+    // từ sớm thì đợt sau mới có gì để kết luận.
+    ledgerEnabled: true, // tự ghi mọi cú call nhìn thấy (GMGN + X)
+    deletionCheck: true, // định kỳ hỏi X xem tweet call đã ghi còn không
+    showLedgerDetail: true, // một dòng số liệu sổ ở màn chi tiết một người (GMGN)
+    showLedgerOnX: true, // cùng dòng đó trên trang hồ sơ X
+    xNarrativeBtn: true, // nút "nói về chuyện này trước chưa" trên tweet có CA
   };
 
   const STORAGE = {
@@ -47,6 +54,12 @@
     FRAMES: "kt:frames", // popup hỏi SW: content script đã vào được những frame nào
     THESIS: "kt:thesis", // frame trên cùng → SW → mọi frame: đám người trên chart
     API: "kt:api", // frame nghe được người trong API lạ → SW → mọi frame
+    // Sổ cái cú call — mọi thứ đi qua SW vì IndexedDB phải thuộc về extension
+    LEDGER_ADD: "kt:ledgerAdd", // { calls: [...] }
+    LEDGER_TOKEN: "kt:ledgerToken", // { tokenKey, created: {ts,key,rank}, timeKeys }
+    LEDGER_PERSON: "kt:ledgerPerson", // { handle, wallet } → { summary, parts }
+    LEDGER_TOKEN_GET: "kt:ledgerTokenGet", // { tokenKey } → { createdAt } | null
+    LEDGER_STATS: "kt:ledgerStats", // Chẩn đoán
   };
 
   /**
@@ -62,6 +75,7 @@
     "src/lib/stats.js",
     "src/lib/model.js",
     "src/lib/gmgn.js",
+    "src/lib/ledger.js",
     "src/lib/tooltip-text.js",
     "src/lib/geom.js",
     "src/lib/sheet-url.js",

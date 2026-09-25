@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KOL Tracker",
-  "version": "0.14.0",
+  "version": "0.15.1",
   "description": "Research KOL/caller crypto ngay trên chart GMGN: ai đã post về token này, ai đáng tin, ghi chú thẳng vào Google Sheet.",
   "permissions": [
     "storage",
@@ -21,7 +21,8 @@
     "https://docs.google.com/*",
     "https://*.googleusercontent.com/*",
     "https://script.google.com/*",
-    "https://script.googleusercontent.com/*"
+    "https://script.googleusercontent.com/*",
+    "https://publish.twitter.com/*"
   ],
   "background": {
     "service_worker": "background/service-worker.js"
@@ -61,6 +62,7 @@
         "src/lib/stats.js",
         "src/lib/model.js",
         "src/lib/gmgn.js",
+        "src/lib/ledger.js",
         "src/lib/tooltip-text.js",
         "src/lib/geom.js",
         "src/lib/sheet-url.js",
@@ -105,6 +107,7 @@
         "src/lib/stats.js",
         "src/lib/model.js",
         "src/lib/gmgn.js",
+        "src/lib/ledger.js",
         "src/lib/tooltip-text.js",
         "src/lib/sheet-url.js",
         "src/lib/x-page.js",

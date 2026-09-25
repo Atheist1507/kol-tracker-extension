@@ -272,6 +272,30 @@
       KT.render.hydrateAvatars(el.content);
       syncBackBtn();
       el.body.scrollTop = 0;
+      fillLedger(hit.person, detailRef);
+    }
+
+    /**
+     * Dòng số liệu của sổ tự ghi — hỏi service worker (sổ nằm ở đó). Trả lời
+     * về muộn thì phải kiểm lại vẫn đang mở ĐÚNG người đó: bấm sang người
+     * khác giữa chừng mà vẫn điền là in số của A vào hồ sơ của B.
+     */
+    function fillLedger(person, ref) {
+      const cfg = api.getState().cfg || {};
+      if (!cfg.ledgerEnabled || !cfg.showLedgerDetail) return;
+      if (!person || (!person.username && !person.wallet)) return;
+      try {
+        chrome.runtime
+          .sendMessage({ type: KT.MSG.LEDGER_PERSON, handle: person.username, wallet: person.wallet })
+          .then((res) => {
+            if (detailRef !== ref) return;
+            const slot = el.content.querySelector('[data-slot="ledger"]');
+            if (slot) slot.innerHTML = KT.render.ledgerHtml(res && res.parts);
+          })
+          .catch(() => {});
+      } catch (e) {
+        /* extension vừa cập nhật — tab này cần F5, không phải việc của panel */
+      }
     }
 
     function rerender() {

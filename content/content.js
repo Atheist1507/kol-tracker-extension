@@ -211,6 +211,7 @@
   function takeThesis(list) {
     if (!list || !list.length) return;
     state.thesisAll = list;
+    ledgerSend(ledgerFromThesis(list));
     for (const p of list) {
       const key = KT.handleKey(p.username);
       if (key && !state.extra.has(key)) state.extra.set(key, Object.assign({ tuDau: "fomo/thesis" }, p));
@@ -316,6 +317,61 @@
    * "Extension context invalidated", và tab đó không trả lời ai nữa cho tới
    * khi F5. Không nói ra thì nó trông y hệt "extension hỏng".
    */
+  /**
+   * Gửi cú call sang sổ cái (service worker). Chỉ gửi, không đợi: sổ là dữ
+   * liệu phụ, hỏng thì im — không được làm chậm hay làm hỏng panel.
+   * `seenAt` lấy NGAY lúc nhìn thấy, không để SW tự lấy giờ lúc nó kịp ghi.
+   */
+  function ledgerSend(calls) {
+    if (!calls.length || !state.cfg.ledgerEnabled || !alive()) return;
+    chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_ADD, calls }).catch(() => {});
+  }
+
+  function ledgerFromThesis(list) {
+    const seenAt = Date.now();
+    return list
+      .filter((p) => p.postId && p.tokenAddress)
+      .map((p) => ({
+        id: "t:" + p.postId,
+        source: "thesis",
+        handle: p.username,
+        authorId: p.authorId,
+        tokenKey: p.tokenAddress,
+        chain: p.chain,
+        tokenSymbol: p.tokenSymbol,
+        calledAt: p.postedTs,
+        multiple: null, // feed thesis không nói kèo đã chạy bao nhiêu
+        text: p.postText,
+        seenAt,
+      }));
+  }
+
+  /**
+   * Bảng X Tracker: `callers` đã GỘP theo người, đại diện là bài SỚM NHẤT —
+   * đúng thứ sổ cần (cú call là bài đầu tiên). `multiple` là x của CHÍNH bài
+   * đó tính tới lúc này — thứ quyết định "ghi trước" hay "ghi muộn".
+   */
+  function ledgerFromCallers(callers, token) {
+    const addr = token && token.address;
+    if (!addr) return [];
+    const seenAt = Date.now();
+    return callers
+      .filter((c) => c.postId || c.postedTs)
+      .map((c) => ({
+        id: "g:" + (c.postId || (c.wallet || c.username) + "|" + c.postedTs) + ":" + KT.walletKey(addr),
+        source: "gmgn",
+        handle: c.username,
+        wallet: c.wallet,
+        tokenKey: addr,
+        chain: token.chain,
+        tokenSymbol: token.symbol,
+        calledAt: c.postedTs,
+        multiple: c.multiple,
+        text: c.postText,
+        seenAt,
+      }));
+  }
+
   function alive() {
     try {
       return !!(chrome.runtime && chrome.runtime.id);
@@ -443,6 +499,7 @@
             address: where.tokenAddress,
           });
         }
+        ledgerSend(ledgerFromCallers(callers, state.token));
         if (panel) panel.update();
         if (overlay) overlay.reset();
         shareCallers();
@@ -461,6 +518,20 @@
             name: first.name,
             address: KT.walletKey(first.address),
           });
+          // Mốc token RA ĐỜI, để đo "call sau bao lâu". Chưa đo được GMGN để
+          // nó ở cột nào — nên ghi lại cả tên các cột trông như thời gian cho
+          // Chẩn đoán, và chỉ nhận những cột nằm trong danh sách đã duyệt.
+          const moc = KT.ledger.tokenCreatedAt(first, Date.now());
+          state.tokenMoc = {
+            cot: moc ? moc.key : null,
+            luc: moc ? KT.fmtDateTime(moc.ts) : null,
+            cacCotThoiGian: KT.ledger.timeLikeKeys(first),
+          };
+          if (moc && first.address && state.cfg.ledgerEnabled && alive()) {
+            chrome.runtime
+              .sendMessage({ type: KT.MSG.LEDGER_TOKEN, tokenKey: first.address, created: moc })
+              .catch(() => {});
+          }
           // Feed thesis có thể về TRƯỚC khi biết token đang mở là cái nào —
           // lúc đó bộ lọc theo token chưa chạy được. Lọc lại.
           if (state.thesisAll.length) applyThesis();
@@ -724,6 +795,9 @@
             };
           })(),
           thesisTong: state.thesisAll.length,
+          // Mốc token ra đời: cột nào của GMGN mang nó? `cot: null` mà
+          // `cacCotThoiGian` có tên lạ = phải thêm tên đó vào CREATED_KEYS.
+          mocTokenRaDoi: state.tokenMoc || null,
           mauChart: state.chartPeople
             .slice(0, 3)
             .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " — " + (KT.fmtDateTime(p.postedTs) || "?")),

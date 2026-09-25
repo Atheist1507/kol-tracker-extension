@@ -186,6 +186,23 @@ giữ hay không, không cho biết bán lúc nào. Suy ra "bán nhanh" từ "hi
 Còn vài đồng bụi sau khi bán vẫn tính là **xả sạch** — đòi đúng `balance = 0` là xếp nhầm sang "còn
 giữ". Thiếu hẳn mấy cột số thì là *"không biết"*, **không** quy về 0.
 
+### Sổ tự ghi cú call
+
+Extension tự ghi lại **mọi cú call nó nhìn thấy** — feed trên chart GMGN, bảng X Tracker, và tweet có
+CA trên X — không cần bấm N. Sổ nằm trong trình duyệt (IndexedDB), **không** vào Google Sheet.
+
+- **Ghi trước / ghi muộn**: cú call thấy khi kèo *chưa chạy* là "ghi trước" — chỉ những cú này mới đáng
+  dùng để chấm điểm. Thấy sau khi kèo đã pump thì ai nhìn lại cũng giỏi.
+- Màn chi tiết một người (GMGN) và trang hồ sơ X có một dòng **Sổ tự ghi**: số kèo, bao nhiêu ghi trước,
+  ngày nhiều kèo nhất, thường call sau bao lâu kể từ khi token ra đời, bài call bị xoá.
+- Tweet có CA trên X mọc nút **kính lúp**: mở tìm kiếm các bài của chính người đó nói về ticker đó
+  **trước** ngày token ra đời — tách người đã theo dõi narrative từ trước khỏi kẻ call bừa.
+- Mỗi 6 giờ extension hỏi X xem các tweet call đã ghi còn không. Chỉ tính là **xoá** khi mất ở hai lần
+  kiểm cách nhau ≥20 giờ **và** các bài khác của cùng người đó vẫn còn.
+- Bật/tắt từng phần ở **Cài đặt → 5. Sổ tự ghi cú call**. Dữ liệu thô giữ 90 ngày; người có hồ sơ giữ mãi.
+
+Đây mới là **số liệu**, chưa có nhãn tự động ("call bừa", "nghi bot"…) — nhãn cần vài tuần dữ liệu thật.
+
 ## 4. Overlay trên chart (Mức 2)
 
 Mục tiêu cuối của spec: avatar nào có trong database thì **tự có viền màu theo tier ngay trên chart**,
@@ -268,7 +285,7 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 94 test logic thuần, không cần cài gì
+npm test         # test logic thuần, không cần cài gì
 npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
 npm run icons    # sinh lại icons/icon-*.png
 ```

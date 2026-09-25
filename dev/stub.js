@@ -107,12 +107,23 @@
   globalThis.chrome = {
     storage: { sync: area("sync"), local: area("local"), onChanged: { addListener: (fn) => listeners.push(fn) } },
     runtime: {
+      id: "preview", // thiếu cái này thì alive() tưởng extension vừa bị gỡ — mọi lời gửi sang SW im lặng
       sendMessage: async (msg) => {
         if (msg && msg.type === "kt:saveNote") {
           console.log("[preview] saveNote payload:", JSON.parse(JSON.stringify(msg.payload)));
           globalThis.__LAST_SAVE__ = msg.payload;
           return { ok: true, createdPerson: true };
         }
+        // Sổ tự ghi: giữ lại mọi cú call gửi sang, để soi bằng mắt / Playwright
+        // xem trang đọc ra ĐÚNG người, đúng bài (nhất là quote tweet).
+        if (msg && msg.type === "kt:ledgerAdd") {
+          (globalThis.__LEDGER__ = globalThis.__LEDGER__ || []).push(...msg.calls);
+          return { added: msg.calls.length, merged: 0 };
+        }
+        if (msg && msg.type === "kt:ledgerPerson") {
+          return { parts: ["7 kèo (3 ghi trước)", "có ngày ≥5 kèo", "1 bài call đã bị xoá"] };
+        }
+        if (msg && msg.type === "kt:ledgerTokenGet") return null;
         return { ok: true };
       },
       onMessage: { addListener: () => {} },

@@ -12,7 +12,16 @@
   // phân biệt được ghi chú của ai, mà cột vẫn nằm đó trông như đang hoạt động.
   const TEXT_FIELDS = ["sheetApiUrl", "sheetApiSecret", "addedBy", "kolsCsvUrl", "callsCsvUrl", "sheetUrl"];
   const NUMBER_FIELDS = ["winMultiple", "minSample", "refreshMinutes", "staleMinutes"];
-  const BOOL_FIELDS = ["panelEnabled", "overlayRings", "overlayHover"];
+  const BOOL_FIELDS = [
+    "panelEnabled",
+    "overlayRings",
+    "overlayHover",
+    "ledgerEnabled",
+    "deletionCheck",
+    "showLedgerDetail",
+    "showLedgerOnX",
+    "xNarrativeBtn",
+  ];
 
   const KOL_HEADERS = [
     "handle",
@@ -263,7 +272,16 @@
     el.className = "status";
     el.textContent =
       `${db.counts.people} người · ${db.counts.notes} ghi chú · cập nhật ${KT.timeAgo(data.syncedAt)}` +
-      (ghosts.length ? ` · ${ghosts.length} người có ghi chú nhưng chưa có dòng ở tab Overview` : "");
+      (ghosts.length ? ` · ${ghosts.length} người có ghi chú nhưng chưa có dòng ở tab Overview` : "") +
+      (db.counts.merged
+        ? `\n⚠ ${db.counts.merged} hồ sơ đang chứa ghi chú của 2 tài khoản chỉ khác nhau dấu _ (lỗi cũ trước v0.15.1): ` +
+          db.people
+            .filter((p) => p.mergedNames.length)
+            .slice(0, 5)
+            .map((p) => p.mergedNames.map((n) => "@" + n).join(" + "))
+            .join("; ") +
+          ". Tách tay trong Sheet theo cột username."
+        : "");
   }
 
   $("refresh").addEventListener("click", async () => {
@@ -279,5 +297,40 @@
     if (area === "local" && changes[KT.STORAGE.DATA]) renderStatus();
   });
 
+  /**
+   * Sổ đang có gì. Kèm kết quả lượt kiểm xoá bài gần nhất: "toàn 429" (bị X
+   * hãm) và "toàn 200" (không ai xoá) trông giống hệt nhau từ bên ngoài —
+   * không ai bị đánh dấu — nên phải in mã trả về ra mới phân biệt được.
+   */
+  async function renderLedger() {
+    const el = $("ledger-stats");
+    try {
+      const s = await chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_STATS });
+      if (!s || s.error) {
+        el.textContent = "Không đọc được sổ" + (s && s.error ? ": " + s.error : ".");
+        return;
+      }
+      const n = s.theoNguon || {};
+      let t =
+        `${s.cuCall} cú call đã ghi (X: ${n.x || 0} · chart GMGN: ${n.thesis || 0} · bảng X Tracker: ${n.gmgn || 0})` +
+        ` · ${s.tokenCoMoc} token có mốc ra đời`;
+      const k = s.kiemXoaBai;
+      if (k) {
+        const ma = Object.entries(k.maTraVe || {})
+          .map(([code, c]) => (code === "0" ? "lỗi mạng" : "HTTP " + code) + "×" + c)
+          .join(", ");
+        t +=
+          `\nKiểm xoá bài lần cuối ${KT.timeAgo(k.at)}: ${k.kiem} tweet — còn ${k.song}, mất ${k.mat}, không biết ${k.khongBiet}` +
+          (ma ? ` (${ma})` : "");
+      } else {
+        t += "\nChưa kiểm xoá bài lần nào (tweet phải đủ 1 ngày tuổi mới được kiểm).";
+      }
+      el.textContent = t;
+    } catch (e) {
+      el.textContent = "Không đọc được sổ: " + (e && e.message ? e.message : e);
+    }
+  }
+
   renderStatus();
+  renderLedger();
 })();

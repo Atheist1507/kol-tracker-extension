@@ -140,6 +140,27 @@
       </section>
 
       <section class="card">
+        <h2>5. Sổ tự ghi cú call</h2>
+        <p class="hint">
+          Extension tự ghi lại <b>mọi cú call nó nhìn thấy</b> — trên chart GMGN và các tweet có CA trên X —
+          không cần bấm N. Sổ nằm trong trình duyệt này, <b>không</b> ghi vào Google Sheet. Dữ liệu thô giữ
+          90 ngày; người đã có hồ sơ trong Sheet thì giữ mãi.
+        </p>
+        <p class="hint">
+          <b>"Ghi trước"</b> = thấy cú call khi kèo <i>chưa chạy</i>. Chỉ những cú đó mới đáng dùng để chấm điểm:
+          cú call thấy sau khi kèo đã pump thì ai nhìn lại cũng thấy giỏi. Đây mới là <b>số liệu</b>, chưa phải
+          kết luận ai tốt ai xấu.
+        </p>
+        <label class="check"><input type="checkbox" id="ledgerEnabled" /> <span>Tự ghi sổ mọi cú call nhìn thấy</span></label>
+        <label class="check"><input type="checkbox" id="deletionCheck" /> <span>Kiểm tra định kỳ xem tweet call đã ghi có bị xoá không <span class="hint">(hỏi publish.twitter.com, không gửi cookie)</span></span></label>
+        <div class="label" style="margin-top:12px">Hiện ở đâu</div>
+        <label class="check"><input type="checkbox" id="showLedgerDetail" /> <span>GMGN — một dòng số liệu sổ ở màn chi tiết của một người</span></label>
+        <label class="check"><input type="checkbox" id="showLedgerOnX" /> <span>X — dòng đó trên trang hồ sơ (dưới phần bio)</span></label>
+        <label class="check"><input type="checkbox" id="xNarrativeBtn" /> <span>X — nút 🔍 trên tweet có CA: "người này có nói về chuyện này trước khi token ra đời không?"</span></label>
+        <div class="status" id="ledger-stats">Đang đọc sổ…</div>
+      </section>
+
+      <section class="card">
         <h2>Mời người khác dùng chung</h2>
         <p class="hint">
           Hai người dùng <b>chung một Sheet</b>: bạn của bạn dán <b>đúng URL Web App và SECRET này</b>,
