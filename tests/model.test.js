@@ -143,3 +143,10 @@ test("ghi chú cho người đã đổi tên phải rơi vào ĐÚNG dòng cũ",
   const person = KT.findPerson(db, { username: "ten_moi", postId: "post-1" });
   assert.strictEqual(person.wallet, "x:ten_cu");
 });
+
+test("vị trí trên sóng quy về 3 nhóm", () => {
+  assert.strictEqual(KT.parsePosition("đu đỉnh"), "late");
+  assert.strictEqual(KT.parsePosition("Đầu sóng"), "early");
+  assert.strictEqual(KT.parsePosition("giữa"), "mid");
+  assert.strictEqual(KT.parsePosition("hmm"), "");
+});

@@ -90,7 +90,7 @@
         <button class="btn" data-test="kolsCsvUrl">Thử link tab KOLs</button>
 
         <label class="field">
-          <span class="label">Tab <b>Calls</b> (để trống cũng chạy, chỉ là không có track record)</span>
+          <span class="label">Tab <b>Calls</b> (để trống cũng chạy — đây là đường đọc CSV cũ)</span>
           <input type="url" id="callsCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=123…&output=csv" />
           <span class="test" id="callsCsvUrl-test"></span>
         </label>
@@ -103,27 +103,9 @@
         </label>
       </section>
 
-      <section class="card">
-        <h2>3. Cách tính track record</h2>
-        <div class="grid">
-          <label class="field">
-            <span class="label">Từ x mấy trở lên tính là call thắng</span>
-            <input type="number" id="winMultiple" min="1" step="0.5" />
-          </label>
-          <label class="field">
-            <span class="label">Bao nhiêu case thì win rate mới đáng tin</span>
-            <input type="number" id="minSample" min="1" step="1" />
-          </label>
-        </div>
-        <p class="hint">
-          Cột <code>result</code> đọc được cả “x5”, “5x”, “+300%”, “-70%” lẫn chữ (“đúng”, “sai”, “rug”).
-          Có số thì SỐ quyết định, không có số mới đọc chữ. Dưới x1 = thua, từ ngưỡng trên = thắng,
-          ở giữa = huề. Case không đọc được không tính vào mẫu số của win rate.
-        </p>
-      </section>
 
       <section class="card">
-        <h2>4. Hiển thị</h2>
+        <h2>3. Hiển thị</h2>
         <label class="check"><input type="checkbox" id="panelEnabled" /> <span>Tự mở panel khi vào GMGN (Alt+K để bật/tắt)</span></label>
         <label class="check"><input type="checkbox" id="overlayRings" /> <span>Viền màu theo tier quanh avatar quen mặt trên trang</span></label>
         <label class="check"><input type="checkbox" id="overlayHover" /> <span>Hover avatar / tooltip → hiện thẻ tóm tắt</span></label>
@@ -186,7 +168,7 @@
     <script src="../src/lib/normalize.js"></script>
     <script src="../src/lib/csv.js"></script>
     <script src="../src/lib/tier.js"></script>
-    <script src="../src/lib/stats.js"></script>
+    <script src="../src/lib/datetime.js"></script>
     <script src="../src/lib/model.js"></script>
     <script src="../src/lib/gmgn.js"></script>
     <script src="../src/lib/tooltip-text.js"></script>

@@ -11,17 +11,12 @@
   const MARGIN = 12;
 
   function createPanel(api) {
-    const host = document.createElement("div");
-    host.id = "kol-tracker-panel";
-    host.style.cssText = "position:fixed;z-index:2147483000;right:16px;bottom:16px;display:none;";
-    const shadow = host.attachShadow({ mode: "open" });
-
-    const style = document.createElement("style");
-    style.textContent = KT.PANEL_CSS;
-    shadow.appendChild(style);
-
-    const wrap = document.createElement("div");
-    wrap.className = "kt-root";
+    const { host, wrap } = KT.dom.shadowHost({
+      id: "kol-tracker-panel",
+      hostStyle: "position:fixed;z-index:2147483000;right:16px;bottom:16px;display:none;",
+      css: KT.PANEL_CSS,
+      wrapClass: "kt-root",
+    });
     wrap.innerHTML = `
       <div class="kt-panel">
         <div class="kt-head">
@@ -41,7 +36,6 @@
         </div>
         <div class="kt-foot"><span data-el="foot"></span></div>
       </div>`;
-    shadow.appendChild(wrap);
 
     const el = {
       panel: wrap.querySelector(".kt-panel"),

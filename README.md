@@ -120,8 +120,10 @@ handle,token,called_at,price_at_call,chart_position,result,added_by
 | `chart_position` | Call ở đoạn nào của sóng: `đầu sóng` / `giữa sóng` / `đu đỉnh`. |
 | `result` | Kết quả: `x5`, `5x`, `+300%`, `-70%`, hoặc chữ (`đúng`, `sai`, `rug`). |
 
-> **Log cả case sai**, không chỉ case thắng — nếu không win rate là con số tự lừa mình.
-> Dưới 5 case thì extension vẫn hiện win rate nhưng kèm cảnh báo "chưa đủ mẫu".
+> ⚠ **Cột `result` hiện KHÔNG được extension chấm điểm.** Từng có một hàm tính win rate từ cột này
+> (`calcStats`), nhưng nó chưa bao giờ được gọi từ giao diện nào, và `buildPayload` cũng không bao
+> giờ ghi vào cột `result` — nên nó đã bị xoá (13/10/2026) thay vì để đó làm người đọc tưởng có.
+> Cột vẫn nhận và vẫn hiện nguyên văn trong thẻ chi tiết; chấm điểm thì làm bằng mắt.
 
 Tên cột tiếng Việt cũng nhận (`Hạng` = `tier`, `Cờ đỏ` = `red_flags`, `Kết quả` = `result`…).
 Cột nào extension không hiểu thì **không bị vứt đi** — vẫn hiện ở cuối thẻ chi tiết.
@@ -292,6 +294,8 @@ background/service-worker.js  CHỖ DUY NHẤT fetch CSV (content script gọi d
 content/main-world.js      Chạy CÙNG thế giới JS với GMGN (world: MAIN): bọc fetch/XHR để nghe
                            response của API community/messages, postMessage sang thế giới cách ly.
                            CHỈ ĐỌC, không sửa gì của trang
+content/dom.js             Helper DOM dùng chung cho mọi mặt: dựng shadow root, kiểm extension
+                           còn sống. Chỉ nhận hàm ≥2 mặt cùng cần, không giữ state
 content/content.js         Điều phối: ghép người-trên-chart (API) với hồ sơ (Sheet), phím tắt, tin nhắn
 content/note-box.js        Hộp ghi chú — phím N, điền sẵn tất cả, ⌘Enter ghi vào Sheet
 content/panel.js           Mức 1 — panel nổi (shadow DOM, kéo thả, tìm kiếm, thẻ chi tiết)
@@ -299,14 +303,14 @@ content/overlay.js         Mức 2 — viền tier quanh avatar + thẻ hover + 
 content/x.js               Trên X: nút ghi chú ở hồ sơ, pill + thẻ hover trong feed, chip contract,
                            dòng "đã thấy call N token" lấy từ sổ trên chain
 popup/                     Bản rút gọn của panel, dùng được ở mọi trang
-options/                   Cấu hình: 2 link CSV, ngưỡng win rate, bật/tắt overlay
+options/                   Cấu hình: kết nối Sheet, 2 link CSV, bật/tắt overlay
 apps-script/Code.gs        Sống TRONG file Sheet: doGet trả JSON cho extension đọc, doPost nhận
                            một lần ghi chú → thêm dòng Detail + tạo/cập nhật dòng Overview
 src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ config.js):
   normalize.js               bỏ dấu, quy handle/token/URL avatar về khoá so khớp
   csv.js                     parser CSV (RFC 4180) + map tên cột Việt/Anh → khoá chuẩn
   tier.js                    S/A/B/C → chữ cái + màu
-  stats.js                   đọc "x5"/"đu đỉnh"/"+300%" → win rate, timing, mốc thời gian
+  datetime.js                đọc/viết mốc thời gian ("18/09/2026 lúc 14:37", ISO, dd/mm/yyyy)
   model.js                   dựng db người/ghi chú trong bộ nhớ (khoá là VÍ) + tìm kiếm + dò đổi tên
   tooltip-text.js            mẩu chữ trong tooltip → ứng viên handle (chủ thẻ vs tên bị nhắc tới)
   gmgn.js                    đọc API community/messages + fomo/thesis của GMGN: danh tính, nội dung
@@ -315,7 +319,8 @@ src/lib/                   Logic THUẦN, không đụng DOM hay chrome.* (trừ
   ledger.js                  sổ trên chain — gộp feed thesis của GMGN để tra lại được từ trang X
   ca.js                      bắt contract address trong một đoạn chữ → link GMGN
   sheet-url.js               link Sheet kiểu gì cũng ra được link CSV
-  render.js                  dựng HTML dùng CHUNG cho panel và popup
+  render.js                  dựng HTML dùng CHUNG cho panel, popup, thẻ hover GMGN và hai chỗ
+                             trên X (`personBrief`/`noteLine` — MỘT bộ tên lớp `kt-brief-*`)
   styles.js                  CSS dạng chuỗi (shadow DOM phải nhét style bằng JS)
   config.js                  giá trị mặc định, khoá storage, danh sách content script
 tests/                     node --test, không dependency
@@ -330,8 +335,9 @@ trong `src/lib/` là script thường gắn vào `globalThis.KT`, và cùng lúc
 ## 6. Phát triển
 
 ```bash
-npm test         # 174 test logic thuần, không cần cài gì
-npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn chưa?
+npm test         # 173 test logic thuần, không cần cài gì
+npm run check    # manifest trỏ đúng file? danh sách content script có lệch không? cú pháp ổn
+                 # chưa? có hàm nào export ra KT mà chẳng ai gọi không?
 npm run icons    # sinh lại icons/icon-*.png
 ```
 

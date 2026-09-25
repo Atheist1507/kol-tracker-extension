@@ -178,6 +178,60 @@
     </div>`;
   }
 
+  /**
+   * "Tóm tắt một người" — khối chữ dùng chung cho MỌI thẻ nổi.
+   *
+   * Trước đây khối này được gõ tay ở BA chỗ: thẻ hover trên chart GMGN
+   * (overlay), dải dưới bio ở trang hồ sơ X, và thẻ hover trong dòng thời gian
+   * X. Ba bản, ba bộ tên lớp CSS (`kt-card-note` vs `kt-x-note`), cùng một
+   * biểu thức `[fmtDateTime(...), token, addedBy].filter(Boolean).join(" · ")`
+   * chép nguyên văn. Sửa cách hiện ghi chú ở một chỗ thì hai chỗ kia giữ
+   * nguyên kiểu cũ, và không có gì báo.
+   *
+   * Giờ một hàm, một bộ tên lớp `kt-brief-*`. Phần KHUNG (nền, viền, bề rộng,
+   * chỗ đứng) vẫn của từng mặt — đó mới là chỗ chúng thật sự khác nhau.
+   */
+  function noteLine(note) {
+    if (!note || !note.note) return "";
+    const meta = [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      `<div class="kt-brief-note">${esc(note.note)}</div>` +
+      (meta ? `<div class="kt-brief-meta">${esc(meta)}</div>` : "")
+    );
+  }
+
+  /**
+   * @param person  hồ sơ, có thể null (người hoàn toàn lạ)
+   * @param opts.chainHtml   dòng "đã thấy call N token…" — chỉ trang X có
+   * @param opts.emptyNote   chữ hiện khi chưa có ghi chú nào; bỏ trống thì không hiện gì
+   * @param opts.unknownHead nhãn ở đầu khi chưa có hồ sơ
+   */
+  function personBrief(person, opts) {
+    const o = opts || {};
+    const note = (person && person.notes && person.notes[0]) || null;
+    const color = person ? KT.tierColor(person.tier) : o.unknownColor || "#6E7A88";
+    const head = person
+      ? `<div class="kt-brief-head"><b style="color:${esc(color)}">${esc(person.tierLetter || "chưa xếp hạng")}</b>` +
+        (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
+        (person.redFlags ? ` · <span class="kt-brief-flag">⚑ ${esc(person.redFlags)}</span>` : "") +
+        `</div>`
+      : o.unknownHead
+        ? `<div class="kt-brief-head"><b style="color:${esc(color)}">${esc(o.unknownHead)}</b></div>`
+        : "";
+    return (
+      head +
+      (o.chainHtml || "") +
+      (person && person.summary ? `<div class="kt-brief-sum">${esc(person.summary)}</div>` : "") +
+      (note && note.note
+        ? noteLine(note)
+        : o.emptyNote
+          ? `<div class="kt-brief-meta">${esc(o.emptyNote)}</div>`
+          : "")
+    );
+  }
+
   /** Bảng ghi chú của một người. */
   function notesHtml(notes, limit) {
     if (!notes.length) return `<div class="kt-hint">Chưa ghi chú gì về người này.</div>`;
@@ -289,6 +343,8 @@
   KT.fmtMultiple = fmtMultiple;
   KT.fmtUsd = fmtUsd;
   KT.render = {
+    noteLine,
+    personBrief,
     personRow,
     resultsHtml,
     callerRow,

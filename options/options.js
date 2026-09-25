@@ -11,7 +11,7 @@
   // Một người dùng thì không ai để ý; hai người dùng chung Sheet thì không
   // phân biệt được ghi chú của ai, mà cột vẫn nằm đó trông như đang hoạt động.
   const TEXT_FIELDS = ["sheetApiUrl", "sheetApiSecret", "addedBy", "kolsCsvUrl", "callsCsvUrl", "sheetUrl"];
-  const NUMBER_FIELDS = ["winMultiple", "minSample", "refreshMinutes", "staleMinutes"];
+  const NUMBER_FIELDS = ["refreshMinutes", "staleMinutes"];
   const BOOL_FIELDS = ["panelEnabled", "overlayRings", "overlayHover"];
 
   const KOL_HEADERS = [

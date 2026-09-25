@@ -6,7 +6,11 @@
  */
 const path = require("path");
 
-const FILES = ["normalize", "csv", "tier", "stats", "model", "gmgn", "tooltip-text", "geom", "x-page", "sheet-url", "render", "ca", "ledger", "config"];
+// ⚠ styles.js CÓ mặt ở đây dù nó chỉ là chuỗi CSS: khối `kt-brief-*` được
+// dựng ở render.js nhưng định dạng thì nằm bên styles.js, và hai chỗ đó lệch
+// nhau thì chữ vẫn hiện mà mất sạch định dạng — không lỗi, không triệu chứng.
+// tests/render-brief.test.js khoá cặp đó lại, nên file này phải nạp được.
+const FILES = ["normalize", "csv", "tier", "datetime", "model", "gmgn", "tooltip-text", "geom", "x-page", "sheet-url", "styles", "render", "ca", "ledger", "config"];
 for (const f of FILES) require(path.join(__dirname, "..", "src", "lib", f + ".js"));
 
 module.exports = globalThis.KT;

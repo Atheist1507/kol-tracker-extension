@@ -14,8 +14,6 @@
     sheetUrl: "", // link /edit để bấm "Mở Sheet" khi cần thêm người mới
     refreshMinutes: 30, // 0 = chỉ làm tươi thủ công
     staleMinutes: 10, // mở trang GMGN mà dữ liệu cũ hơn ngần này thì tự fetch
-    winMultiple: 2, // từ xN trở lên tính là call thắng
-    minSample: 5, // dưới ngần này case thì win rate chưa đáng tin
     panelEnabled: true,
     overlayRings: true, // viền màu quanh avatar quen mặt trên chart
     overlayHover: true, // hover avatar → thẻ tóm tắt
@@ -62,7 +60,7 @@
     "src/lib/normalize.js",
     "src/lib/csv.js",
     "src/lib/tier.js",
-    "src/lib/stats.js",
+    "src/lib/datetime.js",
     "src/lib/model.js",
     "src/lib/gmgn.js",
     "src/lib/tooltip-text.js",
@@ -72,6 +70,7 @@
     "src/lib/styles.js",
     "src/lib/render.js",
     "src/lib/ledger.js",
+    "content/dom.js",
     "content/overlay.js",
     "content/note-box.js",
     "content/panel.js",

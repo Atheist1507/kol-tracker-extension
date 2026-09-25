@@ -11,6 +11,7 @@
 (function () {
   "use strict";
   const KT = globalThis.KT;
+  const alive = KT.dom.alive;
 
   // Panel chỉ ở frame trên cùng; overlay thì frame nào cũng chạy.
   const isTop = window.top === window;
@@ -340,14 +341,6 @@
    * "Extension context invalidated", và tab đó không trả lời ai nữa cho tới
    * khi F5. Không nói ra thì nó trông y hệt "extension hỏng".
    */
-  function alive() {
-    try {
-      return !!(chrome.runtime && chrome.runtime.id);
-    } catch (e) {
-      return false;
-    }
-  }
-
   const api = {
     getState: () => state,
     refresh: () =>

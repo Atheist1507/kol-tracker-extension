@@ -19,18 +19,12 @@
   const TIERS = ["S", "A", "B", "C", "D"];
 
   function createNoteBox(api) {
-    const host = document.createElement("div");
-    host.id = "kol-tracker-note";
-    host.style.cssText = "position:fixed;z-index:2147483100;display:none;";
-    const shadow = host.attachShadow({ mode: "open" });
-
-    const style = document.createElement("style");
-    style.textContent = KT.PANEL_CSS;
-    shadow.appendChild(style);
-
-    const wrap = document.createElement("div");
-    wrap.className = "kt-root";
-    shadow.appendChild(wrap);
+    const { host, wrap } = KT.dom.shadowHost({
+      id: "kol-tracker-note",
+      hostStyle: "position:fixed;z-index:2147483100;display:none;",
+      css: KT.PANEL_CSS,
+      wrapClass: "kt-root",
+    });
 
     let ctx = null;
     let open = false;

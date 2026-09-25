@@ -16,6 +16,7 @@
 (function () {
   "use strict";
   const KT = globalThis.KT;
+  const alive = KT.dom.alive;
 
   if (globalThis.__KOL_TRACKER_X__) return;
   globalThis.__KOL_TRACKER_X__ = true;
@@ -32,14 +33,6 @@
   let lastAnchors = { nut: null, dai: null };
 
   /* ---------- dữ liệu ---------- */
-
-  function alive() {
-    try {
-      return !!(chrome.runtime && chrome.runtime.id);
-    } catch (e) {
-      return false;
-    }
-  }
 
   async function load() {
     const [cfg, data, so] = await Promise.all([KT.getConfig(), KT.getData(), docSo()]);
@@ -136,16 +129,7 @@
   /* ---------- vẽ ---------- */
 
   function khungRieng(id) {
-    const host = document.createElement("div");
-    if (id) host.id = id;
-    const shadow = host.attachShadow({ mode: "open" });
-    const style = document.createElement("style");
-    style.textContent = KT.X_CSS;
-    shadow.appendChild(style);
-    const wrap = document.createElement("div");
-    wrap.className = "kt-x";
-    shadow.appendChild(wrap);
-    return { host, wrap };
+    return KT.dom.shadowHost({ id, css: KT.X_CSS, wrapClass: "kt-x" });
   }
 
   function veNut(person) {
@@ -182,28 +166,12 @@
     lastAnchors.dai = neo ? neo.ten : null;
     if (!neo) return;
 
-    const note = (person && person.notes && person.notes[0]) || null;
     const { host, wrap } = khungRieng(STRIP_ID);
     host.style.cssText = "display:block;margin:8px 0;";
     const mau = person ? KT.tierColor(person.tier) : "#6E7A88";
     wrap.innerHTML =
       `<div class="kt-x-strip" style="border-color:${KT.esc(mau)}">` +
-      (person
-        ? `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
-          (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
-          (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
-          `</div>`
-        : "") +
-      chain +
-      (person && person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
-      (note && note.note
-        ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
-          `<div class="kt-x-meta">${KT.esc(
-            [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
-              .filter(Boolean)
-              .join(" · ")
-          )}</div>`
-        : "") +
+      KT.render.personBrief(person, { chainHtml: chain }) +
       `</div>`;
 
     // Dải nằm DƯỚI chỗ neo. Với "Được theo dõi bởi" thì phải trèo lên khối
@@ -431,26 +399,14 @@
       theHost.style.cssText = "position:fixed;z-index:2147483000;display:none;";
       document.body.appendChild(theHost);
     }
-    const note = (person && person.notes && person.notes[0]) || null;
-    const mau = person ? KT.tierColor(person.tier) : "#58A6FF";
     theHost.__wrap.innerHTML =
       `<div class="kt-x-card">` +
-      `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(
-        person ? person.tierLetter || "chưa xếp hạng" : "chưa ghi chú"
-      )}</b>` +
-      (person && person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
-      (person && person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
-      `</div>` +
-      chain +
-      (person && person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
-      (note && note.note
-        ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
-          `<div class="kt-x-meta">${KT.esc(
-            [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
-              .filter(Boolean)
-              .join(" · ")
-          )}</div>`
-        : `<div class="kt-x-meta">Chưa ghi chú gì — bấm để ghi.</div>`) +
+      KT.render.personBrief(person, {
+        chainHtml: chain,
+        unknownHead: "chưa ghi chú",
+        unknownColor: "#58A6FF",
+        emptyNote: "Chưa ghi chú gì — bấm để ghi.",
+      }) +
       `</div>`;
     theHost.style.display = "block";
     // Đặt DƯỚI cái pill, kéo vào trong màn nếu tràn mép phải.

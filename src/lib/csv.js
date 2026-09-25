@@ -149,7 +149,6 @@
 
   KT.parseCSV = parseCSV;
   KT.parseTable = parseTable;
-  KT.COLUMN_ALIASES = COLUMN_ALIASES;
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { parseCSV, parseTable, COLUMN_ALIASES };

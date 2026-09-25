@@ -23,6 +23,22 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  /**
+   * "đầu sóng" / "giữa" / "đu đỉnh" → early / mid / late.
+   *
+   * Ở đây chứ không ở `stats.js` nữa: file kia chết rồi, mà hàm này chỉ có
+   * ĐÚNG MỘT chỗ gọi — dòng `position:` ngay bên dưới. Một hàm dùng một lần
+   * thì để cạnh chỗ dùng, đừng bắt người đọc nhảy file.
+   */
+  function parsePosition(raw) {
+    const s = KT.stripAccents(raw).toLowerCase();
+    if (!s) return "";
+    if (/(dinh|top|late|muon|tre|cuoi|fomo)/.test(s)) return "late";
+    if (/(giua|mid|middle|than)/.test(s)) return "mid";
+    if (/(dau|som|early|bottom|day|sniper|presale)/.test(s)) return "early";
+    return "";
+  }
+
   function truthy(value) {
     const s = text(value).toLowerCase();
     return s === "true" || s === "1" || s === "x" || s === "có" || s === "yes";
@@ -71,7 +87,7 @@
       holding: text(row.holding_state),
       pnlUsd: num(row.pnl_usd_at_note),
       note: text(row.note),
-      position: KT.parsePosition(row.chart_position),
+      position: parsePosition(row.chart_position),
       positionRaw: text(row.chart_position),
       result: text(row.result),
       sourceUrl: text(row.source_url),
@@ -306,6 +322,7 @@
     return person;
   }
 
+  KT.parsePosition = parsePosition;
   KT.personFromCaller = personFromCaller;
   KT.buildDb = buildDb;
   KT.findPerson = findPerson;
@@ -316,6 +333,6 @@
   KT.walletKey = walletKey;
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { buildDb, findPerson, findRenames, renamedFrom, renamedFromPost, search, walletKey, personFromCaller };
+    module.exports = { parsePosition, buildDb, findPerson, findRenames, renamedFrom, renamedFromPost, search, walletKey, personFromCaller };
   }
 })(typeof globalThis !== "undefined" ? globalThis : self);
