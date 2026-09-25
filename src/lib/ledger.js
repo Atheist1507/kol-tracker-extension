@@ -90,10 +90,10 @@
   /**
    * Khoá một NGƯỜI trong sổ cái.
    *
-   * ⚠ KHÔNG dùng `KT.handleKey`: hàm đó xoá dấu gạch dưới (vì nó còn phải
-   * nuốt được "x.com/Foo", "@Foo " gõ tay trong Sheet), nên `foo_bar` và
-   * `foobar` — hai tài khoản X khác nhau — thành một. Ở Sheet thì hậu quả là
-   * tra nhầm; ở đây là trộn cú call của hai người vào một hồ sơ uy tín.
+   * Chặt hơn `KT.handleKey`: chỉ nhận tay cầm X HỢP LỆ (≤15 ký tự, chữ/số/_),
+   * không nhận tên hiển thị kiểu "Crypto Ape". Dấu `_` là một phần của tên —
+   * `foo_bar` và `foobar` là hai tài khoản khác nhau (trước v0.15.1 chính
+   * `handleKey` từng gộp chúng làm một).
    * Tay cầm X không phân biệt hoa thường nhưng dấu `_` là một phần của tên.
    */
   const X_HANDLE_RE = /^[a-z0-9_]{1,15}$/;

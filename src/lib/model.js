@@ -82,6 +82,35 @@
   }
 
   /**
+   * Hồ sơ này có đang chứa ghi chú của HAI tài khoản X khác nhau không?
+   *
+   * Trước v0.15.1 khoá so khớp xoá dấu `_`, nên `foo_bar` và `foobar` rơi vào
+   * CÙNG một dòng Sheet (khoá `x:foobar`). Không tách tự động được — không
+   * biết ghi chú nào của ai ngoài cột username của từng dòng — nên chỉ BÁO.
+   *
+   * Hai tên khác hẳn nhau trong một hồ sơ là chuyện bình thường (người đó đổi
+   * tên). Chỉ báo khi hai tên CHỈ khác nhau ở dấu `_` — đúng dấu vết của lỗi cũ.
+   * Trả về các tên đó, rỗng = không sao.
+   */
+  function mergedNames(person) {
+    const byLoose = Object.create(null);
+    const names = [person.username].concat(person.notes.map((n) => n.username));
+    for (const name of names) {
+      const strict = KT.handleKey(name);
+      if (!strict) continue;
+      const loose = KT.looseHandleKey(name);
+      const set = (byLoose[loose] = byLoose[loose] || {});
+      if (!set[strict]) set[strict] = KT.displayHandle(name);
+    }
+    const out = [];
+    for (const loose in byLoose) {
+      const shown = Object.values(byLoose[loose]);
+      if (shown.length > 1) out.push.apply(out, shown);
+    }
+    return out;
+  }
+
+  /**
    * overviewRows + detailRows → db tra cứu được.
    * Note của một ví CHƯA có dòng Overview vẫn giữ, dưới dạng hồ sơ tạm
    * (`ghost`) — mất dấu một người vì lỡ xoá dòng Overview thì đúng lúc cần
@@ -140,6 +169,7 @@
         return b.notedTs - a.notedTs;
       });
       person.noteCount = person.notes.length;
+      person.mergedNames = mergedNames(person);
       person.searchText = KT.stripAccents(
         [person.username, person.displayName, person.summary, person.redFlags].join(" ")
       ).toLowerCase();
@@ -158,7 +188,11 @@
       byUsername,
       byToken,
       byPostId,
-      counts: { people: people.filter((p) => !p.ghost).length, notes: noteCount },
+      counts: {
+        people: people.filter((p) => !p.ghost).length,
+        notes: noteCount,
+        merged: people.filter((p) => p.mergedNames.length).length,
+      },
     };
   }
 
@@ -249,7 +283,10 @@
     const raw = text(query);
     if (!raw) return [];
 
+    // Ô tìm kiếm thì DỄ DÃI (bỏ cả `_`): gõ "cryptoape" vẫn ra @crypto_ape.
+    // Khớp CHÍNH XÁC xếp trên khớp dễ dãi.
     const key = KT.handleKey(raw);
+    const loose = KT.looseHandleKey(raw);
     const plain = KT.stripAccents(raw).toLowerCase();
     const wallet = walletKey(raw);
     const out = [];
@@ -263,9 +300,11 @@
         reason = "ví";
       } else if (key && person.usernameKey === key) {
         score = 120;
-      } else if (key && person.usernameKey.startsWith(key)) {
+      } else if (loose && KT.looseHandleKey(person.username) === loose) {
+        score = 110;
+      } else if (loose && KT.looseHandleKey(person.username).startsWith(loose)) {
         score = 90;
-      } else if (key && person.usernameKey.includes(key)) {
+      } else if (loose && KT.looseHandleKey(person.username).includes(loose)) {
         score = 70;
       } else if (plain.length >= 2 && person.searchText.includes(plain)) {
         score = 40;

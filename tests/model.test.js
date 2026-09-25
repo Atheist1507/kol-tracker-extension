@@ -143,3 +143,54 @@ test("ghi chú cho người đã đổi tên phải rơi vào ĐÚNG dòng cũ",
   const person = KT.findPerson(db, { username: "ten_moi", postId: "post-1" });
   assert.strictEqual(person.wallet, "x:ten_cu");
 });
+
+/* ---------- dấu gạch dưới: hai tài khoản khác nhau (25/09/2026) ---------- */
+
+test("tra foobar KHÔNG ra hồ sơ của foo_bar", () => {
+  const db = KT.buildDb([{ wallet: "x:foo_bar", username: "foo_bar", tier: "S" }], []);
+  assert.strictEqual(KT.findPerson(db, { username: "foobar" }), null);
+  assert.strictEqual(KT.findPerson(db, { username: "@Foo_Bar" }).tier, "S");
+});
+
+test("người cũ ghi trước bản sửa (khoá x: không có _) vẫn tra ra đúng dòng cũ qua cột username", () => {
+  const db = KT.buildDb(
+    [{ wallet: "x:cryptoape", username: "crypto_ape", tier: "A" }],
+    [{ wallet: "x:cryptoape", username: "crypto_ape", note: "cũ" }]
+  );
+  const p = KT.findPerson(db, { username: "crypto_ape" });
+  assert.strictEqual(p.wallet, "x:cryptoape"); // ghi chú mới sẽ rơi vào ĐÚNG dòng cũ
+  assert.strictEqual(p.noteCount, 1);
+  assert.deepStrictEqual(p.mergedNames, []);
+});
+
+test("hồ sơ bị lỗi cũ gộp nhầm hai tài khoản chỉ khác dấu _ thì bị báo ra", () => {
+  const db = KT.buildDb(
+    [{ wallet: "x:foobar", username: "foobar" }],
+    [
+      { wallet: "x:foobar", username: "foobar", note: "a" },
+      { wallet: "x:foobar", username: "foo_bar", note: "b" },
+    ]
+  );
+  assert.deepStrictEqual(db.people[0].mergedNames.sort(), ["foo_bar", "foobar"]);
+  assert.strictEqual(db.counts.merged, 1);
+});
+
+test("đổi tên hẳn (khác nhau không chỉ ở dấu _) KHÔNG bị báo là gộp nhầm", () => {
+  const db = KT.buildDb(
+    [{ wallet: "0xabc", username: "newname" }],
+    [{ wallet: "0xabc", username: "oldname", note: "a" }]
+  );
+  assert.deepStrictEqual(db.people[0].mergedNames, []);
+});
+
+test("ô tìm kiếm vẫn dễ dãi: gõ 'cryptoape' ra @crypto_ape, khớp chính xác xếp trên", () => {
+  const db = KT.buildDb(
+    [
+      { wallet: "0x1", username: "crypto_ape" },
+      { wallet: "0x2", username: "cryptoape" },
+    ],
+    []
+  );
+  const hits = KT.search(db, "cryptoape").map((h) => h.person.username);
+  assert.deepStrictEqual(hits, ["cryptoape", "crypto_ape"]);
+});

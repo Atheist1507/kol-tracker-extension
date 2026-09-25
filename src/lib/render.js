@@ -240,6 +240,13 @@
       </div>
       ${person.summary ? `<div class="kt-desc">${esc(person.summary)}</div>` : ""}
       ${person.redFlags ? `<div class="kt-flags"><b>⚑ Cờ đỏ:</b> ${esc(person.redFlags)}</div>` : ""}
+      ${
+        person.mergedNames && person.mergedNames.length
+          ? `<div class="kt-flags"><b>⚠ Hồ sơ bị gộp nhầm:</b> ghi chú của ${esc(
+              person.mergedNames.map((n) => "@" + n).join(", ")
+            )} đang nằm chung một dòng (lỗi cũ trước v0.15.1 coi dấu _ như không có). Đó là các tài khoản KHÁC nhau — tách tay trong Sheet theo cột username.</div>`
+          : ""
+      }
       ${o.caller ? callerSnapshot(o.caller) : ""}
       <div data-slot="ledger"></div>
       <div class="kt-btns">

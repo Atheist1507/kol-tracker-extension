@@ -40,12 +40,29 @@
   }
 
   /**
-   * Khoá so khớp của một handle. Bỏ dấu, bỏ mọi ký tự không phải chữ/số —
-   * nên "crypto_ape", "Crypto Ape" và "@cryptoape" gộp làm một. Gộp hơi rộng
-   * là CỐ Ý: nhầm hai người khác nhau còn đỡ hơn tra không ra người mình cần.
+   * Khoá DANH TÍNH của một handle — dùng để trả lời "có phải cùng một người
+   * không". Bỏ dấu, bỏ @, bỏ URL, không phân biệt hoa thường, nhưng GIỮ dấu
+   * gạch dưới.
+   *
+   * ⚠ Bản cũ xoá luôn `_` ("gộp hơi rộng là cố ý: nhầm hai người còn đỡ hơn
+   * tra không ra") — sai: trên X, `foo_bar` và `foobar` là HAI tài khoản
+   * khác nhau, ai cũng đăng ký được cái kia. Gộp làm một là ghi chú, hạng,
+   * cờ đỏ của người này dán lên người kia, im lặng. Với một công cụ đánh giá
+   * uy tín, nhầm người TỆ HƠN tra không ra.
+   *
+   * Tìm kiếm mờ (ô tìm của panel) thì vẫn dễ dãi — xem `looseHandleKey`.
    */
   function handleKey(raw) {
-    return stripAccents(displayHandle(raw)).toLowerCase().replace(/[^a-z0-9]/g, "");
+    return stripAccents(displayHandle(raw)).toLowerCase().replace(/[^a-z0-9_]/g, "");
+  }
+
+  /**
+   * Khoá DỄ DÃI: bỏ cả `_` — "Crypto Ape" ≈ "crypto_ape". CHỈ dùng cho ô tìm
+   * kiếm và để DÒ hồ sơ bị gộp nhầm; tuyệt đối không dùng để quyết định hai
+   * dòng là một người.
+   */
+  function looseHandleKey(raw) {
+    return handleKey(raw).replace(/_/g, "");
   }
 
   /** Token: "$pepe" / " PEPE " → "PEPE". */
@@ -138,6 +155,7 @@
   KT.headerKey = headerKey;
   KT.displayHandle = displayHandle;
   KT.handleKey = handleKey;
+  KT.looseHandleKey = looseHandleKey;
   KT.tokenKey = tokenKey;
   KT.unwrapProxyUrl = unwrapProxyUrl;
   KT.avatarKey = avatarKey;
@@ -149,6 +167,7 @@
       headerKey,
       displayHandle,
       handleKey,
+      looseHandleKey,
       tokenKey,
       unwrapProxyUrl,
       avatarKey,

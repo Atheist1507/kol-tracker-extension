@@ -7,7 +7,18 @@ test("URL profile, @ và khoảng trắng quy về cùng một khoá", () => {
   assert.strictEqual(KT.handleKey("https://x.com/CryptoApe"), k);
   assert.strictEqual(KT.handleKey("twitter.com/@cryptoape"), k);
   assert.strictEqual(KT.handleKey("  Crypto Ape "), k);
-  assert.strictEqual(KT.handleKey("crypto_ape"), k);
+});
+
+// ⚠ Test này từng khoá điều NGƯỢC LẠI ("crypto_ape" ≡ "cryptoape"). Đổi theo
+// quyết định 25/09/2026: trên X đó là HAI tài khoản khác nhau, gộp làm một là
+// dán ghi chú/hạng của người này lên người kia.
+test("dấu gạch dưới là một phần của tên: foo_bar và foobar là hai người", () => {
+  assert.notStrictEqual(KT.handleKey("crypto_ape"), KT.handleKey("cryptoape"));
+  assert.strictEqual(KT.handleKey("@Crypto_Ape"), KT.handleKey("x.com/crypto_ape"));
+});
+
+test("khoá dễ dãi (chỉ cho ô tìm kiếm) vẫn bỏ qua dấu gạch dưới", () => {
+  assert.strictEqual(KT.looseHandleKey("crypto_ape"), KT.looseHandleKey("Crypto Ape"));
 });
 
 test("link tới một tweet cụ thể vẫn ra handle của chủ tweet", () => {

@@ -718,10 +718,25 @@ trên X. KHÔNG ghi vào Sheet.
   SAU lệnh import → tên trần rơi vào TDZ → ReferenceError → CẢ service worker
   chết (kể cả tải Sheet), không lỗi nào hiện ra. Chỉ bắt được khi nạp extension
   thật vào Chromium — test thuần không thấy.
-- **Khoá người là `personKeyOf`, KHÔNG phải `KT.handleKey`.** `handleKey` xoá
-  dấu `_` nên `foo_bar` ≡ `foobar` — hai tài khoản X khác nhau. Trong sổ thế là
-  trộn cú call của hai người vào một hồ sơ uy tín.
-  ⚠ `handleKey` vẫn đang dùng cho phần tra Sheet — cùng lỗi đó còn sống ở đó.
+- **Khoá người trong sổ là `personKeyOf`** — chỉ nhận tay cầm X hợp lệ, giữ `_`.
+
+## Dấu `_` là một phần của tên — v0.15.1 (25/09/2026)
+
+`KT.handleKey` từng xoá mọi thứ không phải chữ/số, kể cả `_` ("gộp hơi rộng là
+cố ý"). Trên X, `foo_bar` và `foobar` là HAI tài khoản — ai cũng đăng ký được
+cái kia. Gộp làm một = ghi chú, hạng, cờ đỏ của người này dán lên người kia.
+Với công cụ đánh giá uy tín, nhầm người tệ hơn tra không ra.
+
+- `handleKey` giờ GIỮ `_` — dùng cho mọi phép "có phải cùng một người không".
+- `looseHandleKey` (bỏ cả `_`) CHỈ cho ô tìm kiếm và để dò hồ sơ gộp nhầm.
+  Tuyệt đối không dùng nó để quyết định hai dòng là một người.
+- Người không có ví được ghi vào Sheet với khoá `x:<handleKey>`, nên người ghi
+  TRƯỚC bản sửa có khoá kiểu `x:cryptoape` cho `@crypto_ape`. Họ vẫn rơi đúng
+  dòng cũ vì `findPerson` tra theo cột `username` (lưu tên THẬT), và `keyOf`
+  lấy `person.wallet` đã lưu trước khi tự dựng khoá mới. Có test khoá lại.
+- Hồ sơ đã bị gộp nhầm từ trước KHÔNG tách tự động được: `mergedNames` báo ra
+  (màn chi tiết + dòng trạng thái ở Cài đặt) khi một hồ sơ chứa hai tên CHỈ
+  khác nhau ở dấu `_`. Đổi tên hẳn thì không báo — đó là chuyện bình thường.
 - **Đơn vị đếm là (người, token)**, không phải bản ghi: cùng kèo thấy ở X lẫn
   GMGN, hay hô năm lần, vẫn là MỘT kèo.
 - **"Ghi trước" / "ghi muộn" quyết định theo LÚC MÌNH THẤY, không theo kết

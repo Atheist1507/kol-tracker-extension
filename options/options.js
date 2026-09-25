@@ -272,7 +272,16 @@
     el.className = "status";
     el.textContent =
       `${db.counts.people} người · ${db.counts.notes} ghi chú · cập nhật ${KT.timeAgo(data.syncedAt)}` +
-      (ghosts.length ? ` · ${ghosts.length} người có ghi chú nhưng chưa có dòng ở tab Overview` : "");
+      (ghosts.length ? ` · ${ghosts.length} người có ghi chú nhưng chưa có dòng ở tab Overview` : "") +
+      (db.counts.merged
+        ? `\n⚠ ${db.counts.merged} hồ sơ đang chứa ghi chú của 2 tài khoản chỉ khác nhau dấu _ (lỗi cũ trước v0.15.1): ` +
+          db.people
+            .filter((p) => p.mergedNames.length)
+            .slice(0, 5)
+            .map((p) => p.mergedNames.map((n) => "@" + n).join(" + "))
+            .join("; ") +
+          ". Tách tay trong Sheet theo cột username."
+        : "");
   }
 
   $("refresh").addEventListener("click", async () => {
