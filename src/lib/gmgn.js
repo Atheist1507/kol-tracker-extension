@@ -469,6 +469,57 @@
   }
 
 
+  /**
+   * Endpoint ĐANG SOI trước khi dựng tính năng lên chúng (28/09/2026):
+   *   token_mcap_candles  → mcap lúc call + đỉnh sau call (kết quả thật)
+   *   tg_calls/klines, discord_calls/klines → cú call từ Telegram/Discord
+   *   twitter/token/search → tweet về token (có tweet ID không?)
+   *   tokens/top_buyers, token_holders → ví mua sớm (mua trước khi hô?)
+   * Luật cũ của repo: đo cột thật trước, đừng đoán tên cột rồi lấy kết quả
+   * rỗng làm bằng chứng.
+   */
+  const PROBE_RE = /token_mcap_candles|tg_calls\/klines|discord_calls\/klines|twitter\/token\/search|tokens\/top_buyers|token_holders\//;
+
+  /**
+   * Mẫu soi của một response: mảng dữ liệu chính nằm ở đâu, bao nhiêu dòng,
+   * TÊN cột, và giá trị của DÒNG ĐẦU (chuỗi cắt còn 40 ký tự — đủ nhận ra
+   * đơn vị thời gian / dạng id, không đủ để chép nội dung bài của ai).
+   * Mảng dữ liệu = mảng DÀI NHẤT trong 4 tầng đầu.
+   */
+  function probeSample(payload) {
+    let best = null;
+    function visit(node, path, depth) {
+      if (!node || typeof node !== "object" || depth > 4) return;
+      if (Array.isArray(node)) {
+        if (node.length && (!best || node.length > best.arr.length)) best = { arr: node, path };
+        // Chỉ leo vào dòng đầu khi nó là OBJECT: nến dạng [[t,o,h,l,c], …]
+        // mà leo vào thì một cây nến (5 số) thắng cả danh sách nến.
+        if (node.length && node[0] && typeof node[0] === "object" && !Array.isArray(node[0])) {
+          visit(node[0], path + "[0]", depth + 1);
+        }
+        return;
+      }
+      for (const k of Object.keys(node).slice(0, 40)) visit(node[k], path ? path + "." + k : k, depth + 1);
+    }
+    visit(payload, "", 0);
+    if (!best) return { mang: null, hinhDang: shapeOf(payload) };
+    const first = best.arr[0];
+    const show = (v) => {
+      if (v === null || v === undefined) return String(v);
+      if (typeof v === "string") return JSON.stringify(v.length > 40 ? v.slice(0, 40) + "…" : v);
+      if (typeof v === "object") return Array.isArray(v) ? "[" + v.length + "]" : "{" + Object.keys(v).slice(0, 8).join(",") + "}";
+      return String(v);
+    };
+    let dongDau;
+    if (Array.isArray(first)) dongDau = first.slice(0, 12).map(show);
+    else if (first && typeof first === "object")
+      dongDau = Object.keys(first)
+        .slice(0, 40)
+        .map((k) => k + "=" + show(first[k]));
+    else dongDau = [show(first)];
+    return { mang: best.path || "(gốc)", soDong: best.arr.length, dongDau };
+  }
+
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
   function parseEndpoint(url) {
     const m = String(url || "").match(/\/api\/v1\/token\/([^/]+)\/([^/]+)\/community\/messages/);
@@ -483,6 +534,8 @@
     groupCallers,
     parseEndpoint,
     apiPath,
+    PROBE_RE,
+    probeSample,
     parseThesis,
     thesisSample,
     tsFrom,

@@ -775,3 +775,18 @@ Với công cụ đánh giá uy tín, nhầm người tệ hơn tra không ra.
   việc của đợt gắn nhãn — hình dạng của nó phụ thuộc nhãn cần gì.
 - `dev/stub.js` phải có `runtime.id` — thiếu là `alive()` tưởng extension bị gỡ
   và mọi lời gửi sang SW im lặng. Stub giữ mọi cú call gửi sang ở `__LEDGER__`.
+
+## Soi 5 endpoint trước khi dựng tính năng — v0.15.2 (28/09/2026)
+
+Chẩn đoán trên trang thật lộ ra các endpoint chưa dùng: `token_mcap_candles`
+(mcap lúc call + đỉnh sau call), `tg_calls/klines` + `discord_calls/klines`
+(call từ Telegram/Discord), `twitter/token/search` (tweet về token),
+`tokens/top_buyers` + `token_holders/` (ví mua sớm). Chưa biết cột bên trong
+→ `KT.gmgn.PROBE_RE` + `probeSample`: Chẩn đoán in `soiApi` (mảng dữ liệu ở
+đâu, số dòng, TÊN cột, giá trị dòng đầu với chuỗi cắt 40 ký tự).
+- Mục soi KHÔNG chịu trần 40 dòng của `apiLog`, và `main-world` cho trần 5MB
+  riêng (thay vì 800KB) — bị cắt là mất đúng thứ đang đo; bị cắt thì `lyDo`.
+- ⚠ Nến dạng `[[t,o,h,l,c], …]`: chỉ leo vào dòng đầu khi nó là OBJECT, nếu
+  không một cây nến 5 số thắng cả danh sách nến (có test).
+- Đã đo `mocTokenRaDoi` trên trang thật: cột là `creation_timestamp`; GMGN có
+  thêm `migrated_timestamp` riêng — xác nhận việc bỏ `open_timestamp` là đúng.

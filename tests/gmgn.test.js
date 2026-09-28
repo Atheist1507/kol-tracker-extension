@@ -354,3 +354,42 @@ test("feed thesis KHÔNG gắn nhãn giữ/xả", () => {
   assert.strictEqual(list[0].isHoldingRedFlag, false);
   assert.strictEqual(list[0].tradeUsd, 8060.36); // tiền thì vẫn giữ
 });
+
+/* ---------- soi endpoint trước khi dựng tính năng (28/09/2026) ---------- */
+
+test("PROBE_RE bắt đúng 5 endpoint đang soi, không bắt nhầm token_holder_stat", () => {
+  const re = KT.gmgn.PROBE_RE;
+  for (const u of [
+    "/api/v1/token_mcap_candles/robinhood/0xabc?resolution=1m",
+    "/api/v1/tg_calls/klines/robinhood/0xabc",
+    "/api/v1/discord_calls/klines/robinhood/0xabc",
+    "/vas/api/v1/twitter/token/search?q=x",
+    "/api/v1/tokens/top_buyers/robinhood/0xabc",
+    "/vas/api/v1/token_holders/robinhood/0xabc",
+  ])
+    assert.ok(re.test(u), u);
+  assert.ok(!re.test("/vas/api/v1/token_holder_stat/robinhood/0xabc"));
+});
+
+test("probeSample tìm mảng dài nhất, in tên cột + dòng đầu (chuỗi bị cắt)", () => {
+  const r = KT.gmgn.probeSample({
+    code: 0,
+    data: { meta: [1], list: [{ time: 1790570209, open: "0.1", text: "x".repeat(100) }, {}, {}] },
+  });
+  assert.strictEqual(r.mang, "data.list");
+  assert.strictEqual(r.soDong, 3);
+  assert.ok(r.dongDau.includes("time=1790570209"));
+  assert.ok(r.dongDau.some((d) => d.startsWith("text=") && d.length < 60));
+});
+
+test("probeSample đọc được nến dạng mảng-trong-mảng", () => {
+  const r = KT.gmgn.probeSample({ data: [[1790570209000, 1, 2, 0.5, 1.5], [1, 2, 3, 4, 5]] });
+  assert.strictEqual(r.mang, "data");
+  assert.deepStrictEqual(r.dongDau, ["1790570209000", "1", "2", "0.5", "1.5"]);
+});
+
+test("probeSample không có mảng nào thì trả hình dạng", () => {
+  const r = KT.gmgn.probeSample({ code: 0, data: { a: 1 } });
+  assert.strictEqual(r.mang, null);
+  assert.ok(r.hinhDang);
+});
