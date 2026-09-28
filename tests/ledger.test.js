@@ -323,3 +323,22 @@ test("không có bài bị xoá thì không nhắc tới xoá bài", () => {
   const s = L.summarize([call({})], {}, NOW);
   assert.ok(!L.summaryParts(s).some((p) => p.includes("xoá")));
 });
+
+/* ---------- nguồn xs: tweet GMGN tìm được (28/09/2026) ---------- */
+
+test("tweet nguồn xs (có tweet ID) cũng được kiểm xoá bài", () => {
+  const c = call({ id: "xs:1", source: "xs", tweetId: "10009", calledAt: NOW - 2 * DAY });
+  assert.deepEqual(L.pickForCheck([c], NOW, 5).map((x) => x.id), ["xs:1"]);
+});
+
+test("ngày tạo tài khoản X hiện trong tóm tắt, lấy mốc sớm nhất", () => {
+  const a = call({ id: "a", joinedAt: Date.UTC(2026, 8, 1) / 1000 });
+  const b = call({ id: "b", tokenKey: "t2", joinedAt: Date.UTC(2026, 8, 20) / 1000 });
+  const s = L.summarize([a, b], {}, NOW);
+  assert.equal(s.accountCreatedAt, Date.UTC(2026, 8, 1));
+  assert.ok(L.summaryParts(s).some((p) => p.startsWith("tài khoản X tạo ")));
+});
+
+test("không biết ngày tạo tài khoản thì không nhắc", () => {
+  assert.ok(!L.summaryParts(L.summarize([call({})], {}, NOW)).some((p) => p.includes("tài khoản X")));
+});

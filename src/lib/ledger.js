@@ -206,6 +206,10 @@
       lastSeenAt: seenAt,
       multipleAtFirstSeen: numOrNull(i.multiple),
       tweetId: /^\d{5,25}$/.test(text(i.tweetId)) ? text(i.tweetId) : "",
+      // ID SỐ của tài khoản X (không đổi khi đổi tên) + ngày tạo tài khoản —
+      // chỉ nguồn "xs" (twitter/token/search của GMGN) mới có.
+      xUserId: /^\d{3,25}$/.test(text(i.xUserId)) ? text(i.xUserId) : "",
+      joinedAt: toTs(i.joinedAt),
       textHead: text(i.text).slice(0, 140),
       check: null,
     };
@@ -228,7 +232,7 @@
       out.multipleAtFirstSeen = inc.multipleAtFirstSeen;
     }
     out.lastSeenAt = Math.max(old.lastSeenAt || 0, inc.lastSeenAt || 0);
-    for (const k of ["calledAt", "handle", "wallet", "authorId", "chain", "tokenSymbol", "tweetId", "textHead"]) {
+    for (const k of ["calledAt", "handle", "wallet", "authorId", "chain", "tokenSymbol", "tweetId", "xUserId", "joinedAt", "textHead"]) {
       if ((out[k] === null || out[k] === "" || out[k] === undefined) && inc[k]) out[k] = inc[k];
     }
     return out;
@@ -346,7 +350,9 @@
   function pickForCheck(calls, now, limit) {
     const out = [];
     for (const c of calls || []) {
-      if (!c || c.source !== "x" || !c.tweetId || c.calledAt == null) continue;
+      // Mọi bản ghi CÓ tweet ID (tweet lướt thấy trên X, hoặc tweet GMGN tìm
+      // được) — feed thesis/bảng X Tracker không có ID nên không kiểm được.
+      if (!c || !c.tweetId || c.calledAt == null) continue;
       const age = now - c.calledAt;
       if (age < LEDGER.CHECK_MIN_AGE_MS || age > LEDGER.CHECK_MAX_AGE_MS) continue;
       if (confirmedMissing(c)) continue;
@@ -412,6 +418,7 @@
       deleted: 0,
       unreachable: 0,
       tweetsChecked: 0,
+      accountCreatedAt: null,
       sources: {},
     };
 
@@ -448,6 +455,13 @@
       }
     }
 
+    // Ngày tạo tài khoản X: một sự kiện, lấy giá trị sớm nhất từng thấy.
+    for (const c of calls || []) {
+      if (c && c.joinedAt != null && (out.accountCreatedAt == null || c.joinedAt < out.accountCreatedAt)) {
+        out.accountCreatedAt = c.joinedAt;
+      }
+    }
+
     out.activeDays = perDay.size;
     for (const v of perDay.values()) if (v > out.maxPerDay) out.maxPerDay = v;
 
@@ -466,7 +480,7 @@
     // Xoá bài: CHỈ tính là "xoá" khi CÙNG lúc đó còn bài khác của chính
     // người này vẫn sống. Tất cả cùng mất = tài khoản bị khoá/xoá/đổi riêng
     // tư — chuyện khác hẳn "xoá chọn lọc cú thua", đừng gộp.
-    const xCalls = (calls || []).filter((c) => c && c.source === "x" && c.tweetId);
+    const xCalls = (calls || []).filter((c) => c && c.tweetId);
     const seenTweet = new Set();
     for (const c of xCalls) {
       if (seenTweet.has(c.tweetId)) continue;
@@ -496,6 +510,11 @@
       parts.push("thường call trong vòng " + s.speed.medianLabel + " sau khi token ra đời (" + s.speed.n + " kèo có mốc)");
     } else if (s.speed.n > 0) {
       parts.push("tốc độ: chưa đủ mốc (" + s.speed.n + " kèo)");
+    }
+    if (s.accountCreatedAt != null) {
+      const d = new Date(s.accountCreatedAt);
+      const pad = (n) => (n < 10 ? "0" : "") + n;
+      parts.push("tài khoản X tạo " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear());
     }
     if (s.deleted) parts.push(s.deleted + " bài call đã bị xoá");
     if (s.unreachable) parts.push(s.unreachable + " bài không còn truy cập được (tài khoản khoá/xoá?)");

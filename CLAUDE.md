@@ -790,3 +790,26 @@ Chẩn đoán trên trang thật lộ ra các endpoint chưa dùng: `token_mcap_
   không một cây nến 5 số thắng cả danh sách nến (có test).
 - Đã đo `mocTokenRaDoi` trên trang thật: cột là `creation_timestamp`; GMGN có
   thêm `migrated_timestamp` riêng — xác nhận việc bỏ `open_timestamp` là đúng.
+
+## Nguồn thứ tư của sổ: tweet GMGN tìm được về token — v0.16.0 (28/09/2026)
+
+`/vas/api/v1/twitter/token/search` (đo trên trang thật): mỗi dòng có
+`tweet_id`, `tw_timestamp` (mili giây, CHUỖI), `tw_type`,
+`user{twitter_user_id, screen_name, joined_at, followers,…}`, `content{text}`,
+`tokens[…]`. `KT.gmgn.parseTwitterSearch` → nguồn **"xs"** của sổ.
+
+- ⚠⚠ Chỉ nhận dòng mà chữ trong bài có ĐÚNG CA của token đang mở. Kết quả tìm
+  có thể là tweet về token KHÁC trùng ticker — nhận hết là ghi cú call vào
+  nhầm token. Cột `tokens` chưa đo hình dạng nên chưa dùng thay phép thử này.
+- ⚠ Chỉ `tw_type === "tweet"`: chữ trong retweet là của người khác.
+  `tweetTimDuoc.theoLoai` trong Chẩn đoán đếm các loại khác để quyết định nới.
+- Tweet search có thể về TRƯỚC khi biết token → giữ payload, chạy lại khi
+  token về (`takeTwitterSearch` ở cả ba chỗ).
+- Nguồn "xs" có tweet ID nên cũng được kiểm xoá bài (`pickForCheck` giờ lấy
+  mọi bản ghi có tweet ID, không chỉ source "x").
+- Lưu thêm `xUserId` (ID số của X — không đổi khi đổi tên; CHƯA dùng làm khoá)
+  và `joinedAt` → tóm tắt có "tài khoản X tạo dd/mm/yyyy" (tín hiệu acc clone).
+- Nến mcap không hiện ở lần đo thứ hai: có thể do khung chart tự gọi. Khung con
+  giờ gửi `soiApi` của nó qua FRAME_HELLO → nằm trong `framesWithScript`.
+- `probeSample.trong`: soi thêm một tầng — call TG/Discord nằm trong mảng con
+  (`{timestamp, tg_calls:[…]}`).

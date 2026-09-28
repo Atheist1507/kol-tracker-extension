@@ -607,6 +607,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       callers: msg.callers,
       lastTooltip: msg.lastTooltip,
       lastHit: msg.lastHit,
+      soiApi: msg.soiApi,
       frameId: sender && sender.frameId,
     });
     return;

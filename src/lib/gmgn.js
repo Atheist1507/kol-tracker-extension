@@ -517,7 +517,86 @@
         .slice(0, 40)
         .map((k) => k + "=" + show(first[k]));
     else dongDau = [show(first)];
-    return { mang: best.path || "(gốc)", soDong: best.arr.length, dongDau };
+    // Soi thêm MỘT tầng: cột nào của dòng đầu là mảng object thì in luôn phần
+    // tử đầu của nó (call Telegram/Discord nằm ở đây: {timestamp, tg_calls:[…]}).
+    const trong = {};
+    if (first && typeof first === "object" && !Array.isArray(first)) {
+      for (const k of Object.keys(first)) {
+        const v = first[k];
+        if (Object.keys(trong).length >= 3) break;
+        const inner = Array.isArray(v) ? v[0] : null;
+        if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+          trong[k] = Object.keys(inner)
+            .slice(0, 30)
+            .map((kk) => kk + "=" + show(inner[kk]));
+        }
+      }
+    }
+    const res = { mang: best.path || "(gốc)", soDong: best.arr.length, dongDau };
+    if (Object.keys(trong).length) res.trong = trong;
+    return res;
+  }
+
+  /**
+   * `/vas/api/v1/twitter/token/search` — tweet về token mà GMGN tự tìm được.
+   * Đo 28/09/2026: mỗi dòng có `tweet_id`, `tw_timestamp` (mili giây, dạng
+   * chuỗi), `tw_type`, `user{twitter_user_id, screen_name, joined_at,…}`,
+   * `content{text}`, `tokens[…]`.
+   *
+   * ⚠⚠ Chỉ nhận dòng mà CHỮ TRONG BÀI chứa đúng địa chỉ CA của token đang mở.
+   * Kết quả tìm có thể gồm tweet về một token KHÁC trùng ticker ($CAT có cả
+   * chục con) — nhận hết là ghi cú call vào nhầm token, và "call sau bao lâu
+   * kể từ khi token ra đời" đo từ mốc của token khác. Cột `tokens` chưa đo
+   * được hình dạng, nên chưa dám dùng nó thay cho phép thử này.
+   *
+   * ⚠ Chỉ `tw_type === "tweet"`: chữ trong retweet là của NGƯỜI KHÁC, gán cho
+   * người retweet là sai chủ. Loại khác đếm riêng ở `theoLoai` để biết nên
+   * nới thêm loại nào.
+   */
+  function parseTwitterSearch(payload, tokenAddress) {
+    const addr = String(tokenAddress || "").trim();
+    const out = { calls: [], thongKe: { tong: 0, theoLoai: {}, coCA: 0, khongCA: 0, loi: 0 } };
+    const data = payload && payload.data !== undefined ? payload.data : payload;
+    const list = Array.isArray(data) ? data : data && Array.isArray(data.list) ? data.list : null;
+    if (!Array.isArray(list) || !addr) return out;
+    const addrLower = addr.toLowerCase();
+    const seen = Object.create(null);
+    for (const raw of list) {
+      if (!raw || typeof raw !== "object") continue;
+      out.thongKe.tong++;
+      const loai = String(raw.tw_type || "?");
+      out.thongKe.theoLoai[loai] = (out.thongKe.theoLoai[loai] || 0) + 1;
+      const text = String((raw.content && raw.content.text) || "");
+      if (text.toLowerCase().indexOf(addrLower) === -1) {
+        out.thongKe.khongCA++;
+        continue;
+      }
+      out.thongKe.coCA++;
+      if (loai !== "tweet") continue;
+      const user = raw.user || {};
+      const handle = String(user.screen_name || "").replace(/^@+/, "");
+      const tweetId = String(raw.tweet_id || "");
+      const calledAt = tsFrom(raw.tw_timestamp);
+      if (!/^[A-Za-z0-9_]{1,15}$/.test(handle) || !/^\d{5,25}$/.test(tweetId) || calledAt == null) {
+        out.thongKe.loi++;
+        continue;
+      }
+      if (seen[tweetId]) continue;
+      seen[tweetId] = true;
+      out.calls.push({
+        id: "xs:" + tweetId + ":" + addrLower,
+        source: "xs",
+        handle,
+        xUserId: String(user.twitter_user_id == null ? "" : user.twitter_user_id),
+        joinedAt: user.joined_at,
+        tokenKey: addrLower,
+        calledAt,
+        multiple: null,
+        tweetId,
+        text,
+      });
+    }
+    return out;
   }
 
   /** Chain + địa chỉ token nằm ngay trong URL của endpoint. */
@@ -536,6 +615,7 @@
     apiPath,
     PROBE_RE,
     probeSample,
+    parseTwitterSearch,
     parseThesis,
     thesisSample,
     tsFrom,

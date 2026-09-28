@@ -312,7 +312,7 @@
       }
       const n = s.theoNguon || {};
       let t =
-        `${s.cuCall} cú call đã ghi (X: ${n.x || 0} · chart GMGN: ${n.thesis || 0} · bảng X Tracker: ${n.gmgn || 0})` +
+        `${s.cuCall} cú call đã ghi (lướt X: ${n.x || 0} · tweet GMGN tìm được: ${n.xs || 0} · chart GMGN: ${n.thesis || 0} · bảng X Tracker: ${n.gmgn || 0})` +
         ` · ${s.tokenCoMoc} token có mốc ra đời`;
       const k = s.kiemXoaBai;
       if (k) {
