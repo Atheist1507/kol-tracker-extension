@@ -115,6 +115,10 @@
       else if (!cu.mau) cu.mau = KT.gmgn.probeSample(payload);
       state.soiApi[path] = cu;
     }
+    if (payload && /\/twitter\/token\/search/.test(String(url))) {
+      state.twSearchPayload = payload;
+      takeTwitterSearch();
+    }
     let row = null;
     for (const r of state.apiLog) if (r.path === path) row = r;
     if (!row) {
@@ -337,6 +341,26 @@
     chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_ADD, calls }).catch(() => {});
   }
 
+  /**
+   * Tweet về token do GMGN tự tìm → sổ (nguồn "xs"). Cần biết token đang mở
+   * là cái nào (chỉ nhận tweet có đúng CA của nó), mà hai thứ đó có thể về
+   * theo thứ tự nào cũng được — nên giữ payload lại và chạy lại khi biết token.
+   */
+  function takeTwitterSearch() {
+    const addr = state.token && state.token.address;
+    if (!state.twSearchPayload || !addr) return;
+    const res = KT.gmgn.parseTwitterSearch(state.twSearchPayload, addr);
+    state.twSearchPayload = null;
+    const seenAt = Date.now();
+    for (const c of res.calls) {
+      c.seenAt = seenAt;
+      c.chain = state.token.chain || "";
+      c.tokenSymbol = state.token.symbol || "";
+    }
+    state.twSearch = Object.assign({ daGhi: res.calls.length }, res.thongKe);
+    ledgerSend(res.calls);
+  }
+
   function ledgerFromThesis(list) {
     const seenAt = Date.now();
     return list
@@ -510,6 +534,7 @@
           });
         }
         ledgerSend(ledgerFromCallers(callers, state.token));
+        takeTwitterSearch();
         if (panel) panel.update();
         if (overlay) overlay.reset();
         shareCallers();
@@ -545,6 +570,7 @@
           // Feed thesis có thể về TRƯỚC khi biết token đang mở là cái nào —
           // lúc đó bộ lọc theo token chưa chạy được. Lọc lại.
           if (state.thesisAll.length) applyThesis();
+          takeTwitterSearch();
           if (panel) panel.update();
         }
       }
@@ -584,6 +610,9 @@
         callers: state.callers.length,
         lastTooltip: diag.lastTooltip,
         lastHit: diag.lastHit,
+        // Khung chart có thể tự gọi API (nến mcap) — Chẩn đoán chỉ đọc khung
+        // trên cùng, nên khung con phải tự khai mục soi của nó.
+        soiApi: isTop ? undefined : state.soiApi,
       })
       .catch(() => {});
   }
@@ -811,6 +840,9 @@
           // Cột thật của 5 endpoint sắp dùng (nến mcap, call TG/Discord, tweet,
           // ví mua sớm). `lyDo` = không đọc được nội dung, kèm vì sao.
           soiApi: state.soiApi,
+          // Tweet GMGN tìm được về token: bao nhiêu dòng, loại gì, bao nhiêu
+          // có đúng CA (chỉ những dòng đó + loại "tweet" mới vào sổ).
+          tweetTimDuoc: state.twSearch || null,
           mauChart: state.chartPeople
             .slice(0, 3)
             .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " — " + (KT.fmtDateTime(p.postedTs) || "?")),

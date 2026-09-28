@@ -151,16 +151,20 @@
       tokenCoMoc: await reqP(tx.objectStore("tokens").count()),
       theoNguon: {},
     };
-    for (const s of ["x", "thesis", "gmgn"]) out.theoNguon[s] = await reqP(calls.index("source").count(s));
+    for (const s of ["x", "xs", "thesis", "gmgn"]) out.theoNguon[s] = await reqP(calls.index("source").count(s));
     const got = await chrome.storage.local.get(CHECK_LOG);
     out.kiemXoaBai = got[CHECK_LOG] || null;
     return out;
   }
 
-  /** Chỉ tweet trên X — thứ duy nhất kiểm xoá bài được (có tweet ID). */
+  /**
+   * Bản ghi có tweet ID — thứ duy nhất kiểm xoá bài được: "x" (lướt thấy trên
+   * X) và "xs" (tweet GMGN tìm được về token).
+   */
   async function xCalls() {
     const db = await openDb();
-    return reqP(db.transaction("calls").objectStore("calls").index("source").getAll("x"));
+    const idx = db.transaction("calls").objectStore("calls").index("source");
+    return (await reqP(idx.getAll("x"))).concat(await reqP(idx.getAll("xs")));
   }
 
   /**

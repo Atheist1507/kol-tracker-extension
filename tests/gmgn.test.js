@@ -393,3 +393,67 @@ test("probeSample không có mảng nào thì trả hình dạng", () => {
   assert.strictEqual(r.mang, null);
   assert.ok(r.hinhDang);
 });
+
+/* ---------- tweet GMGN tìm được về token (28/09/2026) ---------- */
+
+const CA = "0x020bfc650a365f8bb26819deaabf3e21291018b4";
+function twRow(over) {
+  return Object.assign(
+    {
+      id: "7a3aab09",
+      tw_type: "tweet",
+      tweet_id: "2104442922976293065",
+      tw_timestamp: "1790573266153",
+      user: { twitter_user_id: "1234567", screen_name: "caller_one", joined_at: 1780000000 },
+      content: { text: "$CASHCAT " + CA },
+      tokens: [{}],
+    },
+    over
+  );
+}
+
+test("tweet có đúng CA → một cú call nguồn xs, giữ tweet ID, ID số X, ngày tạo tài khoản", () => {
+  const r = KT.gmgn.parseTwitterSearch({ data: [twRow()] }, CA);
+  assert.strictEqual(r.calls.length, 1);
+  const c = r.calls[0];
+  assert.strictEqual(c.source, "xs");
+  assert.strictEqual(c.tweetId, "2104442922976293065");
+  assert.strictEqual(c.xUserId, "1234567");
+  assert.strictEqual(c.calledAt, 1790573266153);
+  assert.strictEqual(c.tokenKey, CA);
+});
+
+test("tweet KHÔNG chứa CA (có thể là token khác trùng ticker) → không ghi, chỉ đếm", () => {
+  const r = KT.gmgn.parseTwitterSearch({ data: [twRow({ content: { text: "$CASHCAT to the moon" } })] }, CA);
+  assert.strictEqual(r.calls.length, 0);
+  assert.strictEqual(r.thongKe.khongCA, 1);
+});
+
+test("CA viết HOA trong tweet vẫn khớp (EVM không phân biệt hoa thường)", () => {
+  const r = KT.gmgn.parseTwitterSearch({ data: [twRow({ content: { text: "CA " + CA.toUpperCase().replace("0X", "0x") } })] }, CA);
+  assert.strictEqual(r.calls.length, 1);
+});
+
+test("retweet → không gán cho người retweet (chữ là của người khác)", () => {
+  const r = KT.gmgn.parseTwitterSearch({ data: [twRow({ tw_type: "retweet" })] }, CA);
+  assert.strictEqual(r.calls.length, 0);
+  assert.strictEqual(r.thongKe.theoLoai.retweet, 1);
+});
+
+test("thiếu giờ / tay cầm hỏng → bỏ và đếm lỗi, không đoán", () => {
+  const r = KT.gmgn.parseTwitterSearch(
+    { data: [twRow({ tw_timestamp: "" }), twRow({ tweet_id: "9", user: { screen_name: "có dấu" } })] },
+    CA
+  );
+  assert.strictEqual(r.calls.length, 0);
+  assert.strictEqual(r.thongKe.loi, 2);
+});
+
+test("chưa biết token đang mở → không ghi gì", () => {
+  assert.strictEqual(KT.gmgn.parseTwitterSearch({ data: [twRow()] }, "").calls.length, 0);
+});
+
+test("probeSample soi thêm một tầng: phần tử đầu của mảng bên trong dòng đầu", () => {
+  const r = KT.gmgn.probeSample({ data: { tg_calls: [{ timestamp: 1788317940, tg_calls: [{ channel: "abc", price: 0.1 }] }, {}] } });
+  assert.deepStrictEqual(r.trong.tg_calls, ['channel="abc"', "price=0.1"]);
+});
