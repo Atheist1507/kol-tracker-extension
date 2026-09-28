@@ -33,6 +33,7 @@
     // và đám avatar trên cây nến là HAI đám khác nhau — cái sau không có danh
     // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
     extra: new Map(), // handleKey → { username, displayName, avatar, wallet, tuDau }
+    soiApi: {}, // path → { lan, mau } — endpoint đang soi trước khi dựng tính năng (gmgn.PROBE_RE)
     mauMessage: null, // các cột THẬT của một message GMGN (xem rememberShape)
     ulidProbe: null, // ulid có ổn định không (xem probeUlid)
     apiLog: [], // { path, lan, nguoi, ten[] } — để Chẩn đoán chỉ ra endpoint nào có người
@@ -105,6 +106,15 @@
    */
   function noteApi(url, payload) {
     const path = KT.gmgn.apiPath(url);
+    // Mục soi riêng, KHÔNG chịu trần 40 dòng của apiLog — mấy endpoint này
+    // chính là thứ đang cần đo, không được để rơi.
+    if (KT.gmgn.PROBE_RE.test(url)) {
+      const cu = state.soiApi[path] || { lan: 0 };
+      cu.lan++;
+      if (!payload) cu.lyDo = (String(url).split("#")[1] || "không có nội dung");
+      else if (!cu.mau) cu.mau = KT.gmgn.probeSample(payload);
+      state.soiApi[path] = cu;
+    }
     let row = null;
     for (const r of state.apiLog) if (r.path === path) row = r;
     if (!row) {
@@ -798,6 +808,9 @@
           // Mốc token ra đời: cột nào của GMGN mang nó? `cot: null` mà
           // `cacCotThoiGian` có tên lạ = phải thêm tên đó vào CREATED_KEYS.
           mocTokenRaDoi: state.tokenMoc || null,
+          // Cột thật của 5 endpoint sắp dùng (nến mcap, call TG/Discord, tweet,
+          // ví mua sớm). `lyDo` = không đọc được nội dung, kèm vì sao.
+          soiApi: state.soiApi,
           mauChart: state.chartPeople
             .slice(0, 3)
             .map((p) => p.username + " id=" + (p.xId || p.authorId || "?") + " — " + (KT.fmtDateTime(p.postedTs) || "?")),
