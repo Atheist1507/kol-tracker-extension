@@ -49,6 +49,14 @@
       token: "PEPE", token_address: "0xtok1", post_text: "ONLY UP", multiplier_at_note: "0.6",
       holding_state: "đã xả sạch", note: "Đu đỉnh rồi mới hô.", chart_position: "đu đỉnh",
       added_by: "Nix", extra: {} },
+    // Một DỰ ÁN đang theo dõi (ghi chú "[Dự án] …" — src/lib/project.js), hai
+    // lần kiểm để thấy chiều hướng điểm. Trong x-preview nó có một tweet đăng CA.
+    { wallet: "x:caller_one", username: "caller_one", noted_at: "2026-09-10T10:00:00Z",
+      note: "[Dự án] loại:launchpad · ship:có · người dùng:? · team:? · builder:không · cộng đồng:?",
+      added_by: "Tam", extra: {} },
+    { wallet: "x:caller_one", username: "caller_one", noted_at: "2026-09-20T10:00:00Z",
+      note: "[Dự án] loại:launchpad · ship:có · người dùng:có · team:có · builder:? · cộng đồng:? — mainnet tuần trước, 400 ví",
+      added_by: "Tam", extra: {} },
   ];
 
   /** Response giả của /api/v1/token/{chain}/{token}/community/messages */
@@ -124,6 +132,8 @@
           return { parts: ["7 kèo (3 ghi trước)", "có ngày ≥5 kèo", "1 bài call đã bị xoá"] };
         }
         if (msg && msg.type === "kt:ledgerTokenGet") return null;
+        if (msg && msg.type === "kt:ledgerTweeters") return [{ handle: "caller_one", calledAt: Date.now() - 3600000, tweetId: "1840000000000000001" }];
+        if (msg && msg.type === "kt:ledgerLatest") return { caller_one: { tokenKey: "0xtok1", tokenSymbol: "POPCAT", calledAt: Date.now() - 3600000 } };
         return { ok: true };
       },
       onMessage: { addListener: () => {} },

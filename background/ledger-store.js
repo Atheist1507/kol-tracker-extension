@@ -21,7 +21,10 @@
   const KT = globalThis.KT;
 
   const DB_NAME = "kt-ledger";
-  const DB_VERSION = 1;
+  // v2 (30/09/2026): thêm chỉ mục tokenKey — "ai đã tự đăng CA của token này".
+  // ⚠ Nâng phiên bản chỉ được THÊM chỉ mục trên store cũ, không tạo lại store:
+  // tạo lại là xoá sạch sổ đã tích mấy tuần.
+  const DB_VERSION = 2;
   const CHECK_LOG = "ledgerCheckLog"; // chrome.storage.local — kết quả kiểm xoá bài gần nhất
   const CHECK_BATCH = 20; // tweet mỗi lượt kiểm
   const CHECK_GAP_MS = 1500; // nghỉ giữa hai lời gọi — đừng dội X
@@ -35,11 +38,12 @@
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains("calls")) {
-          const calls = db.createObjectStore("calls", { keyPath: "id" });
-          calls.createIndex("personKey", "personKey", { unique: false });
-          calls.createIndex("source", "source", { unique: false });
-        }
+        const calls = db.objectStoreNames.contains("calls")
+          ? req.transaction.objectStore("calls")
+          : db.createObjectStore("calls", { keyPath: "id" });
+        if (!calls.indexNames.contains("personKey")) calls.createIndex("personKey", "personKey", { unique: false });
+        if (!calls.indexNames.contains("source")) calls.createIndex("source", "source", { unique: false });
+        if (!calls.indexNames.contains("tokenKey")) calls.createIndex("tokenKey", "tokenKey", { unique: false });
         if (!db.objectStoreNames.contains("tokens")) db.createObjectStore("tokens", { keyPath: "tokenKey" });
       };
       req.onsuccess = () => resolve(req.result);
@@ -261,5 +265,51 @@
     return log;
   }
 
-  KT.ledgerStore = { addCalls, putToken, getToken, person, stats, prune, checkDeletions };
+  /**
+   * Ai đã TỰ ĐĂNG CA của token này trong một tweet (nguồn "x" / "xs")?
+   * Chỉ tweet mới tính: đó là bằng chứng chính chủ, còn feed chart / bảng X
+   * Tracker là người khác nói về token.
+   */
+  async function tweetersOfToken(tokenKey) {
+    const key = KT.ledger.tokenKeyOf(tokenKey);
+    if (!key) return [];
+    const db = await openDb();
+    const rows = await reqP(db.transaction("calls").objectStore("calls").index("tokenKey").getAll(key));
+    const out = {};
+    for (const c of rows) {
+      if (!c.tweetId || (c.source !== "x" && c.source !== "xs")) continue;
+      const h = c.personKey;
+      if (!out[h] || (c.calledAt || 0) < (out[h].calledAt || 0)) {
+        out[h] = { handle: c.handle, calledAt: c.calledAt, tweetId: c.tweetId };
+      }
+    }
+    return Object.values(out);
+  }
+
+  /**
+   * Với mỗi tay cầm: tweet có CA GẦN NHẤT của chính họ trong `days` ngày.
+   * Dùng cho tab Dự án: "dự án này vừa đăng CA".
+   */
+  async function latestTweetCalls(handles, now, days) {
+    const db = await openDb();
+    const idx = db.transaction("calls").objectStore("calls").index("personKey");
+    const since = now - (days || 30) * 86400000;
+    const out = {};
+    for (const h of handles || []) {
+      const key = KT.ledger.personKeyOf({ handle: h });
+      if (!key) continue;
+      const rows = await reqP(idx.getAll(key));
+      let best = null;
+      for (const c of rows) {
+        if (!c.tweetId || (c.source !== "x" && c.source !== "xs") || c.calledAt == null || c.calledAt < since) continue;
+        if (!best || c.calledAt > best.calledAt) best = c;
+      }
+      if (best) {
+        out[h.toLowerCase()] = { tokenKey: best.tokenKey, tokenSymbol: best.tokenSymbol, calledAt: best.calledAt, tweetId: best.tweetId };
+      }
+    }
+    return out;
+  }
+
+  KT.ledgerStore = { tweetersOfToken, latestTweetCalls, addCalls, putToken, getToken, person, stats, prune, checkDeletions };
 })();

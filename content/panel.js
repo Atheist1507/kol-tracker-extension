@@ -208,9 +208,27 @@
       );
     }
 
+    /**
+     * Token đang mở do CHÍNH một dự án mày theo dõi tự đăng CA. Một dòng, chỉ
+     * hiện khi khớp — đây là lúc cả công theo dõi dự án trả tiền.
+     */
+    function duAnTokenHtml() {
+      const list = api.getState().duAnToken;
+      if (!list || !list.length) return "";
+      return list
+        .slice(0, 3)
+        .map(
+          (d) =>
+            `<div class="kt-hint kt-proj">◆ Dự án đang theo dõi <b>@${KT.esc(d.handle)}</b> đã tự đăng CA này${
+              d.calledAt ? " (" + KT.esc(KT.fmtDateTime(d.calledAt)) + ")" : ""
+            }${d.score ? " · phiếu chấm " + KT.esc(d.score) : ""}.</div>`
+        )
+        .join("");
+    }
+
     function renderHome() {
       const { db, callers } = api.getState();
-      const callersBlock = renamesHtml() + callersHtml();
+      const callersBlock = duAnTokenHtml() + renamesHtml() + callersHtml();
 
       if (!db || !db.people.length) {
         el.content.innerHTML =
@@ -229,7 +247,8 @@
         return;
       }
 
-      const top = db.people.filter((p) => !p.ghost).slice(0, 6);
+      // Dự án không lẫn vào danh sách người call — chúng có tab riêng trong popup.
+      const top = db.people.filter((p) => !p.ghost && !p.project).slice(0, 6);
       el.content.innerHTML =
         callersBlock +
         `<div class="kt-sec-title">Hạng cao nhất</div>` +

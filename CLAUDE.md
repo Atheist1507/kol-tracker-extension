@@ -813,3 +813,38 @@ Chẩn đoán trên trang thật lộ ra các endpoint chưa dùng: `token_mcap_
   giờ gửi `soiApi` của nó qua FRAME_HELLO → nằm trong `framesWithScript`.
 - `probeSample.trong`: soi thêm một tầng — call TG/Discord nằm trong mảng con
   (`{timestamp, tg_calls:[…]}`).
+
+## Theo dõi DỰ ÁN + popup là menu duy nhất — v0.17.0 (30/09/2026)
+
+Ngoài người call, chủ máy theo dõi dự án mới manh nha (chưa có token) để có
+sẵn hiểu biết lúc dự án ra token. Logic ở `src/lib/project.js` (có test).
+
+- **Không đụng Sheet / Apps Script.** Code.gs ghi theo danh sách cột CỐ ĐỊNH;
+  thêm cột = hai người phải dán lại code + deploy lại. Nên: một dự án là một
+  hồ sơ bình thường, mỗi lần kiểm là một dòng Detail có `note` mở đầu bằng
+  `[Dự án]` + phiếu chấm `tên:có|?|không` ngăn bằng ` · `, phần chữ tự do sau
+  ` — `. Hồ sơ có ghi chú như vậy → `person.project` (buildDb).
+  ⚠ Phần đọc không ra = "?" (0), không bao giờ đoán là có/không.
+  ⚠ `displayNote` là thứ in ra màn hình — đừng in nguyên dòng `[Dự án] …`.
+- **5 câu hỏi** (`QUESTIONS`): ship thật / người dùng thật / team kiểm chứng
+  được / builder để ý / cộng đồng bàn sản phẩm. Điểm = số câu "có"; hiện kèm
+  chiều hướng so với lần kiểm trước ("3/5 ↑ từ 1") — ở giai đoạn chưa có
+  token, chiều hướng nói nhiều hơn con số. Quá 7 ngày chưa kiểm → "cần kiểm lại".
+- **Giao diện theo ngân sách**, không thêm nút nào ra trang:
+  - hộp ghi chú có công tắc Người call / Dự án; hồ sơ đã là dự án thì mở thẳng
+    chế độ Dự án, điền sẵn phiếu lần trước. Đổi chế độ giữ chữ đang gõ.
+  - X: pill dự án là `◆ 3/5`; tweet có CA của CHÍNH dự án → pill `◆ đăng CA`
+    (khoảnh khắc đáng tiền nhất). Dải hồ sơ / thẻ hover: dòng "◆ Dự án · loại ·
+    điểm · kiểm N ngày trước" thay cho hạng.
+  - GMGN: panel CHỈ hiện một dòng khi token đang mở được chính một dự án đang
+    theo dõi tự tweet CA (`LEDGER_TWEETERS` — chỉ nguồn "x"/"xs", tức bài của
+    chính chủ; feed chart là người khác nói). Không khớp = không hiện gì.
+  - **Popup = menu duy nhất**, 2 tab Người / Dự án (tab nhớ theo máy). Tab Dự
+    án xếp: vừa tự đăng CA (30 ngày) → cần kiểm lại → điểm. Dự án không lẫn vào
+    danh sách người call ở popup lẫn panel.
+- IndexedDB lên **v2** (thêm chỉ mục `tokenKey`). ⚠ `onupgradeneeded` chỉ THÊM
+  chỉ mục trên store cũ qua `req.transaction` — tạo lại store là xoá sổ. Đã
+  kiểm trên extension thật: sổ v1 có dữ liệu → mở bằng code mới → còn nguyên.
+- Chưa làm (thiếu cột thật): báo token nhái gắn link X của dự án — cần biết
+  token info của GMGN để link X ở cột nào. Chẩn đoán soi thêm `wallet_token_info`
+  cho "Khám nghiệm".

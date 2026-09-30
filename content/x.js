@@ -124,6 +124,18 @@
   }
 
   /**
+   * Dòng đầu cho hồ sơ là DỰ ÁN: loại · điểm (kèm chiều hướng) · lần kiểm.
+   * Thay cho hạng — một dự án không có "hạng S", nó có phiếu chấm.
+   */
+  function duAnHtml(p) {
+    const P = KT.project;
+    const bits = [p.category, P.scoreLabel(p)];
+    if (p.checkedTs) bits.push("kiểm " + KT.timeAgo(p.checkedTs));
+    const cu = P.isStale(p) ? ` · <span class="kt-x-flag">cần kiểm lại</span>` : "";
+    return `<div class="kt-x-head"><b class="kt-x-proj">◆ Dự án</b> · ${KT.esc(bits.filter(Boolean).join(" · "))}${cu}</div>`;
+  }
+
+  /**
    * Dòng số liệu của sổ tự ghi trên trang hồ sơ.
    *
    * ⚠ Có CACHE 60s: `ve()` chạy lại mỗi lần DOM của X đổi (vài lần một giây
@@ -177,16 +189,19 @@
       wrap.innerHTML = `<div class="kt-x-strip">${soHtml(so)}</div>`;
     } else {
       const note = (person.notes && person.notes[0]) || null;
-      const mau = KT.tierColor(person.tier);
+      const pj = person.project;
+      const mau = pj ? "#58A6FF" : KT.tierColor(person.tier);
       wrap.innerHTML =
         `<div class="kt-x-strip" style="border-color:${KT.esc(mau)}">` +
-        `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
-        (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
-        (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
-        `</div>` +
+        (pj
+          ? duAnHtml(pj)
+          : `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
+            (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
+            (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
+            `</div>`) +
         (person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
         (note && note.note
-          ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
+          ? `<div class="kt-x-note">${KT.esc(KT.project ? KT.project.displayNote(note.note) : note.note)}</div>` +
             `<div class="kt-x-meta">${KT.esc(
               [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
                 .filter(Boolean)
@@ -361,7 +376,7 @@
     const coNutTim = !!(tw && contracts.length && state.cfg.xNarrativeBtn);
     // Khoá vẽ gồm cả id bài: X tái dùng node khi cuộn, và nút tìm kiếm gắn
     // với MỘT bài cụ thể — cùng người mà khác bài thì phải vẽ lại.
-    const khoaVe = handle + "|" + (coNutTim ? tw.tweetId : "");
+    const khoaVe = handle + "|" + (tw && contracts.length ? tw.tweetId : "") + "|" + (coNutTim ? 1 : 0);
     const daGan = article.dataset[PILL_ID_ATTR];
     if (daGan === khoaVe && article.querySelector("." + PILL_CLASS)) return;
 
@@ -370,14 +385,30 @@
     if (!khoi) return;
 
     const person = personFor(handle);
+    const pj = person && person.project;
     const { host, wrap } = khungRieng(null);
     host.className = PILL_CLASS;
     host.style.cssText = "display:inline-flex;align-items:center;margin-left:6px;vertical-align:middle;";
-    const mau = person ? KT.tierColor(person.tier) : "#6E7A88";
+    const mau = pj ? "#58A6FF" : person ? KT.tierColor(person.tier) : "#6E7A88";
+    // Dự án đang theo dõi TỰ ĐĂNG CA = khoảnh khắc đáng tiền nhất của cả việc
+    // theo dõi dự án — pill đổi hẳn chữ để không lẫn vào dòng thời gian.
+    const duAnDangCA = !!(pj && tw && contracts.length);
+    let nhan = "+";
+    if (duAnDangCA) nhan = "◆ đăng CA";
+    else if (pj) nhan = "◆ " + pj.yes + "/" + KT.project.QUESTIONS.length;
+    else if (person) nhan = (person.tierLetter || "•") + (person.noteCount ? " " + person.noteCount : "");
     wrap.innerHTML =
-      `<button class="kt-x-pill${person ? " co" : ""}" type="button" style="color:${KT.esc(mau)}" ` +
-      `title="${KT.esc(person ? "Xem ghi chú · bấm để ghi thêm" : "Ghi chú người này")}">` +
-      KT.esc(person ? (person.tierLetter || "•") + (person.noteCount ? " " + person.noteCount : "") : "+") +
+      `<button class="kt-x-pill${person ? " co" : ""}${duAnDangCA ? " kt-x-hot" : ""}" type="button" style="color:${KT.esc(mau)}" ` +
+      `title="${KT.esc(
+        duAnDangCA
+          ? "Dự án mày đang theo dõi vừa tự đăng CA trong bài này"
+          : pj
+          ? "Dự án đang theo dõi · bấm để kiểm lại"
+          : person
+          ? "Xem ghi chú · bấm để ghi thêm"
+          : "Ghi chú người này"
+      )}">` +
+      KT.esc(nhan) +
       `</button>`;
 
     const btn = wrap.querySelector("button");
@@ -464,13 +495,15 @@
     const mau = KT.tierColor(person.tier);
     theHost.__wrap.innerHTML =
       `<div class="kt-x-card">` +
-      `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
-      (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
-      (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
-      `</div>` +
+      (person.project
+        ? duAnHtml(person.project)
+        : `<div class="kt-x-head"><b style="color:${KT.esc(mau)}">${KT.esc(person.tierLetter || "chưa xếp hạng")}</b>` +
+          (person.noteCount ? ` · ${person.noteCount} ghi chú` : "") +
+          (person.redFlags ? ` · <span class="kt-x-flag">⚑ ${KT.esc(person.redFlags)}</span>` : "") +
+          `</div>`) +
       (person.summary ? `<div class="kt-x-sum">${KT.esc(person.summary)}</div>` : "") +
       (note && note.note
-        ? `<div class="kt-x-note">${KT.esc(note.note)}</div>` +
+        ? `<div class="kt-x-note">${KT.esc(KT.project ? KT.project.displayNote(note.note) : note.note)}</div>` +
           `<div class="kt-x-meta">${KT.esc(
             [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
               .filter(Boolean)

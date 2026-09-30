@@ -421,7 +421,7 @@
         ${person.summary ? `<div class="kt-card-desc">${KT.esc(person.summary)}</div>` : ""}
         ${
           note && note.note
-            ? `<div class="kt-card-note">${KT.esc(note.note)}</div>
+            ? `<div class="kt-card-note">${KT.esc(KT.project ? KT.project.displayNote(note.note) : note.note)}</div>
                <div class="kt-card-note-meta">${KT.esc(
                  [KT.fmtDateTime(note.notedTs || note.notedAt), note.token ? "$" + note.token : "", note.addedBy]
                    .filter(Boolean)

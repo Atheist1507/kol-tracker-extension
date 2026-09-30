@@ -33,6 +33,7 @@
     // và đám avatar trên cây nến là HAI đám khác nhau — cái sau không có danh
     // sách nào dưới trang để tóm, nên phải nghe API mới biết chúng là ai.
     extra: new Map(), // handleKey → { username, displayName, avatar, wallet, tuDau }
+    duAnToken: [], // dự án đang theo dõi đã tự tweet CA của token đang mở
     soiApi: {}, // path → { lan, mau } — endpoint đang soi trước khi dựng tính năng (gmgn.PROBE_RE)
     mauMessage: null, // các cột THẬT của một message GMGN (xem rememberShape)
     ulidProbe: null, // ulid có ổn định không (xem probeUlid)
@@ -359,6 +360,10 @@
     }
     state.twSearch = Object.assign({ daGhi: res.calls.length }, res.thongKe);
     ledgerSend(res.calls);
+    // Tweet vừa tìm được có thể chính là bài dự án tự đăng CA — hỏi lại sổ
+    // sau khi nó kịp ghi.
+    duAnHoi = "";
+    setTimeout(checkDuAnToken, 1500);
   }
 
   function ledgerFromThesis(list) {
@@ -487,9 +492,42 @@
 
   /* ---------- dữ liệu ---------- */
 
+  /**
+   * Token đang mở có phải do một DỰ ÁN mày theo dõi tự đăng CA không? Hỏi sổ
+   * xem ai đã tweet đúng CA này, rồi giao với các hồ sơ là dự án.
+   * Chạy lại khi biết token và khi Sheet tải xong — hai thứ về không cùng lúc.
+   */
+  let duAnHoi = "";
+  function checkDuAnToken() {
+    const addr = state.token && state.token.address;
+    if (!isTop || !addr || !state.db || !alive()) return;
+    const coDuAn = state.db.people.some((p) => p.project);
+    if (!coDuAn) {
+      state.duAnToken = [];
+      return;
+    }
+    const hoi = addr + "|" + state.db.people.length;
+    if (hoi === duAnHoi) return;
+    duAnHoi = hoi;
+    chrome.runtime
+      .sendMessage({ type: KT.MSG.LEDGER_TWEETERS, tokenKey: addr })
+      .then((list) => {
+        const out = [];
+        for (const t of list || []) {
+          const p = KT.findPerson(state.db, { username: t.handle });
+          if (p && p.project) out.push({ handle: p.username || t.handle, calledAt: t.calledAt, score: KT.project.scoreLabel(p.project) });
+        }
+        state.duAnToken = out;
+        if (panel) panel.update();
+      })
+      .catch(() => {});
+  }
+
   function rebuildDb() {
     const d = state.data;
     state.db = d ? KT.buildDb(d.overview, d.detail) : null;
+    duAnHoi = "";
+    setTimeout(checkDuAnToken, 0);
     // Sheet vừa tải lại thì phải soi lại: người đổi tên chỉ lộ ra khi có CẢ
     // hồ sơ cũ lẫn danh sách đang hiện, mà hai thứ đó về không cùng lúc.
     if (state.thesisAll.length) state.renames = KT.findRenames(state.db, state.thesisAll);
@@ -535,6 +573,7 @@
         }
         ledgerSend(ledgerFromCallers(callers, state.token));
         takeTwitterSearch();
+        checkDuAnToken();
         if (panel) panel.update();
         if (overlay) overlay.reset();
         shareCallers();
@@ -571,6 +610,7 @@
           // lúc đó bộ lọc theo token chưa chạy được. Lọc lại.
           if (state.thesisAll.length) applyThesis();
           takeTwitterSearch();
+          checkDuAnToken();
           if (panel) panel.update();
         }
       }

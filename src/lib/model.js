@@ -170,6 +170,8 @@
       });
       person.noteCount = person.notes.length;
       person.mergedNames = mergedNames(person);
+      // Hồ sơ có ghi chú "[Dự án] …" là một DỰ ÁN, không phải một người call.
+      person.project = KT.project ? KT.project.fromNotes(person.notes) : null;
       person.searchText = KT.stripAccents(
         [person.username, person.displayName, person.summary, person.redFlags].join(" ")
       ).toLowerCase();

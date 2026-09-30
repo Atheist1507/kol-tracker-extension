@@ -37,6 +37,10 @@
     let saving = false;
     let position = "";
     let tier = "";
+    // "nguoi" = ghi chú về một người call; "duan" = một lần kiểm dự án (phiếu
+    // chấm 5 câu, lưu thành ghi chú "[Dự án] …" — xem src/lib/project.js).
+    let mode = "nguoi";
+    let card = { category: "", scores: {} };
 
     function close() {
       open = false;
@@ -57,6 +61,42 @@
       if (top < 8) top = 8;
       host.style.left = left + "px";
       host.style.top = top + "px";
+    }
+
+    /** Phiếu chấm dự án — chỉ hiện ở chế độ Dự án, thay cho xếp hạng. */
+    function projectHtml(person) {
+      const P = KT.project;
+      const last = person.project;
+      const cell = (key, v, label) =>
+        `<button class="kt-chip kt-mini" data-q="${key}" data-v="${v}" aria-pressed="${
+          (card.scores[key] || 0) === v ? "true" : "false"
+        }">${label}</button>`;
+      return `
+            ${
+              last
+                ? `<div class="kt-hint">Lần kiểm trước: <b>${KT.esc(P.scoreLabel(last))}</b>${
+                    last.checkedTs ? " · " + KT.esc(KT.timeAgo(last.checkedTs)) : ""
+                  } — đã điền sẵn, chỉ sửa chỗ thay đổi.</div>`
+                : ""
+            }
+            <div class="kt-field">
+              <label>Loại</label>
+              <div class="kt-chips" data-el="cats">
+                ${P.CATEGORIES.map(
+                  (c) =>
+                    `<button class="kt-chip" data-cat="${KT.esc(c)}" aria-pressed="${
+                      card.category === c ? "true" : "false"
+                    }">${KT.esc(c)}</button>`
+                ).join("")}
+              </div>
+            </div>
+            <div class="kt-field">
+              <label>5 câu hỏi (chưa chắc thì để "?")</label>
+              ${P.QUESTIONS.map(
+                (q) => `<div class="kt-qrow"><span class="kt-qlabel">${KT.esc(q.hoi)}</span>
+                  <span class="kt-chips">${cell(q.key, 1, "có")}${cell(q.key, 0, "?")}${cell(q.key, -1, "không")}</span></div>`
+              ).join("")}
+            </div>`;
     }
 
     function render() {
@@ -83,26 +123,40 @@
               <div class="kt-grow">
                 <div class="kt-handle">${KT.esc(person.username || KT.shortWallet(person.wallet))}</div>
                 <div class="kt-aliases">${KT.esc(KT.shortWallet(person.wallet) || "chưa có ví")}${
-                  person.ghost ? " · người mới" : ` · đã có ${person.noteCount} ghi chú`
+                  person.project
+                    ? ` · dự án · ${person.project.checks} lần kiểm`
+                    : person.ghost
+                    ? " · người mới"
+                    : ` · đã có ${person.noteCount} ghi chú`
                 }</div>
                 ${ctx.renamedFrom ? `<div class="kt-aliases" style="color:#F0883E">đã đổi tên từ @${KT.esc(ctx.renamedFrom)}</div>` : ""}
               </div>
             </div>
 
-            ${caller ? KT.render.callerSnapshot(caller) : ""}
-            ${tokenLine ? `<div class="kt-hint">Token: ${KT.esc(tokenLine)}</div>` : ""}
+            <div class="kt-seg" data-el="mode">
+              <button class="kt-chip" data-mode="nguoi" aria-pressed="${mode === "nguoi"}">Người call</button>
+              <button class="kt-chip" data-mode="duan" aria-pressed="${mode === "duan"}">Dự án</button>
+            </div>
+
+            ${mode === "nguoi" && caller ? KT.render.callerSnapshot(caller) : ""}
+            ${mode === "nguoi" && tokenLine ? `<div class="kt-hint">Token: ${KT.esc(tokenLine)}</div>` : ""}
+            ${mode === "duan" ? projectHtml(person) : ""}
 
             <div class="kt-field">
-              <label for="kt-note-text">Nhận xét của mày</label>
+              <label for="kt-note-text">${mode === "duan" ? "Ghi chú lần kiểm này" : "Nhận xét của mày"}</label>
               <textarea class="kt-ta" id="kt-note-text" data-el="note"
-                placeholder="Ví dụ: call sớm, có luận điểm rõ, nhưng hay xả nhanh…"></textarea>
+                placeholder="${
+                  mode === "duan"
+                    ? "Ví dụ: mainnet tuần trước, 400 ví dùng, team từng làm X…"
+                    : "Ví dụ: call sớm, có luận điểm rõ, nhưng hay xả nhanh…"
+                }"></textarea>
             </div>
 
             ${
               // Ghi chú từ trang X là ghi chú về NGƯỜI, không gắn với cú call
               // nào — không có token thì "call ở đoạn nào của sóng" là câu hỏi
               // không có câu trả lời, hỏi nó chỉ tổ làm người ta phân vân.
-              ctx.token
+              mode === "nguoi" && ctx.token
                 ? `<div class="kt-field">
               <label>Call ở đoạn nào của sóng</label>
               <div class="kt-chips" data-el="positions">
@@ -117,7 +171,7 @@
                 : ""
             }
 
-            <div class="kt-field">
+            ${mode === "duan" ? "" : `<div class="kt-field">
               <label>Xếp hạng ${person.tier ? `(đang là ${KT.esc(person.tier)})` : ""}</label>
               <div class="kt-chips" data-el="tiers">
                 ${TIERS.map(
@@ -127,7 +181,7 @@
                     }" style="${KT.tierLetter(person.tier) === t ? "color:" + KT.tierColor(t) : ""}">${t}</button>`
                 ).join("")}
               </div>
-            </div>
+            </div>`}
 
             <div class="kt-btns">
               <button class="kt-btn kt-primary" data-act="save">Lưu vào Sheet (⌘↵)</button>
@@ -142,6 +196,21 @@
       position = "";
     }
 
+    /** Đổi chế độ mà không mất chữ đang gõ dở. */
+    function switchMode(next) {
+      if (next === mode) return;
+      const ta = wrap.querySelector('[data-el="note"]');
+      const typed = ta ? ta.value : "";
+      mode = next;
+      render();
+      place();
+      const ta2 = wrap.querySelector('[data-el="note"]');
+      if (ta2) {
+        ta2.value = typed;
+        ta2.focus();
+      }
+    }
+
     function setStatus(msg, isError) {
       const el = wrap.querySelector('[data-el="status"]');
       if (el) el.innerHTML = isError ? `<span class="kt-err">${KT.esc(msg)}</span>` : KT.esc(msg);
@@ -150,8 +219,16 @@
     async function save() {
       if (saving || !ctx) return;
       const noteEl = wrap.querySelector('[data-el="note"]');
-      const note = noteEl ? noteEl.value.trim() : "";
-      if (!note && !tier) {
+      let note = noteEl ? noteEl.value.trim() : "";
+      if (mode === "duan") {
+        const cham = Object.keys(card.scores).some((k) => card.scores[k]);
+        if (!note && !cham && !card.category) {
+          setStatus("Chấm ít nhất một câu, chọn loại, hoặc gõ vài chữ đã.", true);
+          return;
+        }
+        note = KT.project.format({ category: card.category, scores: card.scores, text: note });
+        tier = ""; // phiếu dự án không đụng tới hạng của người call
+      } else if (!note && !tier) {
         setStatus("Gõ vài chữ đã, hoặc ít nhất chọn một hạng.", true);
         if (noteEl) noteEl.focus();
         return;
@@ -271,6 +348,24 @@
     }
 
     wrap.addEventListener("click", (ev) => {
+      const m = ev.target.closest("[data-mode]");
+      if (m) return switchMode(m.dataset.mode);
+      const q = ev.target.closest("[data-q]");
+      if (q) {
+        card.scores[q.dataset.q] = Number(q.dataset.v);
+        q.parentElement
+          .querySelectorAll(".kt-chip")
+          .forEach((c) => c.setAttribute("aria-pressed", c === q ? "true" : "false"));
+        return;
+      }
+      const cat = ev.target.closest("[data-cat]");
+      if (cat) {
+        const on = cat.getAttribute("aria-pressed") === "true";
+        cat.parentElement.querySelectorAll(".kt-chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+        if (!on) cat.setAttribute("aria-pressed", "true");
+        card.category = on ? "" : cat.dataset.cat;
+        return;
+      }
       const chip = ev.target.closest("[data-pos], [data-tier]");
       if (chip) {
         const group = chip.parentElement;
@@ -313,6 +408,11 @@
       open(nextCtx) {
         ctx = nextCtx;
         open = true;
+        // Hồ sơ đã là dự án → mở thẳng chế độ Dự án, điền sẵn phiếu lần trước:
+        // kiểm hằng tuần chỉ là sửa chỗ thay đổi rồi lưu.
+        const pj = ctx.person && ctx.person.project;
+        mode = pj || ctx.mode === "duan" ? "duan" : "nguoi";
+        card = { category: pj ? pj.category : "", scores: Object.assign({}, pj ? pj.scores : {}) };
         host.style.display = "block";
         render();
         place();

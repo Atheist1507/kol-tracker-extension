@@ -41,6 +41,8 @@
 .kt-x-note { margin-top: 4px; color: #D7DEE6; }
 .kt-x-meta { margin-top: 2px; font-size: 11px; color: #6E7A88; }
 .kt-x-ledger { margin-top: 4px; font-size: 11px; color: #8B98A5; }
+.kt-x-proj { color: #58A6FF; }
+.kt-x-pill.kt-x-hot { background: rgba(88,166,255,.14); border-width: 1.5px; }
 .kt-x-ledger b { color: #6E7A88; font-weight: 600; }
 
 /* --- trong dòng thời gian --- */
@@ -250,6 +252,12 @@
   background: var(--kt-bg-2); border: 1px solid var(--kt-border); border-radius: 8px;
 }
 .kt-snap .kt-note-post { flex: 1 0 100%; margin-top: 2px; }
+.kt-seg { display: flex; gap: 6px; margin: 10px 0 2px; }
+.kt-seg .kt-chip { flex: 1; justify-content: center; }
+.kt-qrow { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.kt-qlabel { flex: 1; font-size: 12px; color: var(--kt-fg-subtle); line-height: 1.35; }
+.kt-chip.kt-mini { padding: 2px 8px; font-size: 11.5px; }
+.kt-proj { color: #58A6FF; }
 .kt-ledger { margin-top: 8px; font-size: 11.5px; line-height: 1.5; color: var(--kt-fg-subtle); }
 .kt-ledger b { font-weight: 600; }
 
