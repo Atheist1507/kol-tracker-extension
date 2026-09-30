@@ -43,7 +43,7 @@
    * y hệt "endpoint này không có ai". Đoán tên cột rồi lấy kết quả rỗng làm
    * bằng chứng là tự bịt mắt mình.
    */
-  const SUSPECT_RE = /thesis|fomo|callout|callback|social|community|tweet|twitter|kol|caller|mcap_candles|top_buyers|token_holders|_calls\/klines/i;
+  const SUSPECT_RE = /thesis|fomo|callout|callback|social|community|tweet|twitter|kol|caller|mcap_candles|top_buyers|token_holders|_calls\/klines|wallet_token_info/i;
 
   if (window.__KT_MAIN_WORLD__) return;
   window.__KT_MAIN_WORLD__ = true;
@@ -90,7 +90,7 @@
     const body = String(text || "");
     // Endpoint đang soi (nến mcap, ví mua sớm…) có thể nặng hơn trần chung —
     // cho trần riêng 5MB, bị cắt ở đây là mất đúng cái đang cần đo.
-    const PROBE = /mcap_candles|top_buyers|token_holders\/|_calls\/klines|twitter\/token\/search/.test(u);
+    const PROBE = /mcap_candles|top_buyers|token_holders\/|_calls\/klines|twitter\/token\/search|wallet_token_info/.test(u);
     if (body.length > (PROBE ? 5000000 : MAX_BYTES)) {
       // Nói RÕ vì sao bỏ qua. "Bỏ vì quá to" và "bỏ vì không thấy người" là
       // hai chuyện khác hẳn, mà trong sổ chẩn đoán thì trông giống hệt nhau.

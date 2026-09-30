@@ -17,3 +17,6 @@ body {
 .kt-head {
   cursor: default;
 }
+
+/* Hai tab Người / Dự án — menu duy nhất của extension */
+.kt-tabs { padding: 8px 12px 0; margin: 0; }

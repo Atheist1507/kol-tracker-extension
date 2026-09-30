@@ -457,3 +457,7 @@ test("probeSample soi thêm một tầng: phần tử đầu của mảng bên t
   const r = KT.gmgn.probeSample({ data: { tg_calls: [{ timestamp: 1788317940, tg_calls: [{ channel: "abc", price: 0.1 }] }, {}] } });
   assert.deepStrictEqual(r.trong.tg_calls, ['channel="abc"', "price=0.1"]);
 });
+
+test("PROBE_RE bắt cả wallet_token_info (chuẩn bị cho Khám nghiệm)", () => {
+  assert.ok(KT.gmgn.PROBE_RE.test("/pf/api/v1/wallet/robinhood/0xabc/wallet_token_info?token=0xdef"));
+});

@@ -18,9 +18,18 @@
     opts: document.getElementById("opts-btn"),
     panelBtn: document.getElementById("panel-btn"),
     diagBtn: document.getElementById("diag-btn"),
+    tabs: document.getElementById("tabs"),
   };
 
-  const state = { cfg: KT.withDefaults(null), data: null, db: null, detailRef: null };
+  // Tab nhớ theo máy (localStorage của trang popup) — mở lại popup là về đúng
+  // chỗ đang làm dở.
+  let tabNho = "nguoi";
+  try {
+    tabNho = localStorage.getItem("kt-tab") === "duan" ? "duan" : "nguoi";
+  } catch (e) {
+    /* không có storage thì mặc định tab Người */
+  }
+  const state = { cfg: KT.withDefaults(null), data: null, db: null, detailRef: null, tab: tabNho, caMoi: {} };
 
   async function load() {
     const [cfg, data] = await Promise.all([KT.getConfig(), KT.getData()]);
@@ -45,9 +54,77 @@
     el.dot.className = "kt-dot ok";
   }
 
+  /**
+   * Tab Dự án: mọi hồ sơ là dự án. Xếp: vừa TỰ ĐĂNG CA (30 ngày) lên đầu —
+   * đó là lúc cần hành động; rồi tới dự án lâu chưa kiểm lại; rồi theo điểm.
+   */
+  function duAnRow(p) {
+    const P = KT.project;
+    const pj = p.project;
+    const ca = state.caMoi[(p.username || "").toLowerCase()];
+    const bits = [pj.category, P.scoreLabel(pj)];
+    bits.push(pj.checkedTs ? "kiểm " + KT.timeAgo(pj.checkedTs) : "chưa rõ ngày kiểm");
+    return `<div class="kt-row" data-key="${KT.esc(p.wallet || p.usernameKey)}" role="option" tabindex="-1">
+      <span class="kt-grow kt-trunc">
+        <span class="kt-name kt-proj">◆ ${KT.esc(p.username || p.displayName || "?")}</span>
+        <span class="kt-sub" style="display:block">${KT.esc(bits.filter(Boolean).join(" · "))}${
+          P.isStale(pj) ? ' · <span style="color:#E3B341">cần kiểm lại</span>' : ""
+        }</span>
+        ${
+          ca
+            ? `<span class="kt-sub" style="display:block;color:#58A6FF">Đã tự đăng CA${
+                ca.tokenSymbol ? " $" + KT.esc(ca.tokenSymbol) : ""
+              } · ${KT.esc(KT.timeAgo(ca.calledAt))}</span>`
+            : ""
+        }
+      </span>
+    </div>`;
+  }
+
+  function renderDuAn(q) {
+    const db = state.db;
+    let list = db.people.filter((p) => p.project);
+    if (q) {
+      const k = KT.looseHandleKey(q);
+      list = list.filter((p) => KT.looseHandleKey(p.username).includes(k) || (p.project.category || "").toLowerCase().includes(q.toLowerCase()));
+    }
+    const now = Date.now();
+    const caOf = (p) => state.caMoi[(p.username || "").toLowerCase()];
+    list.sort((a, b) => {
+      const ca = caOf(a) ? caOf(a).calledAt : 0;
+      const cb = caOf(b) ? caOf(b).calledAt : 0;
+      if (ca !== cb) return cb - ca;
+      const sa = KT.project.isStale(a.project, now) ? 1 : 0;
+      const sb = KT.project.isStale(b.project, now) ? 1 : 0;
+      if (sa !== sb) return sb - sa;
+      return b.project.yes - a.project.yes;
+    });
+    el.content.innerHTML = list.length
+      ? `<div class="kt-sec-title">Dự án đang theo dõi (${list.length})</div>` + list.map(duAnRow).join("")
+      : `<div class="kt-empty">Chưa theo dõi dự án nào.<br>Trên X, bấm <b>Ghi chú</b> ở trang hồ sơ của dự án → chọn <b>Dự án</b> → chấm 5 câu.</div>`;
+    renderFoot();
+  }
+
+  /** Hỏi sổ: dự án nào vừa tự tweet CA (30 ngày qua). */
+  async function loadCaMoi() {
+    const handles = state.db ? state.db.people.filter((p) => p.project && p.username).map((p) => p.username) : [];
+    if (!handles.length) return;
+    try {
+      state.caMoi = (await chrome.runtime.sendMessage({ type: KT.MSG.LEDGER_LATEST, handles })) || {};
+    } catch (e) {
+      state.caMoi = {};
+    }
+  }
+
+  function syncTabs() {
+    el.tabs.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === state.tab)));
+    el.q.placeholder = state.tab === "duan" ? "Lọc dự án theo tên hoặc loại…" : "Handle, tên, hoặc token…";
+  }
+
   function render() {
     const q = el.q.value.trim();
     const db = state.db;
+    syncTabs();
 
     if (state.detailRef && db) {
       const person = KT.findPerson(db, state.detailRef);
@@ -70,8 +147,11 @@
       return;
     }
 
+    if (state.tab === "duan") return renderDuAn(q);
+
     if (!q) {
-      const top = db.people.filter((p) => !p.ghost).slice(0, 8);
+      // Tab Người: dự án không lẫn vào danh sách người call.
+      const top = db.people.filter((p) => !p.ghost && !p.project).slice(0, 8);
       el.content.innerHTML =
         `<div class="kt-sec-title">Hạng cao nhất</div>` + top.map((p) => KT.render.personRow(p)).join("");
       KT.render.hydrateAvatars(el.content);
@@ -86,6 +166,19 @@
     KT.render.hydrateAvatars(el.content);
     renderFoot();
   }
+
+  el.tabs.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-tab]");
+    if (!b) return;
+    state.tab = b.dataset.tab;
+    state.detailRef = null;
+    try {
+      localStorage.setItem("kt-tab", state.tab);
+    } catch (e) {
+      /* không nhớ được thì thôi */
+    }
+    render();
+  });
 
   el.q.addEventListener("input", () => {
     state.detailRef = null;
@@ -106,7 +199,7 @@
         return;
       }
       if (act === "note") {
-        return renderFoot("Ghi chú thì làm trên trang GMGN: hover một người rồi bấm N.");
+        return renderFoot("Ghi chú: trên GMGN hover một người rồi bấm N; trên X bấm nút Ghi chú ở trang hồ sơ.");
       }
       if (act === "copy") {
         await navigator.clipboard.writeText(actEl.dataset.value || "");
@@ -200,5 +293,9 @@
 
   await load();
   render();
+  // Tra "dự án nào vừa đăng CA" chạy SAU lần vẽ đầu — popup phải mở ngay.
+  loadCaMoi().then(() => {
+    if (state.tab === "duan" && !state.detailRef) render();
+  });
   el.q.focus();
 })();

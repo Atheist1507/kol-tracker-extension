@@ -478,7 +478,9 @@
    * Luật cũ của repo: đo cột thật trước, đừng đoán tên cột rồi lấy kết quả
    * rỗng làm bằng chứng.
    */
-  const PROBE_RE = /token_mcap_candles|tg_calls\/klines|discord_calls\/klines|twitter\/token\/search|tokens\/top_buyers|token_holders\//;
+  // + wallet_token_info (30/09/2026): thông tin một ví với một token — cần cho
+  // "Khám nghiệm" (số token ví đó giao dịch, thời gian giữ, có giờ mua không).
+  const PROBE_RE = /token_mcap_candles|tg_calls\/klines|discord_calls\/klines|twitter\/token\/search|tokens\/top_buyers|token_holders\/|wallet_token_info/;
 
   /**
    * Mẫu soi của một response: mảng dữ liệu chính nằm ở đâu, bao nhiêu dòng,

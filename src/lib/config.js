@@ -60,6 +60,8 @@
     LEDGER_PERSON: "kt:ledgerPerson", // { handle, wallet } → { summary, parts }
     LEDGER_TOKEN_GET: "kt:ledgerTokenGet", // { tokenKey } → { createdAt } | null
     LEDGER_STATS: "kt:ledgerStats", // Chẩn đoán
+    LEDGER_TWEETERS: "kt:ledgerTweeters", // { tokenKey } → [{handle, calledAt, tweetId}] ai TỰ đăng CA này
+    LEDGER_LATEST: "kt:ledgerLatest", // { handles } → { handle: tweet có CA gần nhất (30 ngày) }
   };
 
   /**
@@ -70,6 +72,7 @@
    */
   const CONTENT_FILES = [
     "src/lib/normalize.js",
+    "src/lib/project.js",
     "src/lib/csv.js",
     "src/lib/tier.js",
     "src/lib/stats.js",

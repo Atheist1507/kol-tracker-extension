@@ -203,6 +203,16 @@ CA trên X — không cần bấm N. Sổ nằm trong trình duyệt (IndexedDB)
 
 Đây mới là **số liệu**, chưa có nhãn tự động ("call bừa", "nghi bot"…) — nhãn cần vài tuần dữ liệu thật.
 
+### Theo dõi dự án (chưa có token)
+
+Trên X, vào trang hồ sơ của dự án → **Ghi chú** → chọn **Dự án** → chọn loại và chấm 5 câu (có / ? / không):
+ship thật · người dùng thật · team kiểm chứng được · builder để ý · cộng đồng bàn sản phẩm. Mỗi lần kiểm là
+một dòng trong Sheet (mở đầu bằng `[Dự án]`), lần sau mở lại đã điền sẵn — chỉ sửa chỗ thay đổi.
+
+- Pill trên X: `◆ 3/5`. Khi **chính dự án đăng CA**, pill đổi thành **`◆ đăng CA`**.
+- Trên GMGN: mở chart một token mà dự án đang theo dõi đã tự đăng CA → panel hiện một dòng báo.
+- **Popup của extension** có 2 tab **Người / Dự án**. Tab Dự án xếp: vừa đăng CA → cần kiểm lại (quá 7 ngày) → điểm cao.
+
 ## 4. Overlay trên chart (Mức 2)
 
 Mục tiêu cuối của spec: avatar nào có trong database thì **tự có viền màu theo tier ngay trên chart**,

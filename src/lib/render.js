@@ -200,7 +200,7 @@
               n.addedBy ? " · " + esc(n.addedBy) : ""
             }</span>
           </div>
-          <div class="kt-note-body">${esc(n.note || "—")}</div>
+          <div class="kt-note-body">${esc(KT.project ? KT.project.displayNote(n.note) || "—" : n.note || "—")}</div>
           ${n.postText ? `<div class="kt-note-post">“${esc(n.postText)}”</div>` : ""}
           ${meta && meta !== n.token ? `<div class="kt-sub">${esc(meta)}</div>` : ""}
         </div>`;

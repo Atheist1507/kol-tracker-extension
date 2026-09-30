@@ -7,6 +7,7 @@
  */
 importScripts(
   "../src/lib/normalize.js",
+  "../src/lib/project.js",
   "../src/lib/csv.js",
   "../src/lib/tier.js",
   "../src/lib/stats.js",
@@ -573,6 +574,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (t) => sendResponse(t ? { createdAt: t.createdAt, key: t.key } : null),
       () => sendResponse(null)
     );
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_TWEETERS) {
+    KT.ledgerStore.tweetersOfToken(msg.tokenKey).then(sendResponse, () => sendResponse([]));
+    return true;
+  }
+  if (msg.type === KT.MSG.LEDGER_LATEST) {
+    KT.ledgerStore.latestTweetCalls(msg.handles, Date.now(), 30).then(sendResponse, () => sendResponse({}));
     return true;
   }
   if (msg.type === KT.MSG.LEDGER_STATS) {
